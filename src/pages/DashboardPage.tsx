@@ -114,6 +114,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<'activation' | 'rent'>('activation');
+  const [rentDuration, setRentDuration] = useState<'4hours' | '1day' | '1week' | '1month'>('4hours');
   const [currentStep, setCurrentStep] = useState<Step>('service');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
@@ -416,12 +417,23 @@ export default function DashboardPage() {
     if (!selectedService || !selectedCountry || !user?.id) return;
 
     try {
-      console.log('🚀 [ACTIVATE] Début achat:', {
+      const isRent = mode === 'rent';
+      const priceMultiplier = isRent ? (
+        rentDuration === '4hours' ? 1 :
+        rentDuration === '1day' ? 3 :
+        rentDuration === '1week' ? 15 : 50
+      ) : 1;
+      const finalPrice = Math.ceil(selectedCountry.price * priceMultiplier);
+
+      console.log(`🚀 [${isRent ? 'RENT' : 'ACTIVATE'}] Début achat:`, {
+        mode,
+        duration: isRent ? rentDuration : 'N/A',
         service: selectedService.code || selectedService.name,
         serviceCode: selectedService.code,
         country: selectedCountry.name,
         countryCode: selectedCountry.code,
-        price: selectedCountry.price,
+        basePrice: selectedCountry.price,
+        finalPrice,
         userId: user.id
       });
 
@@ -432,53 +444,54 @@ export default function DashboardPage() {
         .eq('id', user.id)
         .single();
 
-      if (!userData || userData.balance < selectedCountry.price) {
+      if (!userData || userData.balance < finalPrice) {
         toast({
           title: 'Solde insuffisant',
-          description: `Besoin de ${selectedCountry.price}Ⓐ, disponible: ${userData?.balance || 0}Ⓐ`,
+          description: `Besoin de ${finalPrice}Ⓐ, disponible: ${userData?.balance || 0}Ⓐ`,
           variant: 'destructive'
         });
         return;
       }
 
       // SMS-Activate gère automatiquement la sélection d'opérateur
-      // Pas besoin de sélection manuelle comme avec 5sim
-      console.log('🔍 [ACTIVATE] SMS-Activate sélectionnera automatiquement le meilleur opérateur');
+      console.log(`🔍 [${isRent ? 'RENT' : 'ACTIVATE'}] SMS-Activate sélectionnera automatiquement le meilleur opérateur`);
       
-      // Acheter le numéro via Edge Function
+      // Préparer le body selon le mode
       const requestBody = {
         country: selectedCountry.code,
         operator: 'any', // SMS-Activate choisit automatiquement le meilleur
         product: selectedService.code || selectedService.name.toLowerCase(),
-        userId: user.id
+        userId: user.id,
+        ...(isRent && { duration: rentDuration })
       };
       
-      console.log('📤 [ACTIVATE] Envoi à buy-sms-activate-number:', requestBody);
+      const functionName = isRent ? 'buy-sms-activate-rent' : 'buy-sms-activate-number';
+      console.log(`📤 [${isRent ? 'RENT' : 'ACTIVATE'}] Envoi à ${functionName}:`, requestBody);
       
-      const { data: buyData, error: buyError } = await supabase.functions.invoke('buy-sms-activate-number', {
+      const { data: buyData, error: buyError } = await supabase.functions.invoke(functionName, {
         body: requestBody
       });
 
-      console.log('📥 [ACTIVATE] Réponse:', { buyData, buyError });
+      console.log(`📥 [${isRent ? 'RENT' : 'ACTIVATE'}] Réponse:`, { buyData, buyError });
 
       if (buyError || !buyData?.success) {
-        console.error('❌ [ACTIVATE] Erreur détaillée:', { buyError, buyData });
+        console.error(`❌ [${isRent ? 'RENT' : 'ACTIVATE'}] Erreur détaillée:`, { buyError, buyData });
         
         // Essayer de récupérer le message d'erreur depuis la réponse HTTP
         if (buyError && 'context' in buyError) {
           const context = (buyError as any).context;
-          console.error('❌ [ACTIVATE] Context:', context);
+          console.error(`❌ [${isRent ? 'RENT' : 'ACTIVATE'}] Context:`, context);
           
           // Lire le body de la réponse pour avoir le message d'erreur
           if (context && typeof context.text === 'function') {
             try {
               const errorText = await context.text();
-              console.error('❌ [ACTIVATE] Error body:', errorText);
+              console.error(`❌ [${isRent ? 'RENT' : 'ACTIVATE'}] Error body:`, errorText);
               const errorJson = JSON.parse(errorText);
-              console.error('❌ [ACTIVATE] Error JSON:', errorJson);
+              console.error(`❌ [${isRent ? 'RENT' : 'ACTIVATE'}] Error JSON:`, errorJson);
               throw new Error(errorJson.error || errorJson.message || 'Achat échoué');
             } catch (e) {
-              console.error('❌ [ACTIVATE] Failed to parse error:', e);
+              console.error(`❌ [${isRent ? 'RENT' : 'ACTIVATE'}] Failed to parse error:`, e);
             }
           }
         }
@@ -486,36 +499,35 @@ export default function DashboardPage() {
         throw new Error(buyData?.error || buyData?.details || buyError?.message || 'Achat échoué');
       }
 
-      console.log('✅ [ACTIVATE] Numéro acheté:', buyData.data);
+      console.log(`✅ [${isRent ? 'RENT' : 'ACTIVATE'}] Numéro acheté:`, buyData.data);
 
       // Recharger les activations depuis la DB
-      // Le useEffect va automatiquement mettre à jour le state avec les données fraîches
       refetchActivations();
       
-      // Vérifier IMMÉDIATEMENT si le SMS est déjà arrivé (détection instantanée)
-      console.log('🚀 [ACTIVATE] Vérification immédiate du SMS...');
-      setTimeout(async () => {
-        try {
-          await supabase.functions.invoke('check-sms-activate-status', {
-            body: {
-              activationId: buyData.data.activation_id,
-              userId: user?.id
-            }
-          });
-          // Recharger après vérification
-          refetchActivations();
-          console.log('✅ [ACTIVATE] Vérification immédiate terminée');
-        } catch (e) {
-          console.error('⚠️ [ACTIVATE] Erreur vérification immédiate:', e);
-        }
-      }, 1000); // Attendre 1 seconde que l'activation soit bien en DB
-      
-      // NE PAS changer l'étape - permettre d'acheter plusieurs numéros
-      // setCurrentStep('active');
+      if (!isRent) {
+        // Pour activation: Vérifier IMMÉDIATEMENT si le SMS est déjà arrivé
+        console.log('🚀 [ACTIVATE] Vérification immédiate du SMS...');
+        setTimeout(async () => {
+          try {
+            await supabase.functions.invoke('check-sms-activate-status', {
+              body: {
+                activationId: buyData.data.activation_id,
+                userId: user?.id
+              }
+            });
+            refetchActivations();
+            console.log('✅ [ACTIVATE] Vérification immédiate terminée');
+          } catch (e) {
+            console.error('⚠️ [ACTIVATE] Erreur vérification immédiate:', e);
+          }
+        }, 1000);
+      }
 
       toast({
-        title: 'Numéro activé !',
-        description: `${buyData.data.phone} - En attente du SMS...`,
+        title: isRent ? 'Numéro loué !' : 'Numéro activé !',
+        description: isRent 
+          ? `${buyData.data.phone} - Disponible pour ${rentDuration}`
+          : `${buyData.data.phone} - En attente du SMS...`,
       });
 
       // Réinitialiser la sélection pour permettre un nouvel achat
@@ -524,9 +536,9 @@ export default function DashboardPage() {
       setCurrentStep('service');
 
     } catch (error: any) {
-      console.error('❌ [ACTIVATE] Exception:', error);
+      console.error(`❌ [${mode === 'rent' ? 'RENT' : 'ACTIVATE'}] Exception:`, error);
       toast({
-        title: 'Activation échouée',
+        title: mode === 'rent' ? 'Location échouée' : 'Activation échouée',
         description: error.message || 'Erreur inconnue',
         variant: 'destructive'
       });
@@ -620,16 +632,25 @@ export default function DashboardPage() {
           {/* Mode Toggle */}
           <div className="flex bg-gray-100 rounded-full p-1 mb-5">
             <button
-              className="flex-1 py-2 text-sm font-semibold rounded-full transition-all bg-white text-gray-900 shadow-sm"
+              onClick={() => setMode('activation')}
+              className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
+                mode === 'activation'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
               Activation
             </button>
-            <Link
-              to="/rent"
-              className="flex-1 py-2 text-sm font-semibold rounded-full transition-all text-gray-600 hover:text-gray-900 text-center"
+            <button
+              onClick={() => setMode('rent')}
+              className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
+                mode === 'rent'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
               Rent
-            </Link>
+            </button>
           </div>
 
           {/* STEP 1: Service Selection */}
@@ -844,19 +865,59 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
+                  {/* Rent Duration Selector */}
+                  {mode === 'rent' && (
+                    <div className="mb-6">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">DURATION</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: '4hours' as const, label: '4 Hours', price: selectedCountry.price * 1 },
+                          { value: '1day' as const, label: '1 Day', price: selectedCountry.price * 3 },
+                          { value: '1week' as const, label: '1 Week', price: selectedCountry.price * 15 },
+                          { value: '1month' as const, label: '1 Month', price: selectedCountry.price * 50 }
+                        ].map(option => (
+                          <button
+                            key={option.value}
+                            onClick={() => setRentDuration(option.value)}
+                            className={`p-3 rounded-lg border-2 transition-all ${
+                              rentDuration === option.value
+                                ? 'border-blue-600 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="text-sm font-semibold text-gray-900">{option.label}</div>
+                            <div className="text-lg font-bold text-blue-600">{Math.ceil(option.price)} Ⓐ</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <Button 
                     onClick={handleActivate}
                     className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-2xl flex items-center justify-between px-6"
                   >
-                    <span>Activate</span>
+                    <span>{mode === 'rent' ? 'Rent' : 'Activate'}</span>
                     <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-lg">
-                      <span className="text-2xl">{Math.floor(selectedCountry.price)}</span>
+                      <span className="text-2xl">
+                        {mode === 'rent' 
+                          ? Math.ceil(selectedCountry.price * (
+                              rentDuration === '4hours' ? 1 :
+                              rentDuration === '1day' ? 3 :
+                              rentDuration === '1week' ? 15 : 50
+                            ))
+                          : Math.floor(selectedCountry.price)
+                        }
+                      </span>
                       <span className="text-sm">Ⓐ</span>
                     </div>
                   </Button>
 
                   <p className="text-center text-sm text-gray-500 mt-4">
-                    If the number does not receive an SMS, the funds will be returned to the balance
+                    {mode === 'rent' 
+                      ? 'The number will be available for the selected duration and can receive multiple SMS'
+                      : 'If the number does not receive an SMS, the funds will be returned to the balance'
+                    }
                   </p>
                 </>
               )}
