@@ -32,35 +32,58 @@ serve(async (req) => {
       )
     }
     
-    console.log(`🌍 [COUNTRY-AVAILABILITY] Checking availability for ${service} across ${countries?.length || 0} countries`)
+    console.log(`🌍 [COUNTRY-AVAILABILITY] Checking availability for ${service} across ${countries?.length || 'ALL'} countries`)
     
-    // Country ID to code mapping
-    const countryMap: Record<number, { code: string, name: string }> = {
-      187: { code: 'usa', name: 'United States' },
-      4: { code: 'philippines', name: 'Philippines' },
-      6: { code: 'indonesia', name: 'Indonesia' },
-      22: { code: 'india', name: 'India' },
-      12: { code: 'england', name: 'England' },
-      0: { code: 'russia', name: 'Russia' },
-      2: { code: 'kazakhstan', name: 'Kazakhstan' },
-      36: { code: 'canada', name: 'Canada' },
-      78: { code: 'france', name: 'France' },
-      43: { code: 'germany', name: 'Germany' },
-      52: { code: 'thailand', name: 'Thailand' },
-      10: { code: 'vietnam', name: 'Vietnam' },
-      15: { code: 'poland', name: 'Poland' },
-      73: { code: 'brazil', name: 'Brazil' },
-      82: { code: 'mexico', name: 'Mexico' }
+    // Récupérer TOUS les pays depuis l'API pour avoir le mapping ID -> nom
+    console.log('🔍 [COUNTRY-AVAILABILITY] Fetching all countries metadata...')
+    const countriesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getCountries`
+    const countriesResponse = await fetch(countriesUrl)
+    
+    if (!countriesResponse.ok) {
+      throw new Error(`Failed to fetch countries: ${countriesResponse.status}`)
     }
     
-    // Default top countries si non spécifié
-    const countriesToCheck = countries && countries.length > 0 
-      ? countries 
-      : [187, 4, 6, 22, 12, 36, 78, 43, 52, 10]
+    const allCountriesData = await countriesResponse.json()
     
-    // Scanner tous les pays en parallèle
-    const results = await Promise.all(
-      countriesToCheck.map(async (countryId: number) => {
+    // Construire le mapping ID -> {code, name} dynamiquement
+    const countryMap: Record<number, { code: string, name: string }> = {}
+    Object.entries(allCountriesData).forEach(([id, country]: [string, any]) => {
+      countryMap[parseInt(id)] = {
+        code: country.eng.toLowerCase().replace(/\s+/g, '_'),
+        name: country.eng
+      }
+    })
+    
+    console.log(`✅ [COUNTRY-AVAILABILITY] Loaded ${Object.keys(countryMap).length} countries metadata`)
+    
+    // Si aucun pays spécifié, vérifier TOUS les pays visibles
+    let countriesToCheck: number[] = []
+    
+    if (countries && countries.length > 0) {
+      countriesToCheck = countries
+    } else {
+      // Extraire les IDs de tous les pays visibles
+      countriesToCheck = Object.entries(allCountriesData)
+        .filter(([_, country]: [string, any]) => country.visible === 1)
+        .map(([id, _]: [string, any]) => parseInt(id))
+      
+      console.log(`📊 [COUNTRY-AVAILABILITY] Will check ${countriesToCheck.length} visible countries`)
+    }
+    
+    console.log(`🔎 [COUNTRY-AVAILABILITY] Checking ${countriesToCheck.length} countries for service ${service}`)
+    
+    // Scanner tous les pays en parallèle (par batches pour éviter rate limiting)
+    const batchSize = 20
+    const batches: number[][] = []
+    for (let i = 0; i < countriesToCheck.length; i += batchSize) {
+      batches.push(countriesToCheck.slice(i, i + batchSize))
+    }
+    
+    const results: (CountryAvailability | null)[] = []
+    
+    for (const batch of batches) {
+      const batchResults = await Promise.all(
+        batch.map(async (countryId: number) => {
         try {
           const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=${countryId}`
           const response = await fetch(url)
@@ -97,7 +120,15 @@ serve(async (req) => {
           return null
         }
       })
-    )
+      )
+      
+      results.push(...batchResults)
+      
+      // Petit délai entre les batches pour éviter rate limiting
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
     
     // Filtrer les résultats valides et trier par disponibilité
     const availability = results

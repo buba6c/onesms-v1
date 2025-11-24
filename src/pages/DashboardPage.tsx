@@ -286,13 +286,12 @@ export default function DashboardPage() {
       );
       
       // 3️⃣ Appeler Edge Function pour obtenir les VRAIES quantités par pays
-      const topCountryIds = [187, 4, 6, 22, 12, 36, 78, 43, 52, 10]; // Top 10 pays
+      // ✅ NE PAS spécifier de pays -> récupérer TOUS les pays disponibles
       
       try {
         const { data: availabilityData, error } = await supabase.functions.invoke('get-country-availability', {
           body: { 
-            service: apiServiceCode, // ✅ Utiliser le code court de l'API
-            countries: topCountryIds
+            service: apiServiceCode // ✅ Sans countries -> scan ALL visible countries
           }
         });
         
