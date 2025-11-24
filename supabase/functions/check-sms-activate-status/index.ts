@@ -53,7 +53,63 @@ serve(async (req) => {
     let smsText = null
     let newStatus = activation.status
 
-    // Try parsing as JSON first (V2 format)
+    // Check for plain text responses first (STATUS_CANCEL, STATUS_WAIT_CODE, etc.)
+    if (responseText === 'STATUS_CANCEL' || responseText.startsWith('STATUS_CANCEL')) {
+      console.log('❌ [CHECK-SMS-ACTIVATE] Activation cancelled by SMS-Activate')
+
+      await supabaseClient
+        .from('activations')
+        .update({ status: 'cancelled' })
+        .eq('id', activationId)
+
+      // Refund user (unfreeze balance)
+      const { data: transaction } = await supabaseClient
+        .from('transactions')
+        .select('*')
+        .eq('related_activation_id', activationId)
+        .eq('status', 'pending')
+        .single()
+
+      if (transaction) {
+        await supabaseClient
+          .from('transactions')
+          .update({ status: 'refunded' })
+          .eq('id', transaction.id)
+
+        const { data: user } = await supabaseClient
+          .from('users')
+          .select('frozen_balance')
+          .eq('id', activation.user_id)
+          .single()
+
+        if (user) {
+          const newFrozenBalance = Math.max(0, user.frozen_balance - activation.price)
+          await supabaseClient
+            .from('users')
+            .update({ frozen_balance: newFrozenBalance })
+            .eq('id', activation.user_id)
+
+          console.log('💰 [CHECK-SMS-ACTIVATE] Refunded:', activation.price)
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            status: 'cancelled',
+            sms_code: null,
+            sms_text: null
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+
+    // Try parsing as JSON (V2 format for active activations)
     try {
       const jsonResponse = JSON.parse(responseText)
       
