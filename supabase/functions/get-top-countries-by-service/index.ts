@@ -116,8 +116,19 @@ serve(async (req) => {
       const successRate = stats?.rate || null
       const rank = parseInt(index) + 1
       const count = countryData.count || 0
-      const price = countryData.price || 0
-      const retailPrice = countryData.retail_price || price
+      
+      // 💵 CONVERSION AUTOMATIQUE DES PRIX
+      // Prix SMS-Activate en $ → FCFA → Pièces (Ⓐ)
+      const priceUSD = countryData.price || 0
+      const USD_TO_FCFA = 600  // 1$ = 600 FCFA
+      const FCFA_TO_COINS = 100  // 1Ⓐ = 100 FCFA
+      const MARGIN = 1.3  // +30% marge
+      
+      // Calcul: $0.50 × 600 = 300 FCFA ÷ 100 = 3Ⓐ × 1.3 = 3.9Ⓐ
+      const priceFCFA = priceUSD * USD_TO_FCFA
+      const priceCoins = (priceFCFA / FCFA_TO_COINS) * MARGIN
+      const price = Math.ceil(priceCoins)  // Arrondir au supérieur
+      const retailPrice = price
       
       // Calcul du score composite
       // ✅ CORRECTION: Utiliser UNIQUEMENT ranking + disponibilité + prix
@@ -148,7 +159,7 @@ serve(async (req) => {
     
     console.log(`🏆 [TOP-COUNTRIES] Top 5 by composite score:`)
     topCountries.slice(0, 5).forEach((c, i) => {
-      console.log(`   ${i + 1}. ${c.countryName} - Score: ${c.compositeScore.toFixed(1)} (Success: ${c.successRate}%, Share: ${c.share}%, Count: ${c.count}, Rank: ${c.rank})`)
+      console.log(`   ${i + 1}. ${c.countryName} - Score: ${c.compositeScore.toFixed(1)} (Price: ${c.price}Ⓐ, Count: ${c.count}, Rank: ${c.rank})`)
     })
     
     return new Response(

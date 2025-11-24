@@ -793,14 +793,7 @@ export default function DashboardPage() {
                             <span className="text-2xl hidden items-center justify-center">{getFlagEmoji(country.name)}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-bold text-sm text-gray-900 truncate">{country.name}</p>
-                              {country.successRate && (
-                                <span className={`${getSuccessRateBadge(country.successRate).bg} ${getSuccessRateBadge(country.successRate).text} px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0`}>
-                                  {country.successRate}%
-                                </span>
-                              )}
-                            </div>
+                            <p className="font-bold text-sm text-gray-900 truncate">{country.name}</p>
                             <p className="text-xs text-green-600 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                               {country.count.toLocaleString()} numbers
