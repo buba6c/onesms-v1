@@ -1,0 +1,37 @@
+name: Sync Countries
+
+on:
+  schedule:
+    # Toutes les heures
+    - cron: '0 * * * *'
+  workflow_dispatch: # Permet déclenchement manuel
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync-countries Edge Function
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-countries' \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          
+          http_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "❌ Sync countries failed with status $http_code"
+            exit 1
+          fi
+          
+          echo "✅ Countries synchronized successfully"
+      
+      - name: Parse and display stats
+        run: |
+          echo "📊 Countries synchronized"
+          echo "🔄 Next sync in 1 hour"
