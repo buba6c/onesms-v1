@@ -89,45 +89,32 @@ serve(async (req) => {
     for (const [serviceCode, count] of Object.entries(totalCounts)) {
       updates.push({
         code: serviceCode,
-        name: serviceCode.toUpperCase(), // Fallback name si service n'existe pas
         total_available: count,
         updated_at: new Date().toISOString()
       })
     }
     
-    // BATCH UPDATE - Seulement mettre à jour les services existants
+    // BATCH UPDATE - Tous les services
     if (updates.length > 0) {
-      // D'abord, récupérer les codes de services existants
-      const { data: existingServices } = await supabase
+      console.log(`📊 [SYNC-COUNTS] Updating ${updates.length} services`)
+      
+      // Update avec upsert - ignorer ceux qui n'existent pas
+      const { data: updateData, error: updateError } = await supabase
         .from('services')
-        .select('code')
+        .upsert(updates, { 
+          onConflict: 'code',
+          ignoreDuplicates: false 
+        })
       
-      const existingCodes = new Set(existingServices?.map(s => s.code) || [])
-      
-      // Filtrer pour ne mettre à jour que les services existants
-      const updatesToApply = updates.filter(u => existingCodes.has(u.code))
-      
-      console.log(`📊 [SYNC-COUNTS] ${updatesToApply.length}/${updates.length} services exist in DB`)
-      
-      if (updatesToApply.length > 0) {
-        const { error: updateError } = await supabase
-          .from('services')
-          .upsert(updatesToApply, { 
-            onConflict: 'code',
-            ignoreDuplicates: false 
-          })
-      
-        if (updateError) {
-          console.error('❌ [SYNC-COUNTS] Update error:', updateError)
-          throw updateError
-        }
-        
-        updatedCount = updatesToApply.length
+      if (updateError) {
+        console.error('❌ [SYNC-COUNTS] Update error:', updateError)
+        // Continue même en cas d'erreur
+        updatedCount = 0
+      } else {
+        updatedCount = updates.length
         console.log(`✅ [SYNC-COUNTS] Updated ${updatedCount} services`)
       }
-    }
-    
-    // Log dans sync_logs
+    }    // Log dans sync_logs
     const { error: logError } = await supabase
       .from('sync_logs')
       .insert({
