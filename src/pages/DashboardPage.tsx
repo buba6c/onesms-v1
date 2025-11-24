@@ -332,8 +332,8 @@ export default function DashboardPage() {
               code: c.countryCode,
               flag: getFlagEmoji(c.countryCode),
               successRate: Number(finalSuccessRate.toFixed(1)),
-              count: c.coinsCount || Math.floor(c.price * 50), // ✅ Nombre de pièces (prix × 50)
-              price: Number(finalPrice.toFixed(2)),
+              count: c.count, // ✅ Nombre de numéros disponibles chez SMS-Activate
+              price: Number(finalPrice.toFixed(2)), // Prix en pièces (Ⓐ)
               compositeScore: c.compositeScore, // Score de tri intelligent
               rank: c.rank, // Position dans le classement SMS-Activate
               share: c.share // Part de marché
@@ -803,7 +803,7 @@ export default function DashboardPage() {
                             </div>
                             <p className="text-xs text-green-600 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                              {country.count.toLocaleString()} pièces
+                              {country.count.toLocaleString()} numbers
                             </p>
                           </div>
                         </div>
@@ -843,7 +843,7 @@ export default function DashboardPage() {
                       <p className="font-bold text-base text-gray-900">{selectedCountry.name}</p>
                       <p className="text-sm text-green-600 flex items-center gap-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        {selectedCountry.count.toLocaleString()} pièces
+                        {selectedCountry.count.toLocaleString()} numbers
                       </p>
                     </div>
                     <button onClick={() => setCurrentStep('country')} className="p-2 hover:bg-gray-200 rounded-full transition-all">

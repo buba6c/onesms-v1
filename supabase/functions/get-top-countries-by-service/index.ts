@@ -119,9 +119,6 @@ serve(async (req) => {
       const price = countryData.price || 0
       const retailPrice = countryData.retail_price || price
       
-      // Calculer le nombre de pièces (prix × 50) pour l'affichage
-      const coinsCount = Math.floor(price * 50)
-      
       // Calcul du score composite
       // ✅ CORRECTION: Utiliser UNIQUEMENT ranking + disponibilité + prix
       // Le success rate et share de getListOfTopCountriesByService ne matchent pas avec getTopCountriesByServiceRank
@@ -136,9 +133,8 @@ serve(async (req) => {
         countryId,
         countryCode: countryInfo.code,
         countryName: countryInfo.name,
-        count,  // Quantité de numéros disponibles
-        coinsCount,  // Nombre de pièces calculé (prix × 50)
-        price,
+        count,  // Quantité de numéros disponibles chez SMS-Activate
+        price,  // Prix en pièces (Ⓐ)
         retailPrice,
         share,
         successRate,
