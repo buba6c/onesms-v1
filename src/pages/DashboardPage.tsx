@@ -929,7 +929,54 @@ export default function DashboardPage() {
       {/* Main Content - Active Numbers */}
       <main className="flex-1 overflow-y-auto bg-white">
         <div className="p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Active numbers</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Active numbers</h2>
+            
+            {/* Sync Button - Pour récupérer les SMS manqués */}
+            {activeNumbers.length > 0 && (
+              <Button
+                onClick={async () => {
+                  try {
+                    toast({
+                      title: '🔄 Synchronisation...',
+                      description: 'Vérification des SMS sur SMS-Activate',
+                    });
+                    
+                    const { data, error } = await supabase.functions.invoke('sync-sms-activate-activations');
+                    
+                    if (error) throw error;
+                    
+                    if (data.updated > 0) {
+                      toast({
+                        title: '✅ SMS Récupéré !',
+                        description: `${data.updated} SMS trouvé(s)`,
+                      });
+                      refetchActivations();
+                    } else {
+                      toast({
+                        title: '⏳ Aucun nouveau SMS',
+                        description: `${data.synced} activation(s) vérifiée(s)`,
+                      });
+                    }
+                  } catch (error: any) {
+                    toast({
+                      title: 'Erreur de synchronisation',
+                      description: error.message,
+                      variant: 'destructive'
+                    });
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync SMS
+              </Button>
+            )}
+          </div>
 
           {activeNumbers.length === 0 ? (
             <div className="text-center py-16">
