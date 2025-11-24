@@ -240,6 +240,30 @@ export default function DashboardPage() {
       
       console.log('🌐 [LIVE] Chargement pays avec quantités réelles...');
       
+      // Mapper les codes longs vers les codes courts de l'API SMS-Activate
+      const serviceCodeMapping: Record<string, string> = {
+        'whatsapp': 'wa',
+        'telegram': 'tg',
+        'facebook': 'fb',
+        'instagram': 'ig',
+        'google': 'go',
+        'twitter': 'tw',
+        'discord': 'dr',
+        'uber': 'uk',
+        'netflix': 'ne',
+        'spotify': 'sp',
+        'tiktok': 'ti',
+        'linkedin': 'li',
+        'amazon': 'am',
+        'paypal': 'pm',
+        'microsoft': 'microsoft'
+      };
+      
+      // Utiliser le code court si disponible, sinon le code original
+      const apiServiceCode = serviceCodeMapping[selectedService.code.toLowerCase()] || selectedService.code;
+      
+      console.log(`📝 [LIVE] Service: ${selectedService.code} → API code: ${apiServiceCode}`);
+      
       // 1️⃣ Récupérer les prix depuis pricing_rules (notre marge 20%)
       const { data: pricingData } = await supabase
         .from('pricing_rules')
@@ -267,7 +291,7 @@ export default function DashboardPage() {
       try {
         const { data: availabilityData, error } = await supabase.functions.invoke('get-country-availability', {
           body: { 
-            service: selectedService.code,
+            service: apiServiceCode, // ✅ Utiliser le code court de l'API
             countries: topCountryIds
           }
         });
