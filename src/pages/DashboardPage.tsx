@@ -312,26 +312,24 @@ export default function DashboardPage() {
         
         // 4️⃣ Mapper vers le format Country avec tri intelligent SMS-Activate
         const mapped = countries
-          .filter((c: any) => c.count > 0) // Seulement pays disponibles
+          .filter((c: any) => c.count > 0 && c.price > 0) // ✅ Filtrer pays avec stock ET prix valide
           .map((c: any) => {
-            // Utiliser notre prix ou celui de SMS-Activate
-            const ourPrice = priceMap.get(c.countryCode.toLowerCase());
-            const smsActivatePrice = c.price || 1.0;
-            const finalPrice = ourPrice || smsActivatePrice;
+            // Utiliser directement le prix SMS-Activate (plus fiable et toujours à jour)
+            const finalPrice = c.price;
             
-            // ✅ CORRECTION: Utiliser notre DB en priorité pour success rate
+            // ✅ Success rate : Utiliser notre DB si disponible, sinon ne pas afficher
             const ourSuccessRate = successRateMap.get(c.countryCode.toLowerCase());
             const smsActivateSuccessRate = c.successRate; // Peut être null
             
-            // Priorité: Notre DB (plus fiable) > SMS-Activate (peut être null) > 95% par défaut
-            const finalSuccessRate = ourSuccessRate || smsActivateSuccessRate || 95;
+            // Priorité: Notre DB > SMS-Activate > null (pas de badge si pas de données)
+            const finalSuccessRate = ourSuccessRate || smsActivateSuccessRate || null;
             
             return {
               id: c.countryId.toString(),
               name: c.countryName,
               code: c.countryCode,
               flag: getFlagEmoji(c.countryCode),
-              successRate: Number(finalSuccessRate.toFixed(1)),
+              successRate: finalSuccessRate ? Number(finalSuccessRate.toFixed(1)) : null,
               count: c.count, // ✅ Nombre de numéros disponibles chez SMS-Activate
               price: Number(finalPrice.toFixed(2)), // Prix en pièces (Ⓐ)
               compositeScore: c.compositeScore, // Score de tri intelligent
@@ -797,9 +795,11 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="font-bold text-sm text-gray-900 truncate">{country.name}</p>
-                              <span className={`${getSuccessRateBadge(country.successRate).bg} ${getSuccessRateBadge(country.successRate).text} px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0`}>
-                                {country.successRate}%
-                              </span>
+                              {country.successRate && (
+                                <span className={`${getSuccessRateBadge(country.successRate).bg} ${getSuccessRateBadge(country.successRate).text} px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0`}>
+                                  {country.successRate}%
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs text-green-600 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
