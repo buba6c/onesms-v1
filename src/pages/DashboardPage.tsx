@@ -272,9 +272,20 @@ export default function DashboardPage() {
           }
         });
         
-        if (error) throw error;
+        if (error) {
+          console.error('❌ [LIVE] Erreur Edge Function:', error);
+          throw error;
+        }
         
-        const availability = availabilityData.availability || [];
+        console.log('📡 [LIVE] Response:', availabilityData);
+        
+        // Extraire availability (peut être dans data.availability ou directement dans data)
+        const availability = availabilityData?.availability || [];
+        
+        if (!availability || availability.length === 0) {
+          console.warn('⚠️ [LIVE] Aucun pays disponible dans la réponse');
+          throw new Error('No countries available');
+        }
         
         // 4️⃣ Mapper vers le format Country avec VRAIES quantités + prix + taux
         const mapped = availability
@@ -295,7 +306,7 @@ export default function DashboardPage() {
           });
         
         console.log('🏆 [LIVE] Top 5 pays:', mapped.slice(0, 5).map(c => 
-          `${c.name} (${c.successRate}% - ${c.count} nums - ${c.price}Ⓐ)`
+          `${c.name} (${c.successRate}% - ${c.count} nums - $${c.price})`
         ));
         
         return mapped;
