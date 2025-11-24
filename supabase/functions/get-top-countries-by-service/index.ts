@@ -118,13 +118,14 @@ serve(async (req) => {
       const retailPrice = countryData.retail_price || price
       
       // Calcul du score composite
-      // Formule: success_rate * 0.4 + share * 0.3 + availability_bonus + ranking_bonus
-      const successScore = successRate * 0.4  // 40% poids sur succès (0-40)
-      const popularityScore = share * 0.3     // 30% poids sur popularité (0-30)
+      // ✅ CORRECTION: Utiliser UNIQUEMENT ranking + disponibilité + prix
+      // Le success rate et share de getListOfTopCountriesByService ne matchent pas avec getTopCountriesByServiceRank
+      // Donc on se base sur le ranking SMS-Activate qui est plus fiable
+      const rankingScore = Math.max(0, 100 - rank)  // 100 points pour #1, 99 pour #2, etc.
       const availabilityBonus = count > 1000 ? 20 : count > 100 ? 10 : count > 0 ? 5 : 0  // 0-20 bonus
-      const rankingBonus = (50 - rank) * 0.2  // 10% poids sur position (0-10)
+      const priceBonus = price > 0 ? Math.max(0, 10 - (price * 2)) : 0  // Prix bas = bonus élevé (0-10)
       
-      const compositeScore = successScore + popularityScore + availabilityBonus + rankingBonus
+      const compositeScore = rankingScore + availabilityBonus + priceBonus
       
       topCountries.push({
         countryId,

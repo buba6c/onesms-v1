@@ -319,10 +319,13 @@ export default function DashboardPage() {
             const smsActivatePrice = c.price || 1.0;
             const finalPrice = ourPrice || smsActivatePrice;
             
-            // Utiliser le success rate de SMS-Activate ou notre fallback
-            const ourSuccessRate = successRateMap.get(c.countryCode.toLowerCase());
+            // ✅ CORRECTION: Utiliser le success rate de SMS-Activate pour cohérence avec le tri
+            // Le compositeScore utilise le success rate de SMS-Activate, donc on doit afficher le même
             const smsActivateSuccessRate = c.successRate || 95;
-            const finalSuccessRate = ourSuccessRate || smsActivateSuccessRate;
+            const ourSuccessRate = successRateMap.get(c.countryCode.toLowerCase());
+            
+            // Priorité: SMS-Activate (pour cohérence avec le tri) > Notre DB (fallback)
+            const finalSuccessRate = smsActivateSuccessRate || ourSuccessRate || 95;
             
             return {
               id: c.countryId.toString(),
