@@ -111,11 +111,16 @@ serve(async (req) => {
       const stats = statsData.find((s: any) => s.country === countryId)
       
       const share = stats?.share || 0
-      const successRate = stats?.rate || 95
+      // ✅ CORRECTION: Ne pas mettre 95% par défaut si pas de stats
+      // On laissera le frontend utiliser notre DB ou ne rien afficher
+      const successRate = stats?.rate || null
       const rank = parseInt(index) + 1
       const count = countryData.count || 0
       const price = countryData.price || 0
       const retailPrice = countryData.retail_price || price
+      
+      // Calculer le nombre de pièces (prix × 50) pour l'affichage
+      const coinsCount = Math.floor(price * 50)
       
       // Calcul du score composite
       // ✅ CORRECTION: Utiliser UNIQUEMENT ranking + disponibilité + prix
@@ -131,7 +136,8 @@ serve(async (req) => {
         countryId,
         countryCode: countryInfo.code,
         countryName: countryInfo.name,
-        count,
+        count,  // Quantité de numéros disponibles
+        coinsCount,  // Nombre de pièces calculé (prix × 50)
         price,
         retailPrice,
         share,

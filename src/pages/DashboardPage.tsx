@@ -319,13 +319,12 @@ export default function DashboardPage() {
             const smsActivatePrice = c.price || 1.0;
             const finalPrice = ourPrice || smsActivatePrice;
             
-            // ✅ CORRECTION: Utiliser le success rate de SMS-Activate pour cohérence avec le tri
-            // Le compositeScore utilise le success rate de SMS-Activate, donc on doit afficher le même
-            const smsActivateSuccessRate = c.successRate || 95;
+            // ✅ CORRECTION: Utiliser notre DB en priorité pour success rate
             const ourSuccessRate = successRateMap.get(c.countryCode.toLowerCase());
+            const smsActivateSuccessRate = c.successRate; // Peut être null
             
-            // Priorité: SMS-Activate (pour cohérence avec le tri) > Notre DB (fallback)
-            const finalSuccessRate = smsActivateSuccessRate || ourSuccessRate || 95;
+            // Priorité: Notre DB (plus fiable) > SMS-Activate (peut être null) > 95% par défaut
+            const finalSuccessRate = ourSuccessRate || smsActivateSuccessRate || 95;
             
             return {
               id: c.countryId.toString(),
@@ -333,7 +332,7 @@ export default function DashboardPage() {
               code: c.countryCode,
               flag: getFlagEmoji(c.countryCode),
               successRate: Number(finalSuccessRate.toFixed(1)),
-              count: c.count, // ✅ VRAIES quantités de SMS-Activate
+              count: c.coinsCount || Math.floor(c.price * 50), // ✅ Nombre de pièces (prix × 50)
               price: Number(finalPrice.toFixed(2)),
               compositeScore: c.compositeScore, // Score de tri intelligent
               rank: c.rank, // Position dans le classement SMS-Activate
@@ -804,7 +803,7 @@ export default function DashboardPage() {
                             </div>
                             <p className="text-xs text-green-600 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                              {country.count.toLocaleString()} numbers available
+                              {country.count.toLocaleString()} pièces
                             </p>
                           </div>
                         </div>
@@ -844,7 +843,7 @@ export default function DashboardPage() {
                       <p className="font-bold text-base text-gray-900">{selectedCountry.name}</p>
                       <p className="text-sm text-green-600 flex items-center gap-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        {selectedCountry.count.toLocaleString()} numbers available
+                        {selectedCountry.count.toLocaleString()} pièces
                       </p>
                     </div>
                     <button onClick={() => setCurrentStep('country')} className="p-2 hover:bg-gray-200 rounded-full transition-all">
