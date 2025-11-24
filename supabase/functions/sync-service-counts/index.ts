@@ -89,27 +89,42 @@ serve(async (req) => {
     for (const [serviceCode, count] of Object.entries(totalCounts)) {
       updates.push({
         code: serviceCode,
+        name: serviceCode.toUpperCase(), // Fallback name si service n'existe pas
         total_available: count,
         updated_at: new Date().toISOString()
       })
     }
     
-    // BATCH UPDATE (upsert pour créer si n'existe pas)
+    // BATCH UPDATE - Seulement mettre à jour les services existants
     if (updates.length > 0) {
-      const { error: updateError } = await supabase
+      // D'abord, récupérer les codes de services existants
+      const { data: existingServices } = await supabase
         .from('services')
-        .upsert(updates, { 
-          onConflict: 'code',
-          ignoreDuplicates: false 
-        })
+        .select('code')
       
-      if (updateError) {
-        console.error('❌ [SYNC-COUNTS] Update error:', updateError)
-        throw updateError
+      const existingCodes = new Set(existingServices?.map(s => s.code) || [])
+      
+      // Filtrer pour ne mettre à jour que les services existants
+      const updatesToApply = updates.filter(u => existingCodes.has(u.code))
+      
+      console.log(`📊 [SYNC-COUNTS] ${updatesToApply.length}/${updates.length} services exist in DB`)
+      
+      if (updatesToApply.length > 0) {
+        const { error: updateError } = await supabase
+          .from('services')
+          .upsert(updatesToApply, { 
+            onConflict: 'code',
+            ignoreDuplicates: false 
+          })
+      
+        if (updateError) {
+          console.error('❌ [SYNC-COUNTS] Update error:', updateError)
+          throw updateError
+        }
+        
+        updatedCount = updatesToApply.length
+        console.log(`✅ [SYNC-COUNTS] Updated ${updatedCount} services`)
       }
-      
-      updatedCount = updates.length
-      console.log(`✅ [SYNC-COUNTS] Updated ${updatedCount} services`)
     }
     
     // Log dans sync_logs
