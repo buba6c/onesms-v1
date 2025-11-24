@@ -285,13 +285,13 @@ export default function DashboardPage() {
         countriesData?.map(c => [c.code.toLowerCase(), c.success_rate]) || []
       );
       
-      // 3️⃣ Appeler Edge Function pour obtenir les VRAIES quantités par pays
-      // ✅ NE PAS spécifier de pays -> récupérer TOUS les pays disponibles
+      // 3️⃣ Appeler Edge Function pour obtenir les pays triés intelligemment
+      // ✅ Utilise getTopCountriesByServiceRank de SMS-Activate (tri par performance + popularité)
       
       try {
-        const { data: availabilityData, error } = await supabase.functions.invoke('get-country-availability', {
+        const { data: availabilityData, error } = await supabase.functions.invoke('get-top-countries-by-service', {
           body: { 
-            service: apiServiceCode // ✅ Sans countries -> scan ALL visible countries
+            service: apiServiceCode // ✅ Tri intelligent: success rate + popularity + availability
           }
         });
         
@@ -302,34 +302,44 @@ export default function DashboardPage() {
         
         console.log('📡 [LIVE] Response:', availabilityData);
         
-        // Extraire availability (peut être dans data.availability ou directement dans data)
-        const availability = availabilityData?.availability || [];
+        // Extraire countries (nouvelle structure avec stats SMS-Activate)
+        const countries = availabilityData?.countries || [];
         
-        if (!availability || availability.length === 0) {
+        if (!countries || countries.length === 0) {
           console.warn('⚠️ [LIVE] Aucun pays disponible dans la réponse');
           throw new Error('No countries available');
         }
         
-        // 4️⃣ Mapper vers le format Country avec VRAIES quantités + prix + taux
-        const mapped = availability
-          .filter((c: any) => c.available > 0) // Seulement pays disponibles
+        // 4️⃣ Mapper vers le format Country avec tri intelligent SMS-Activate
+        const mapped = countries
+          .filter((c: any) => c.count > 0) // Seulement pays disponibles
           .map((c: any) => {
-            const price = priceMap.get(c.countryCode.toLowerCase()) || 1.0;
-            const successRate = successRateMap.get(c.countryCode.toLowerCase()) || 95;
+            // Utiliser notre prix ou celui de SMS-Activate
+            const ourPrice = priceMap.get(c.countryCode.toLowerCase());
+            const smsActivatePrice = c.price || 1.0;
+            const finalPrice = ourPrice || smsActivatePrice;
+            
+            // Utiliser le success rate de SMS-Activate ou notre fallback
+            const ourSuccessRate = successRateMap.get(c.countryCode.toLowerCase());
+            const smsActivateSuccessRate = c.successRate || 95;
+            const finalSuccessRate = ourSuccessRate || smsActivateSuccessRate;
             
             return {
               id: c.countryId.toString(),
               name: c.countryName,
               code: c.countryCode,
               flag: getFlagEmoji(c.countryCode),
-              successRate: Number(successRate.toFixed(1)),
-              count: c.available, // ✅ VRAIES quantités
-              price: Number(price.toFixed(2))
+              successRate: Number(finalSuccessRate.toFixed(1)),
+              count: c.count, // ✅ VRAIES quantités de SMS-Activate
+              price: Number(finalPrice.toFixed(2)),
+              compositeScore: c.compositeScore, // Score de tri intelligent
+              rank: c.rank, // Position dans le classement SMS-Activate
+              share: c.share // Part de marché
             };
           });
         
-        console.log('🏆 [LIVE] Top 5 pays:', mapped.slice(0, 5).map(c => 
-          `${c.name} (${c.successRate}% - ${c.count} nums - $${c.price})`
+        console.log('🏆 [LIVE] Top 5 pays (tri intelligent):', mapped.slice(0, 5).map(c => 
+          `${c.name} (${c.successRate}% - ${c.count} nums - $${c.price} - Score: ${c.compositeScore?.toFixed(1)})`
         ));
         
         return mapped;
