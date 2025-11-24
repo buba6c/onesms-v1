@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,11 @@ const corsHeaders = {
 
 const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')!
+
+// Supabase client pour récupérer les settings
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 interface TopCountryData {
   countryId: number
@@ -36,7 +42,17 @@ serve(async (req) => {
       )
     }
     
-    console.log(`🏆 [TOP-COUNTRIES] Getting top countries for service: ${service}`)
+    // 💰 Récupérer la marge depuis system_settings (défaut 30%)
+    const { data: marginSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pricing_margin_percentage')
+      .single()
+    
+    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30
+    ;(req as any).__marginPercentage = marginPercentage
+    
+    console.log(`🏆 [TOP-COUNTRIES] Getting top countries for service: ${service} (Marge: ${marginPercentage}%)`)
     
     // 1️⃣ Appeler getTopCountriesByServiceRank (considère le rang utilisateur + Free Price)
     console.log('📊 [TOP-COUNTRIES] Fetching ranked countries with prices...')
@@ -122,11 +138,13 @@ serve(async (req) => {
       const priceUSD = countryData.price || 0
       const USD_TO_FCFA = 600  // 1$ = 600 FCFA
       const FCFA_TO_COINS = 100  // 1Ⓐ = 100 FCFA
-      const MARGIN = 1.3  // +30% marge
+      
+      // Récupérer la marge depuis system_settings (défaut 30%)
+      const marginMultiplier = 1 + ((req as any).__marginPercentage || 30) / 100
       
       // Calcul: $0.50 × 600 = 300 FCFA ÷ 100 = 3Ⓐ × 1.3 = 3.9Ⓐ
       const priceFCFA = priceUSD * USD_TO_FCFA
-      const priceCoins = (priceFCFA / FCFA_TO_COINS) * MARGIN
+      const priceCoins = (priceFCFA / FCFA_TO_COINS) * marginMultiplier
       const price = Math.ceil(priceCoins)  // Arrondir au supérieur
       const retailPrice = price
       
