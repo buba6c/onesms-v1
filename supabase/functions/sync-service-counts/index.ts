@@ -7,7 +7,6 @@ const corsHeaders = {
 }
 
 const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
-const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')!
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -16,9 +15,25 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('PROJECT_URL') || 'https://htfqmamvmhdoixqcbbbw.supabase.co'
-    const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // Récupérer les variables d'environnement avec logging
+    const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    console.log('🔄 [SYNC-COUNTS] Démarrage...')
+    console.log(`📝 [SYNC-COUNTS] SMS_ACTIVATE_API_KEY: ${SMS_ACTIVATE_API_KEY ? 'OK' : 'MISSING'}`)
+    console.log(`📝 [SYNC-COUNTS] SUPABASE_URL: ${SUPABASE_URL ? 'OK' : 'MISSING'}`)
+    console.log(`📝 [SYNC-COUNTS] SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY ? 'OK' : 'MISSING'}`)
+    
+    if (!SMS_ACTIVATE_API_KEY) {
+      throw new Error('SMS_ACTIVATE_API_KEY is not configured')
+    }
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not available')
+    }
+    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
     console.log('🔄 [SYNC-COUNTS] Démarrage de la synchronisation des counts...')
     
@@ -136,21 +151,24 @@ serve(async (req) => {
     
     // Log error
     try {
-      const supabaseUrl = Deno.env.get('PROJECT_URL') || 'https://htfqmamvmhdoixqcbbbw.supabase.co'
-      const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY')!
-      const supabase = createClient(supabaseUrl, supabaseKey)
+      const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
       
-      await supabase.from('sync_logs').insert({
-        sync_type: 'services',
-        status: 'error',
-        services_synced: 0,
-        countries_synced: 0,
-        prices_synced: 0,
-        error_message: error instanceof Error ? error.message : String(error),
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        triggered_by: 'cron'
-      })
+      if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        
+        await supabase.from('sync_logs').insert({
+          sync_type: 'services',
+          status: 'error',
+          services_synced: 0,
+          countries_synced: 0,
+          prices_synced: 0,
+          error_message: error instanceof Error ? error.message : String(error),
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          triggered_by: 'cron'
+        })
+      }
     } catch (logErr) {
       console.error('Failed to log error:', logErr)
     }
