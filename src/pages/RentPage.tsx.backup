@@ -1,0 +1,743 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuthStore } from '@/stores/authStore'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
+import { 
+  Search,
+  Copy,
+  Clock,
+  Mail,
+  X,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react'
+import { getServiceLogo, getServiceLogoFallback, getCountryFlag, getFlagEmoji } from '@/lib/logo-service'
+import { fetch5simPricesForService, type Sim5CountryData } from '@/lib/sync-service'
+
+// Types
+interface Country {
+  id: string
+  name: string
+  code: string
+  price: number
+  count: number
+  successRate: number
+}
+
+interface RentDuration {
+  id: string
+  label: string
+  value: '3hours' | '1day' | '10days' | '1month'
+  hours: number
+  icon: string
+  description: string
+}
+
+interface RentedNumber {
+  id: string
+  order_id: number
+  phone: string
+  service_code: string
+  service_name: string
+  country_code: string
+  operator: string
+  duration_type: string
+  duration_hours: number
+  price: number
+  status: string
+  expires_at: string
+  sms_count: number
+  created_at: string
+}
+
+interface SmsInbox {
+  id: number
+  created_at: string
+  date: string
+  sender: string
+  text: string
+  code: string | null
+}
+
+type StepType = 'country' | 'duration' | 'confirm'
+
+// Durées disponibles
+const RENT_DURATIONS: RentDuration[] = [
+  { id: '1', label: '3 hours', value: '3hours', hours: 3, icon: '⚡', description: 'Quick rental' },
+  { id: '2', label: '1 day', value: '1day', hours: 24, icon: '📅', description: '24 hours' },
+  { id: '3', label: '1 week', value: '1week', hours: 168, icon: '📆', description: '7 days' },
+  { id: '4', label: '10 days', value: '10days', hours: 240, icon: '📋', description: '10 days' },
+  { id: '5', label: '1 month', value: '1month', hours: 720, icon: '📅', description: '30 days' }
+]
+
+// Success rate badge helper
+const getSuccessRateBadge = (rate: number) => {
+  if (rate >= 90) return { bg: 'bg-green-100', text: 'text-green-700' }
+  if (rate >= 70) return { bg: 'bg-yellow-100', text: 'text-yellow-700' }
+  return { bg: 'bg-red-100', text: 'text-red-700' }
+}
+
+// Error handlers
+const handleLogoError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode: string) => {
+  const target = e.target as HTMLImageElement
+  if (target.dataset.fallbackLoaded === 'true') {
+    target.style.display = 'none'
+    const emoji = target.nextElementSibling as HTMLSpanElement
+    if (emoji) emoji.style.display = 'flex'
+    return
+  }
+  target.dataset.fallbackLoaded = 'true'
+  target.src = getServiceLogoFallback(serviceCode)
+}
+
+const getServiceIcon = (serviceCode: string): string => {
+  const icons: Record<string, string> = {
+    whatsapp: '💬',
+    telegram: '✈️',
+    google: '🔍',
+    instagram: '📸',
+    facebook: '📘',
+    twitter: '🐦',
+    other: '❓',
+    fullrent: '💼'
+  }
+  return icons[serviceCode.toLowerCase()] || '📱'
+}
+
+// Structure des offres hosting
+interface HostingOffer {
+  operator: string
+  product: string
+  cost: number
+  count: number
+  rate: number
+}
+
+const RentPage = () => {
+  const { user } = useAuthStore()
+  const queryClient = useQueryClient()
+  
+  // State management
+  const [currentStep, setCurrentStep] = useState<StepType>('country')
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null)
+  const [selectedDuration, setSelectedDuration] = useState<RentDuration | null>(null)
+  const [searchCountry, setSearchCountry] = useState('')
+  const [expandedRental, setExpandedRental] = useState<string | null>(null)
+  const [loadingCountries, setLoadingCountries] = useState(false)
+  
+  // Stocker toutes les offres par pays pour sélection automatique
+  const [countryOffersMap, setCountryOffersMap] = useState<Map<string, HostingOffer[]>>(new Map())
+
+  // Query: Active rented numbers
+  const { data: rentedNumbers = [] } = useQuery({
+    queryKey: ['rentedNumbers', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return []
+      
+      const { data, error } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return data as RentedNumber[]
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30000 // Refresh every 30s
+  })
+
+  // Query: SMS inbox for expanded rental
+  const { data: inboxData } = useQuery({
+    queryKey: ['inbox', expandedRental],
+    queryFn: async () => {
+      if (!expandedRental) return null
+
+      const { data, error } = await supabase.functions.invoke('get-5sim-inbox', {
+        body: { orderId: expandedRental }
+      })
+
+      if (error) throw error
+      return data?.data as { Data: SmsInbox[], Total: number } | null
+    },
+    enabled: !!expandedRental,
+    refetchInterval: 15000 // Refresh every 15s when expanded
+  })
+
+  // Query: Available countries for hosting - récupère les VRAIS prix de location depuis 5sim
+  const { data: availableCountries = [] } = useQuery({
+    queryKey: ['hostingCountries'],
+    queryFn: async () => {
+      setLoadingCountries(true)
+      try {
+        console.log('🌍 [HOSTING] Récupération des prix hosting depuis 5sim...')
+        
+        // Appel direct à l'API 5sim GUEST prices (structure complète par pays)
+        const response = await fetch('https://5sim.net/v1/guest/prices', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        })
+
+        if (!response.ok) {
+          console.error('❌ [HOSTING] HTTP error:', response.status)
+          return []
+        }
+
+        const allPrices = await response.json()
+        console.log('✅ [HOSTING] Prix reçus pour', Object.keys(allPrices).length, 'pays')
+
+        // Les produits hosting (doc 5sim + 1week trouvé dans l'API)
+        const hostingProducts = ['3hours', '1day', '1week', '10days', '1month']
+        const offersMap = new Map<string, HostingOffer[]>()
+
+        // Parser la structure: { countryName: { productName: { operatorName: { cost, count, rate } } } }
+        Object.entries(allPrices).forEach(([countryName, products]: [string, any]) => {
+          if (!products || typeof products !== 'object') return
+
+          const offers: HostingOffer[] = []
+
+          hostingProducts.forEach(hostingProduct => {
+            const productData = products[hostingProduct]
+            
+            if (productData && typeof productData === 'object') {
+              // Collecter toutes les offres (opérateur + produit + prix)
+              Object.entries(productData).forEach(([operatorName, operatorData]: [string, any]) => {
+                if (operatorData && typeof operatorData === 'object') {
+                  const count = operatorData.count || 0
+                  const cost = operatorData.cost || 0
+                  const rate = operatorData.rate || 0
+
+                  // Accepter même avec count=0 (stock en temps réel)
+                  if (cost > 0) {
+                    offers.push({
+                      operator: operatorName,
+                      product: hostingProduct,
+                      cost,
+                      count,
+                      rate
+                    })
+                  }
+                }
+              })
+            }
+          })
+
+          if (offers.length > 0) {
+            offersMap.set(countryName, offers)
+          }
+        })
+
+        // Stocker les offres dans le state pour sélection automatique
+        setCountryOffersMap(offersMap)
+
+        // Convertir en format Country[] avec le prix le plus bas pour affichage
+        const countries: Country[] = Array.from(offersMap.entries()).map(([code, offers]) => {
+          // Trouver l'offre la moins chère (pour affichage)
+          const cheapestOffer = offers.reduce((min, offer) => 
+            offer.cost < min.cost ? offer : min
+          , offers[0])
+          
+          // Calculer le stock total et le taux moyen
+          const totalQty = offers.reduce((sum, o) => sum + o.count, 0)
+          const avgRate = offers.reduce((sum, o) => sum + o.rate, 0) / offers.length || 85
+
+          return {
+            id: code,
+            name: code.charAt(0).toUpperCase() + code.slice(1),
+            code: code,
+            price: cheapestOffer.cost, // Prix le plus bas
+            count: totalQty,
+            successRate: Math.round(avgRate)
+          }
+        })
+
+        // Trier par prix croissant
+        countries.sort((a, b) => a.price - b.price)
+
+        console.log(`📊 [HOSTING] ${countries.length} pays avec hosting disponibles`)
+        console.log('🔝 [HOSTING] Top 5:', countries.slice(0, 5).map(c => `${c.name} (${c.count} nums, ${c.price.toFixed(1)}Ⓐ, ${c.successRate}%)`))
+
+        return countries.filter(c => c.price > 0) // Accepter count=0 car stock en temps réel
+      } catch (error) {
+        console.error('❌ [HOSTING] Erreur:', error)
+        return []
+      } finally {
+        setLoadingCountries(false)
+      }
+    },
+    enabled: currentStep === 'country',
+    staleTime: 60000 // Cache for 1 min
+  })
+
+  // Filtered countries
+  const filteredCountries = availableCountries.filter(country =>
+    country.name.toLowerCase().includes(searchCountry.toLowerCase())
+  )
+
+  // Copy phone number
+  const copyPhone = (phone: string) => {
+    navigator.clipboard.writeText(phone)
+    toast.success('Numéro copié!')
+  }
+
+  // Handle country selection
+  const handleCountrySelect = (country: Country) => {
+    setSelectedCountry(country)
+    setCurrentStep('duration')
+  }
+
+  // Handle duration selection
+  const handleDurationSelect = (duration: RentDuration) => {
+    setSelectedDuration(duration)
+    setCurrentStep('confirm')
+  }
+
+  // Reset selection
+  const handleReset = () => {
+    setCurrentStep('country')
+    setSelectedCountry(null)
+    setSelectedDuration(null)
+    setSearchCountry('')
+  }
+
+  // Sélection automatique du meilleur opérateur pour un pays/durée
+  const selectBestOperator = (countryCode: string, product: string): string => {
+    const offers = countryOffersMap.get(countryCode) || []
+    
+    // Filtrer les offres pour ce produit spécifique
+    const productOffers = offers.filter(o => o.product === product)
+    
+    if (productOffers.length === 0) {
+      console.log(`⚠️ [AUTO] Aucune offre pour ${countryCode}/${product}, utilisation 'any'`)
+      return 'any'
+    }
+    
+    // Trier par: 1) Stock disponible (count > 0 d'abord), 2) Meilleur rate, 3) Prix le plus bas
+    const sorted = [...productOffers].sort((a, b) => {
+      // Priorité 1: Stock disponible
+      if (a.count > 0 && b.count === 0) return -1
+      if (b.count > 0 && a.count === 0) return 1
+      
+      // Priorité 2: Meilleur taux de succès
+      if (b.rate !== a.rate) return b.rate - a.rate
+      
+      // Priorité 3: Prix le plus bas
+      return a.cost - b.cost
+    })
+    
+    const best = sorted[0]
+    console.log(`🎯 [AUTO] Opérateur sélectionné pour ${countryCode}/${product}: ${best.operator} (${best.count} stock, ${best.rate}% rate, ${best.cost}Ⓐ)`)
+    
+    return best.operator
+  }
+
+  // Rent number
+  const handleRentNumber = async () => {
+    if (!selectedCountry || !selectedDuration || !user?.id) return
+
+    try {
+      toast.loading('Location en cours...')
+
+      // Sélection automatique du meilleur opérateur
+      const bestOperator = selectBestOperator(selectedCountry.code, selectedDuration.value)
+
+      const { data, error } = await supabase.functions.invoke('buy-5sim-hosting', {
+        body: {
+          country: selectedCountry.code,
+          operator: bestOperator,
+          product: selectedDuration.value,
+          userId: user.id
+        }
+      })
+
+      if (error) throw error
+
+      toast.dismiss()
+      toast.success('✅ Numéro loué avec succès!')
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['rentedNumbers'] })
+      queryClient.invalidateQueries({ queryKey: ['user'] })
+
+      // Reset
+      handleReset()
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.message || 'Échec de la location')
+      console.error('Rent error:', error)
+    }
+  }
+
+  // Get time remaining
+  const getTimeRemaining = (expiresAt: string): string => {
+    const now = Date.now()
+    const expires = new Date(expiresAt).getTime()
+    const remaining = Math.max(0, expires - now)
+    
+    const hours = Math.floor(remaining / (1000 * 60 * 60))
+    const mins = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
+    
+    if (hours > 0) return `${hours}h ${mins}m`
+    return `${mins}m`
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] bg-gray-50">
+      {/* Sidebar - Order Number */}
+      <aside className="w-[380px] bg-white border-r border-gray-200 overflow-y-auto">
+        <div className="p-5">
+          <h1 className="text-xl font-bold text-gray-900 mb-5">Order number</h1>
+
+          {/* Mode Toggle */}
+          <div className="flex bg-gray-100 rounded-full p-1 mb-5">
+            <Link
+              to="/dashboard"
+              className="flex-1 py-2 text-sm font-semibold rounded-full transition-all text-gray-600 hover:text-gray-900 text-center"
+            >
+              Activation
+            </Link>
+            <button
+              className="flex-1 py-2 text-sm font-semibold rounded-full transition-all bg-white text-gray-900 shadow-sm"
+            >
+              Rent
+            </button>
+          </div>
+
+          {/* STEP 1: Country Selection */}
+          {currentStep === 'country' && (
+            <>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">COUNTRY SELECTION</p>
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Enter country name..."
+                  value={searchCountry}
+                  onChange={(e) => setSearchCountry(e.target.value)}
+                  className="pl-10 h-11 text-sm bg-gray-50 border-gray-200"
+                  disabled={loadingCountries}
+                />
+              </div>
+
+              {loadingCountries ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                  <p className="text-sm text-gray-500 animate-pulse">🌐 Chargement des taux en temps réel depuis 5sim...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2 text-[10px] text-gray-500 px-1">
+                    <span>Country, success rate</span>
+                    <span>Price</span>
+                  </div>
+
+                  {filteredCountries.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <p className="text-sm">Aucun pays disponible pour la location</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+                      {filteredCountries.map((country) => (
+                        <div
+                          key={country.id}
+                          onClick={() => handleCountrySelect(country)}
+                          className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:border-blue-500 hover:shadow-sm transition-all"
+                        >
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <div className="w-12 h-9 rounded border border-gray-200 overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+                              <img 
+                                src={getCountryFlag(country.name)} 
+                                alt={country.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = 'none'
+                                  const emoji = target.nextElementSibling as HTMLSpanElement
+                                  if (emoji) emoji.style.display = 'flex'
+                                }}
+                              />
+                              <span className="text-2xl hidden items-center justify-center">{getFlagEmoji(country.name)}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-bold text-sm text-gray-900 truncate">{country.name}</p>
+                                <span className={`${getSuccessRateBadge(country.successRate).bg} ${getSuccessRateBadge(country.successRate).text} px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0`}>
+                                  {country.successRate}%
+                                </span>
+                              </div>
+                              <p className="text-xs text-green-600 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                {country.count.toLocaleString()} numbers available
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-base flex-shrink-0">
+                            <span>{Math.floor(country.price)}</span>
+                            <span className="text-xs">Ⓐ</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* STEP 2 & 3: Duration Selection */}
+          {(currentStep === 'duration' || currentStep === 'confirm') && selectedCountry && (
+            <>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">SELECTED COUNTRY</p>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 flex items-center gap-3">
+                <div className="w-12 h-9 rounded border border-gray-200 overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+                  <img 
+                    src={getCountryFlag(selectedCountry.name)} 
+                    alt={selectedCountry.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      const emoji = target.nextElementSibling as HTMLSpanElement
+                      if (emoji) emoji.style.display = 'flex'
+                    }}
+                  />
+                  <span className="text-2xl hidden items-center justify-center">{getFlagEmoji(selectedCountry.name)}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-gray-900 truncate">{selectedCountry.name}</p>
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                    {selectedCountry.count.toLocaleString()} numbers available
+                  </p>
+                </div>
+                <button onClick={handleReset} className="p-1.5 hover:bg-gray-200 rounded-full transition-all flex-shrink-0">
+                  <X className="h-4 w-4 text-gray-400" />
+                </button>
+              </div>
+
+              {currentStep === 'duration' && (
+                <>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">RENTAL DURATION</p>
+                  <div className="space-y-2">
+                    {RENT_DURATIONS.map((duration) => (
+                      <div
+                        key={duration.id}
+                        onClick={() => handleDurationSelect(duration)}
+                        className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-blue-500 hover:shadow-sm transition-all"
+                      >
+                        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                          {duration.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm text-gray-900">{duration.label}</p>
+                          <p className="text-xs text-gray-500">{duration.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* STEP 3: Confirmation */}
+              {currentStep === 'confirm' && selectedDuration && (
+                <>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">SELECTED DURATION</p>
+                  <div className="bg-gray-50 rounded-lg p-3 mb-6 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                      {selectedDuration.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-gray-900">{selectedDuration.label}</p>
+                      <p className="text-xs text-gray-500">{selectedDuration.description}</p>
+                    </div>
+                    <button onClick={() => setCurrentStep('duration')} className="p-1.5 hover:bg-gray-200 rounded-full transition-all flex-shrink-0">
+                      <X className="h-4 w-4 text-gray-400" />
+                    </button>
+                  </div>
+
+                  <Button 
+                    onClick={handleRentNumber}
+                    className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-2xl flex items-center justify-between px-6"
+                  >
+                    <span>Rent now</span>
+                    <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-lg">
+                      <span className="text-2xl">{Math.floor(selectedCountry.price)}</span>
+                      <span className="text-sm">Ⓐ</span>
+                    </div>
+                  </Button>
+
+                  <p className="text-center text-sm text-gray-500 mt-4">
+                    You will receive multiple SMS during the rental period
+                  </p>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content - Active Rented Numbers */}
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Active Rented Numbers</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {rentedNumbers.length} active rental{rentedNumbers.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+
+          {rentedNumbers.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No active rentals</h3>
+              <p className="text-sm text-gray-500">
+                Select a country and duration to rent your first number
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {rentedNumbers.map((rental) => {
+                const isExpanded = expandedRental === rental.order_id.toString()
+                const inbox = isExpanded ? inboxData : null
+
+                return (
+                  <div
+                    key={rental.id}
+                    className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all"
+                  >
+                    {/* Header */}
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          <img 
+                            src={getServiceLogo(rental.service_code)} 
+                            alt={rental.service_name}
+                            className="w-6 h-6 object-contain"
+                            onError={(e) => handleLogoError(e, rental.service_code)}
+                          />
+                          <span className="text-xl hidden items-center justify-center">{getServiceIcon(rental.service_code)}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 truncate">{rental.service_name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="w-6 h-4 rounded border border-gray-200 overflow-hidden flex items-center justify-center">
+                              <img 
+                                src={getCountryFlag(rental.country_code)} 
+                                alt={rental.country_code}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = 'none'
+                                  const emoji = target.nextElementSibling as HTMLSpanElement
+                                  if (emoji) emoji.style.display = 'flex'
+                                }}
+                              />
+                              <span className="text-sm hidden items-center justify-center">{getFlagEmoji(rental.country_code)}</span>
+                            </div>
+                            <span className="text-xs text-gray-500">{rental.country_code}</span>
+                          </div>
+                        </div>
+                        <div className="px-2 py-1 bg-blue-50 rounded text-[10px] font-bold text-blue-700 flex-shrink-0">
+                          {rental.duration_type}
+                        </div>
+                      </div>
+
+                      {/* Phone Number */}
+                      <div className="bg-gray-50 rounded-lg p-2.5 flex items-center justify-between">
+                        <span className="font-mono text-sm font-semibold text-gray-900">{rental.phone}</span>
+                        <button
+                          onClick={() => copyPhone(rental.phone)}
+                          className="p-1.5 hover:bg-gray-200 rounded transition-all"
+                        >
+                          <Copy className="h-3.5 w-3.5 text-gray-500" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="p-4 bg-gray-50">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1 text-gray-600">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>{getTimeRemaining(rental.expires_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-blue-600 font-semibold">
+                          <Mail className="h-3.5 w-3.5" />
+                          <span>{rental.sms_count} SMS</span>
+                        </div>
+                      </div>
+
+                      {/* Expand Button */}
+                      <button
+                        onClick={() => setExpandedRental(isExpanded ? null : rental.order_id.toString())}
+                        className="w-full mt-3 py-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 flex items-center justify-center gap-2 transition-all"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Hide SMS
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            View SMS
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* SMS Inbox */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-200 bg-white max-h-64 overflow-y-auto">
+                        {!inbox?.Data || inbox.Data.length === 0 ? (
+                          <div className="p-6 text-center text-sm text-gray-500">
+                            No SMS received yet
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {inbox.Data.map((sms) => (
+                              <div key={sms.id} className="p-3 hover:bg-gray-50 transition-all">
+                                <div className="flex items-start justify-between mb-1">
+                                  <span className="text-xs font-semibold text-gray-900">{sms.sender}</span>
+                                  <span className="text-[10px] text-gray-400">{new Date(sms.date).toLocaleTimeString()}</span>
+                                </div>
+                                <p className="text-xs text-gray-600 leading-relaxed mb-1">{sms.text}</p>
+                                {sms.code && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-1 bg-blue-50 rounded text-xs font-mono font-bold text-blue-700">{sms.code}</span>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(sms.code!)
+                                        toast.success('Code copié!')
+                                      }}
+                                      className="p-1 hover:bg-gray-200 rounded"
+                                    >
+                                      <Copy className="h-3 w-3 text-gray-400" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export default RentPage

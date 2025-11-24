@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMS Virtual - Virtual Phone Numbers</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+            background-color: #fafafa;
+            height: 100%;
+        }
+        
+        html {
+            height: 100%;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Header */
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid #e8e8e8;
+            padding: 0 32px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .nav-menu {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .nav-item {
+            padding: 8px 16px;
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: #f5f5f5;
+            color: #1a1a1a;
+        }
+
+        .balance-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lang-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .lang-selector:hover {
+            background: #f5f5f5;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            height: calc(100% - 64px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 340px;
+            background: #ffffff;
+            border-right: 1px solid #e8e8e8;
+            overflow-y: auto;
+            padding: 24px 20px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+
+        .mode-option {
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #666;
+        }
+
+        .mode-option.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            transition: all 0.2s;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .selected-service {
+            background: #f0f4ff;
+            border: 1px solid #d0ddff;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .service-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .service-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            background: white;
+        }
+
+        .service-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+
+        .availability-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .country-list {
+            margin-bottom: 28px;
+        }
+
+        .country-item {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .country-item:hover {
+            background: #f8f9fa;
+        }
+
+        .country-item.selected {
+            background: #f0f4ff;
+            border: 1px solid #d0ddff;
+        }
+
+        .country-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .country-flag {
+            font-size: 24px;
+        }
+
+        .country-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .country-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .country-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .success-rate {
+            background: #d4f4dd;
+            color: #1e7e34;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .numbers-count {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .country-price {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 700;
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+
+        .service-list-item {
+            padding: 12px;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .service-list-item:hover {
+            border-color: #667eea;
+            background: #fafbff;
+        }
+
+        .service-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .service-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .service-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .service-count {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* Main Content */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+
+        .content-wrapper {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .feature-card {
+            background: white;
+            border: 2px solid #e8e8e8;
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .card-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 24px 0;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+            font-size: 14px;
+            color: #444;
+            line-height: 1.6;
+        }
+
+        .feature-icon {
+            color: #667eea;
+            font-weight: 700;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            background: #5568d3;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .action-btn:active {
+            transform: translateY(0);
+        }
+
+        .steps-section {
+            background: white;
+            border: 2px solid #e8e8e8;
+            border-radius: 16px;
+            padding: 32px;
+        }
+
+        .steps-header {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .step-card {
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 auto 16px;
+        }
+
+        .step-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+
+        .step-desc {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* Scrollbar */
+        .sidebar::-webkit-scrollbar,
+        .content-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track,
+        .content-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb,
+        .content-area::-webkit-scrollbar-thumb {
+            background: #d0d0d0;
+            border-radius: 10px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover,
+        .content-area::-webkit-scrollbar-thumb:hover {
+            background: #b0b0b0;
+        }
+
+        /* Confirmation Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1a1a1a;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 280px;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .steps-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Activation View Styles */
+        .activation-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .service-badge, .country-badge {
+            background: white;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .service-emoji, .country-flag-large {
+            font-size: 24px;
+        }
+
+        .service-title, .country-title {
+            font-size: 16px;
+            color: #1a1a1a;
+        }
+
+        .activation-card {
+            background: white;
+            border: 2px solid #e8e8e8;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .status-banner {
+            background: #fff8e6;
+            border: 2px solid #ffd666;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+
+        .status-banner.success {
+            background: #e6f7ed;
+            border-color: #52c41a;
+        }
+
+        .status-icon {
+            font-size: 28px;
+        }
+
+        .status-text {
+            flex: 1;
+        }
+
+        .status-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+
+        .status-subtitle {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .number-section, .code-section {
+            margin-bottom: 28px;
+        }
+
+        .section-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .number-display, .code-display {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fa;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            padding: 16px 20px;
+        }
+
+        .number-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-text {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 4px;
+        }
+
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .copy-icon {
+            font-size: 16px;
+        }
+
+        .timer-section {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 28px;
+        }
+
+        .timer-circle {
+            position: relative;
+            width: 180px;
+            height: 180px;
+        }
+
+        .timer-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .timer-bg {
+            fill: none;
+            stroke: #e8e8e8;
+            stroke-width: 8;
+        }
+
+        .timer-progress {
+            fill: none;
+            stroke: #667eea;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 283;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s linear;
+        }
+
+        .timer-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .timer-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1a1a;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timer-label {
+            font-size: 13px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .code-message {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #52c41a;
+            font-weight: 600;
+        }
+
+        .success-icon {
+            font-size: 18px;
+        }
+
+        .activation-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .primary-btn {
+            flex: 1;
+            padding: 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .primary-btn:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .secondary-btn {
+            flex: 1;
+            padding: 14px;
+            background: white;
+            color: #666;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .secondary-btn:hover {
+            border-color: #d0d0d0;
+            color: #1a1a1a;
+        }
+
+        .instructions-card {
+            background: white;
+            border: 2px solid #e8e8e8;
+            border-radius: 16px;
+            padding: 28px;
+        }
+
+        .instructions-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+        }
+
+        .instructions-list {
+            margin: 0;
+            padding-left: 24px;
+        }
+
+        .instructions-list li {
+            font-size: 14px;
+            color: #444;
+            line-height: 2;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 0 16px;
+            }
+
+            .nav-menu {
+                display: none;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .content-area {
+                padding: 20px;
+            }
+
+            .activation-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .timer-circle {
+                width: 140px;
+                height: 140px;
+            }
+
+            .timer-value {
+                font-size: 24px;
+            }
+
+            .activation-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body><!-- Header -->
+  <header class="header">
+   <div class="logo">
+    <div class="logo-icon">
+     OS
+    </div><span id="logo-text">One SMS</span>
+   </div>
+   <nav class="nav-menu"><a id="nav-topup" class="nav-item">Top Up</a> <a id="nav-account" class="nav-item">Account</a> <a id="nav-history" class="nav-item">History</a> <a class="nav-item">How to use</a> <a class="nav-item">Contacts</a>
+   </nav>
+   <div style="display: flex; align-items: center; gap: 12px;">
+    <div class="balance-box"><span>💎</span> <span>0.00</span>
+    </div>
+    <div class="lang-selector"><span style="font-size: 18px;">🇬🇧</span> <span style="font-size: 13px; color: #666;">EN</span>
+    </div>
+   </div>
+  </header><!-- Main Container -->
+  <div class="main-container"><!-- Sidebar -->
+   <aside class="sidebar"><!-- Mode Toggle -->
+    <div class="mode-toggle">
+     <div class="mode-option active" id="activation-mode">
+      Activation
+     </div>
+     <div class="mode-option" id="rent-mode">
+      Rent
+     </div>
+    </div><!-- Service Search --> <input type="text" class="search-box" id="search-service-input" placeholder="🔍 Search service..."> <!-- Selected Service -->
+    <div class="selected-service">
+     <div class="service-info">
+      <div class="service-icon">
+       💬
+      </div>
+      <div>
+       <div class="service-name">
+        WhatsApp
+       </div>
+      </div>
+     </div>
+     <div class="availability-badge">
+      1,234
+     </div>
+    </div><!-- Country Selection -->
+    <div class="section-title" id="country-selection-title">
+     Country selection
+    </div><input type="text" class="search-box" placeholder="🔍 Search country..." style="margin-bottom: 14px;">
+    <div class="country-list">
+     <div class="country-item selected">
+      <div class="country-left"><span class="country-flag">🇺🇸</span>
+       <div class="country-details">
+        <div class="country-name">
+         United States
+        </div>
+        <div class="country-stats"><span class="success-rate">98%</span> <span class="numbers-count">456 numbers</span>
+        </div>
+       </div>
+      </div>
+      <div class="country-price"><span>💎</span> <span>2.50</span>
+      </div>
+     </div>
+     <div class="country-item">
+      <div class="country-left"><span class="country-flag">🇬🇧</span>
+       <div class="country-details">
+        <div class="country-name">
+         United Kingdom
+        </div>
+        <div class="country-stats"><span class="success-rate">95%</span> <span class="numbers-count">234 numbers</span>
+        </div>
+       </div>
+      </div>
+      <div class="country-price"><span>💎</span> <span>2.80</span>
+      </div>
+     </div>
+     <div class="country-item">
+      <div class="country-left"><span class="country-flag">🇫����</span>
+       <div class="country-details">
+        <div class="country-name">
+         France
+        </div>
+        <div class="country-stats"><span class="success-rate">97%</span> <span class="numbers-count">189 numbers</span>
+        </div>
+       </div>
+      </div>
+      <div class="country-price"><span>💎</span> <span>3.00</span>
+      </div>
+     </div>
+     <div class="country-item">
+      <div class="country-left"><span class="country-flag">🇩🇪</span>
+       <div class="country-details">
+        <div class="country-name">
+         Germany
+        </div>
+        <div class="country-stats"><span class="success-rate">93%</span> <span class="numbers-count">167 numbers</span>
+        </div>
+       </div>
+      </div>
+      <div class="country-price"><span>💎</span> <span>3.20</span>
+      </div>
+     </div>
+     <div class="country-item">
+      <div class="country-left"><span class="country-flag">🌍</span>
+       <div class="country-details">
+        <div class="country-name">
+         Any other
+        </div>
+        <div class="country-stats"><span class="numbers-count">All services</span>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div>
+   </aside><!-- Main Content -->
+   <main class="content-area">
+    <div class="content-wrapper"><!-- Activation Process Container -->
+     <div id="landing-view"><!-- Feature Cards -->
+      <div class="cards-grid"><!-- Activation Card -->
+       <div class="feature-card">
+        <h2 class="card-title" id="activation-title">Activation</h2>
+        <ul class="feature-list">
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>One-time SMS verification code</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Instant number activation</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Valid for 20 minutes</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Best price per verification</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Perfect for account creation</span></li>
+        </ul><button class="action-btn" id="get-number-btn">Get Number Now</button>
+       </div><!-- Rent Card -->
+       <div class="feature-card">
+        <h2 class="card-title" id="rent-title">Rent</h2>
+        <ul class="feature-list">
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Receive multiple SMS messages</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Extended validity period</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Available for 1-30 days</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Dedicated number just for you</span></li>
+         <li class="feature-item"><span class="feature-icon">✓</span> <span>Ideal for ongoing services</span></li>
+        </ul><button class="action-btn">Rent Number</button>
+       </div>
+      </div><!-- Steps Section -->
+      <div class="steps-section">
+       <h2 class="steps-header" id="steps-title">Steps</h2>
+       <div class="steps-grid">
+        <div class="step-card">
+         <div class="step-number">
+          1
+         </div>
+         <div class="step-title" id="step1-title">
+          Select service and country
+         </div>
+         <div class="step-desc">
+          Choose the service you need and the country for your virtual number
+         </div>
+        </div>
+        <div class="step-card">
+         <div class="step-number">
+          2
+         </div>
+         <div class="step-title" id="step2-title">
+          Copy the number for registration
+         </div>
+         <div class="step-desc">
+          Use the provided number to register on your desired platform
+         </div>
+        </div>
+        <div class="step-card">
+         <div class="step-number">
+          3
+         </div>
+         <div class="step-title" id="step3-title">
+          Enter the code received
+         </div>
+         <div class="step-desc">
+          Copy the verification code and complete your registration
+         </div>
+        </div>
+       </div>
+      </div>
+     </div><!-- Activation Active View (Hidden by default) -->
+     <div id="activation-view" style="display: none;"><!-- Service Header -->
+      <div class="activation-header">
+       <div class="service-badge"><span class="service-emoji">💬</span> <span class="service-title">WhatsApp</span>
+       </div>
+       <div class="country-badge"><span class="country-flag-large">🇺🇸</span> <span class="country-title">United States</span>
+       </div>
+      </div><!-- Main Activation Card -->
+      <div class="activation-card"><!-- Status Banner -->
+       <div class="status-banner waiting">
+        <div class="status-icon">
+         ⏳
+        </div>
+        <div class="status-text">
+         <div class="status-title">
+          Waiting for SMS
+         </div>
+         <div class="status-subtitle">
+          The code will appear here automatically
+         </div>
+        </div>
+       </div><!-- Phone Number Section -->
+       <div class="number-section">
+        <div class="section-label">
+         Your Virtual Number
+        </div>
+        <div class="number-display"><span class="number-text" id="virtual-number">+1 (555) 123-4567</span> <button class="copy-btn" id="copy-number-btn"> <span class="copy-icon">📋</span> <span>Copy</span> </button>
+        </div>
+       </div><!-- Timer Section -->
+       <div class="timer-section">
+        <div class="timer-circle">
+         <svg class="timer-svg" viewbox="0 0 100 100"><circle class="timer-bg" cx="50" cy="50" r="45"></circle> <circle class="timer-progress" cx="50" cy="50" r="45" id="timer-progress-circle"></circle>
+         </svg>
+         <div class="timer-content">
+          <div class="timer-value" id="timer-value">
+           19:45
+          </div>
+          <div class="timer-label">
+           remaining
+          </div>
+         </div>
+        </div>
+       </div><!-- SMS Code Section (Initially hidden) -->
+       <div class="code-section" id="code-section" style="display: none;">
+        <div class="section-label">
+         Verification Code
+        </div>
+        <div class="code-display"><span class="code-text" id="sms-code">123456</span> <button class="copy-btn" id="copy-code-btn"> <span class="copy-icon">📋</span> <span>Copy</span> </button>
+        </div>
+        <div class="code-message"><span class="success-icon">✓</span> <span>Code received successfully!</span>
+        </div>
+       </div><!-- Actions -->
+       <div class="activation-actions"><button class="secondary-btn" id="cancel-btn">Cancel Activation</button> <button class="primary-btn" id="finish-btn" style="display: none;">Finish &amp; Close</button>
+       </div>
+      </div><!-- Instructions Card -->
+      <div class="instructions-card">
+       <h3 class="instructions-title">📝 Quick Guide</h3>
+       <ol class="instructions-list">
+        <li>Copy the phone number above</li>
+        <li>Open WhatsApp and start registration</li>
+        <li>Paste the number when prompted</li>
+        <li>Wait for the SMS code to arrive (usually 10-60 seconds)</li>
+        <li>Copy the code and complete your registration</li>
+       </ol>
+      </div>
+     </div>
+    </div>
+   </main>
+  </div><!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+  <script>
+        const defaultConfig = {
+            logo_text: "One SMS",
+            nav_topup: "Top Up",
+            nav_account: "Account",
+            nav_history: "History",
+            search_service_placeholder: "Search service...",
+            country_selection_title: "Country selection",
+            popular_services_title: "Popular services",
+            activation_title: "Activation",
+            rent_title: "Rent",
+            steps_title: "Steps",
+            step1_title: "Select service and country",
+            step2_title: "Copy the number for registration",
+            step3_title: "Enter the code received",
+            background_color: "#fafafa",
+            surface_color: "#ffffff",
+            text_color: "#1a1a1a",
+            primary_action_color: "#667eea",
+            secondary_action_color: "#5568d3",
+            font_family: "system-ui",
+            font_size: 16
+        };
+
+        async function onConfigChange(config) {
+            const customFont = config.font_family || defaultConfig.font_family;
+            const baseFontStack = '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif';
+            const baseSize = config.font_size || defaultConfig.font_size;
+            
+            // Update text content
+            document.getElementById('logo-text').textContent = config.logo_text || defaultConfig.logo_text;
+            document.getElementById('nav-topup').textContent = config.nav_topup || defaultConfig.nav_topup;
+            document.getElementById('nav-account').textContent = config.nav_account || defaultConfig.nav_account;
+            document.getElementById('nav-history').textContent = config.nav_history || defaultConfig.nav_history;
+            document.getElementById('search-service-input').placeholder = '🔍 ' + (config.search_service_placeholder || defaultConfig.search_service_placeholder);
+            document.getElementById('country-selection-title').textContent = config.country_selection_title || defaultConfig.country_selection_title;
+            document.getElementById('popular-services-title').textContent = config.popular_services_title || defaultConfig.popular_services_title;
+            document.getElementById('activation-title').textContent = config.activation_title || defaultConfig.activation_title;
+            document.getElementById('rent-title').textContent = config.rent_title || defaultConfig.rent_title;
+            document.getElementById('steps-title').textContent = config.steps_title || defaultConfig.steps_title;
+            document.getElementById('step1-title').textContent = config.step1_title || defaultConfig.step1_title;
+            document.getElementById('step2-title').textContent = config.step2_title || defaultConfig.step2_title;
+            document.getElementById('step3-title').textContent = config.step3_title || defaultConfig.step3_title;
+
+            // Update colors
+            const bgColor = config.background_color || defaultConfig.background_color;
+            const surfaceColor = config.surface_color || defaultConfig.surface_color;
+            const textColor = config.text_color || defaultConfig.text_color;
+            const primaryColor = config.primary_action_color || defaultConfig.primary_action_color;
+            const secondaryColor = config.secondary_action_color || defaultConfig.secondary_action_color;
+
+            document.body.style.backgroundColor = bgColor;
+            
+            document.querySelectorAll('.header, .sidebar, .feature-card, .steps-section').forEach(el => {
+                el.style.backgroundColor = surfaceColor;
+            });
+
+            document.querySelectorAll('.logo, .card-title, .steps-header, .section-title, .country-name, .service-label, .step-title').forEach(el => {
+                el.style.color = textColor;
+                el.style.fontFamily = `${customFont}, ${baseFontStack}`;
+            });
+
+            document.querySelectorAll('.action-btn').forEach(btn => {
+                btn.style.backgroundColor = primaryColor;
+            });
+
+            document.querySelector('.mode-option.active').style.backgroundColor = primaryColor;
+            
+            document.querySelectorAll('.step-number').forEach(num => {
+                num.style.backgroundColor = primaryColor;
+            });
+
+            document.querySelectorAll('.availability-badge').forEach(badge => {
+                badge.style.backgroundColor = primaryColor;
+            });
+
+            // Font sizes
+            document.getElementById('logo-text').style.fontSize = `${baseSize * 1.25}px`;
+            document.querySelectorAll('.card-title, .steps-header').forEach(el => {
+                el.style.fontSize = `${baseSize * 1.5}px`;
+            });
+            document.querySelectorAll('.step-title').forEach(el => {
+                el.style.fontSize = `${baseSize * 0.9375}px`;
+            });
+            document.querySelectorAll('.nav-item, .search-box, .feature-item, .step-desc, .country-name, .service-label').forEach(el => {
+                el.style.fontFamily = `${customFont}, ${baseFontStack}`;
+                el.style.fontSize = `${baseSize * 0.875}px`;
+            });
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+
+        // Mode toggle
+        const activationMode = document.getElementById('activation-mode');
+        const rentMode = document.getElementById('rent-mode');
+
+        activationMode.addEventListener('click', () => {
+            activationMode.classList.add('active');
+            rentMode.classList.remove('active');
+        });
+
+        rentMode.addEventListener('click', () => {
+            rentMode.classList.add('active');
+            activationMode.classList.remove('active');
+        });
+
+
+
+        // Activation Flow
+        let timerInterval;
+        let timeRemaining = 1200; // 20 minutes in seconds
+
+        function startActivation() {
+            document.getElementById('landing-view').style.display = 'none';
+            document.getElementById('activation-view').style.display = 'block';
+            
+            // Start timer
+            startTimer();
+            
+            // Simulate SMS arrival after 8 seconds
+            setTimeout(() => {
+                receiveSMS();
+            }, 8000);
+        }
+
+        function startTimer() {
+            const progressCircle = document.getElementById('timer-progress-circle');
+            const timerValue = document.getElementById('timer-value');
+            const circumference = 2 * Math.PI * 45;
+            
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                timerValue.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                const progress = (timeRemaining / 1200) * circumference;
+                progressCircle.style.strokeDashoffset = circumference - progress;
+                
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    showToast('❌ Time expired');
+                }
+            }, 1000);
+        }
+
+        function receiveSMS() {
+            const statusBanner = document.querySelector('.status-banner');
+            const statusIcon = document.querySelector('.status-icon');
+            const statusTitle = document.querySelector('.status-title');
+            const statusSubtitle = document.querySelector('.status-subtitle');
+            const codeSection = document.getElementById('code-section');
+            const finishBtn = document.getElementById('finish-btn');
+            
+            // Update status
+            statusBanner.classList.remove('waiting');
+            statusBanner.classList.add('success');
+            statusIcon.textContent = '✓';
+            statusTitle.textContent = 'SMS Received!';
+            statusSubtitle.textContent = 'Your verification code is ready';
+            
+            // Show code
+            codeSection.style.display = 'block';
+            
+            // Show finish button
+            finishBtn.style.display = 'block';
+            
+            showToast('✓ SMS code received!');
+        }
+
+        function copyToClipboard(text, btnId) {
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById(btnId);
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="copy-icon">✓</span><span>Copied!</span>';
+                btn.style.backgroundColor = '#52c41a';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.backgroundColor = '';
+                }, 2000);
+                
+                showToast('✓ Copied to clipboard');
+            });
+        }
+
+        function cancelActivation() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            document.getElementById('activation-view').style.display = 'none';
+            document.getElementById('landing-view').style.display = 'block';
+            
+            // Reset timer
+            timeRemaining = 1200;
+            document.getElementById('timer-value').textContent = '20:00';
+            
+            // Reset status
+            const statusBanner = document.querySelector('.status-banner');
+            statusBanner.classList.add('waiting');
+            statusBanner.classList.remove('success');
+            document.querySelector('.status-icon').textContent = '⏳';
+            document.querySelector('.status-title').textContent = 'Waiting for SMS';
+            document.querySelector('.status-subtitle').textContent = 'The code will appear here automatically';
+            
+            // Hide code section
+            document.getElementById('code-section').style.display = 'none';
+            document.getElementById('finish-btn').style.display = 'none';
+            
+            showToast('Activation cancelled');
+        }
+
+        // Event listeners
+        document.getElementById('get-number-btn').addEventListener('click', startActivation);
+        
+        document.getElementById('copy-number-btn').addEventListener('click', () => {
+            const number = document.getElementById('virtual-number').textContent;
+            copyToClipboard(number, 'copy-number-btn');
+        });
+        
+        document.getElementById('copy-code-btn').addEventListener('click', () => {
+            const code = document.getElementById('sms-code').textContent;
+            copyToClipboard(code, 'copy-code-btn');
+        });
+        
+        document.getElementById('cancel-btn').addEventListener('click', cancelActivation);
+        
+        document.getElementById('finish-btn').addEventListener('click', () => {
+            cancelActivation();
+            showToast('✓ Activation completed successfully');
+        });
+
+        if (window.elementSdk) {
+            window.elementSdk.init({
+                defaultConfig,
+                onConfigChange,
+                mapToCapabilities: (config) => ({
+                    recolorables: [
+                        {
+                            get: () => config.background_color || defaultConfig.background_color,
+                            set: (value) => {
+                                config.background_color = value;
+                                window.elementSdk.setConfig({ background_color: value });
+                            }
+                        },
+                        {
+                            get: () => config.surface_color || defaultConfig.surface_color,
+                            set: (value) => {
+                                config.surface_color = value;
+                                window.elementSdk.setConfig({ surface_color: value });
+                            }
+                        },
+                        {
+                            get: () => config.text_color || defaultConfig.text_color,
+                            set: (value) => {
+                                config.text_color = value;
+                                window.elementSdk.setConfig({ text_color: value });
+                            }
+                        },
+                        {
+                            get: () => config.primary_action_color || defaultConfig.primary_action_color,
+                            set: (value) => {
+                                config.primary_action_color = value;
+                                window.elementSdk.setConfig({ primary_action_color: value });
+                            }
+                        },
+                        {
+                            get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+                            set: (value) => {
+                                config.secondary_action_color = value;
+                                window.elementSdk.setConfig({ secondary_action_color: value });
+                            }
+                        }
+                    ],
+                    borderables: [],
+                    fontEditable: {
+                        get: () => config.font_family || defaultConfig.font_family,
+                        set: (value) => {
+                            config.font_family = value;
+                            window.elementSdk.setConfig({ font_family: value });
+                        }
+                    },
+                    fontSizeable: {
+                        get: () => config.font_size || defaultConfig.font_size,
+                        set: (value) => {
+                            config.font_size = value;
+                            window.elementSdk.setConfig({ font_size: value });
+                        }
+                    }
+                }),
+                mapToEditPanelValues: (config) => new Map([
+                    ["logo_text", config.logo_text || defaultConfig.logo_text],
+                    ["nav_topup", config.nav_topup || defaultConfig.nav_topup],
+                    ["nav_account", config.nav_account || defaultConfig.nav_account],
+                    ["nav_history", config.nav_history || defaultConfig.nav_history],
+                    ["search_service_placeholder", config.search_service_placeholder || defaultConfig.search_service_placeholder],
+                    ["country_selection_title", config.country_selection_title || defaultConfig.country_selection_title],
+                    ["popular_services_title", config.popular_services_title || defaultConfig.popular_services_title],
+                    ["activation_title", config.activation_title || defaultConfig.activation_title],
+                    ["rent_title", config.rent_title || defaultConfig.rent_title],
+                    ["steps_title", config.steps_title || defaultConfig.steps_title],
+                    ["step1_title", config.step1_title || defaultConfig.step1_title],
+                    ["step2_title", config.step2_title || defaultConfig.step2_title],
+                    ["step3_title", config.step3_title || defaultConfig.step3_title]
+                ])
+            });
+        }
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a213539f58a6e2d',t:'MTc2MzczODgxMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

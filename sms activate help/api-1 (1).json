@@ -1,0 +1,1585 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API protocol for working with SMS-Activate",
+    "version": "2.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v2",
+      "description": "API protocol v2"
+    }
+  ],
+  "paths": {
+    "/countries": {
+      "get": {
+        "tags": [
+          "Countries"
+        ],
+        "summary": "Get the list of countries",
+        "operationId": "8a9892aff609d25e16f24349821dc0e8",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaData"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    },
+    "/currencies": {
+      "get": {
+        "tags": [
+          "Currencies"
+        ],
+        "summary": "Get available currencies",
+        "operationId": "6eff50d579152595d9de31b9c18e1fa5",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CurrenciesResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    },
+    "/currencies/{currency}/rates": {
+      "get": {
+        "tags": [
+          "Currencies"
+        ],
+        "summary": "Get the exchange rate",
+        "operationId": "8a1246fecce0205fd66e292217cb2368",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/currencyPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CurrencyResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    },
+    "/emails": {
+      "get": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Get the list of active purchases",
+        "operationId": "7f17119e77aad0c154d2f5e600ef092a",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/search"
+          },
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          },
+          {
+            "parameter": "status",
+            "name": "status",
+            "in": "query",
+            "description": "Filter by statuses",
+            "required": false,
+            "style": "deepObject",
+            "explode": true,
+            "schema": {
+              "properties": {
+                "id": {
+                  "description": "Parameters used for filtering by activation statuses (3-STATUS_WAIT, 4-STATUS_CANCEL, 5-STATUS_SUCCESS, 6-STATUS_CANCEL_AFTER_SUCCESS)",
+                  "type": "array",
+                  "items": {
+                    "type": "int",
+                    "enum": [
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  }
+                }
+              },
+              "type": "object"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/from"
+          },
+          {
+            "$ref": "#/components/parameters/to"
+          },
+          {
+            "$ref": "#/components/parameters/currencyQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EmailActivation"
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Purchase an activation by mail",
+        "operationId": "22164e5067a27560b8fbf28b2ac1f019",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "required": [
+                  "site",
+                  "mailDomain"
+                ],
+                "properties": {
+                  "site": {
+                    "description": "Website which an activation is purchased for",
+                    "type": "string",
+                    "example": "telegram.com"
+                  },
+                  "mailDomain": {
+                    "description": "Mail domain",
+                    "type": "string",
+                    "example": "gmail.com"
+                  },
+                  "currency": {
+                    "description": "Display currency",
+                    "type": "integer",
+                    "default": 840,
+                    "enum": [
+                      840,
+                      978,
+                      156
+                    ]
+                  },
+                  "service": {
+                    "description": "Service code",
+                    "type": "string",
+                    "example": "tg"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/EmailActivationSuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      }
+    },
+    "/emails/batch": {
+      "post": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Buy activation by mail in bulk",
+        "operationId": "7892a59d83e6e38d154854fe1f1b065f",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "required": [
+                  "site",
+                  "mailDomain",
+                  "count"
+                ],
+                "properties": {
+                  "site": {
+                    "description": "Website which an activation is purchased for",
+                    "type": "string",
+                    "example": "telegram.com"
+                  },
+                  "mailDomain": {
+                    "description": "Mail domain",
+                    "type": "string",
+                    "example": "gmail.com"
+                  },
+                  "count": {
+                    "description": "Number of emails for activation (from 1 to 10)",
+                    "type": "integer",
+                    "maximum": 10,
+                    "minimum": 1,
+                    "example": 5
+                  },
+                  "currency": {
+                    "description": "Display currency",
+                    "type": "integer",
+                    "default": 840,
+                    "enum": [
+                      840,
+                      978,
+                      156
+                    ]
+                  },
+                  "service": {
+                    "description": "Service code",
+                    "type": "string",
+                    "example": "tg"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/EmailActivationBatchSuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      }
+    },
+    "/emails/{emailId}": {
+      "get": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Check status of the activation by mail",
+        "operationId": "c57ebd15edbfa8625b8a60984b76e3c6",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/emailId"
+          },
+          {
+            "$ref": "#/components/parameters/currencyQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmailActivationSuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Cancel the purchase of an activation by mail",
+        "operationId": "20dae8daa691db1282f0d1d268dbac44",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/emailId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "OK"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      }
+    },
+    "/emails/{emailId}/reorder": {
+      "post": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Reorder an activation by mail",
+        "operationId": "bb0d53e0557982f130c1540ed663e831",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/emailId"
+          },
+          {
+            "$ref": "#/components/parameters/currencyQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/EmailActivationSuccessResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      }
+    },
+    "/emails/domains": {
+      "get": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Get the list of available domains",
+        "operationId": "59f271906bdbc81b6b2cdd4213b01775",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "query",
+            "description": "Website which an activation is purchased for",
+            "schema": {
+              "type": "string",
+              "example": "telegram.com"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/currencyQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "name": {
+                            "description": "Domain name",
+                            "type": "string"
+                          },
+                          "cost": {
+                            "description": "Price",
+                            "type": "number",
+                            "format": "float"
+                          },
+                          "currency": {
+                            "description": "Currency",
+                            "type": "string",
+                            "enum": [
+                              643,
+                              840,
+                              978,
+                              156
+                            ]
+                          },
+                          "count": {
+                            "description": "Number of available mails",
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      }
+    },
+    "/emails/services": {
+      "get": {
+        "tags": [
+          "Emails"
+        ],
+        "summary": "Получить список доступных сервисов",
+        "operationId": "8af19d704b0500d7cd31b822062670a1",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/search"
+          },
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          },
+          {
+            "$ref": "#/components/parameters/currencyQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "service": {
+                            "description": "Service code",
+                            "type": "string"
+                          },
+                          "name": {
+                            "description": "Наименование сервиса",
+                            "type": "string"
+                          },
+                          "site": {
+                            "description": "Сайт сервиса",
+                            "type": "string"
+                          },
+                          "minPrice": {
+                            "description": "Минимальная стоимость",
+                            "type": "number",
+                            "format": "float"
+                          },
+                          "count": {
+                            "description": "Number of available mails",
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntityResponse"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        },
+        "security": [
+          {
+            "x_api_key": []
+          }
+        ]
+      }
+    },
+    "/operators/available": {
+      "get": {
+        "tags": [
+          "Operators"
+        ],
+        "summary": "Get the list of available operators",
+        "operationId": "570367d40c79cd266a2ca0af9b1a684f",
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country",
+            "schema": {
+              "type": "string",
+              "example": "66"
+            }
+          },
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service",
+            "schema": {
+              "type": "string",
+              "example": "zong"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Type",
+            "schema": {
+              "type": "integer",
+              "example": "1"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "ruDescription": {
+                        "type": "string"
+                      },
+                      "engDescription": {
+                        "type": "string"
+                      },
+                      "chineseDescription": {
+                        "type": "string"
+                      },
+                      "protocolName": {
+                        "type": "string"
+                      },
+                      "enable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    },
+    "/operators": {
+      "get": {
+        "tags": [
+          "Operators"
+        ],
+        "summary": "Get the list of operators",
+        "operationId": "a27167dfe500e0a841f4ec437746668a",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "countries": {
+                            "type": "array",
+                            "items": {
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            }
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaData"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    },
+    "/partners/products": {
+      "get": {
+        "tags": [
+          "Partners"
+        ],
+        "summary": "Get the list of partner products",
+        "operationId": "9565043c8945ee70d7398d683fd7f3fa",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaData"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    },
+    "/services": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Get the list of services",
+        "operationId": "88756177d58c6102fd2f0a1ac6056b21",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMetaData"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerErrorResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Country": {
+        "description": "Country",
+        "required": [
+          "id",
+          "ru",
+          "eng",
+          "chinese",
+          "pt",
+          "es",
+          "simCount",
+          "code",
+          "show",
+          "sorting",
+          "continent",
+          "promo",
+          "addSms",
+          "rent",
+          "otNote",
+          "multiService",
+          "addedToHub",
+          "countNullCheck",
+          "countNullCheckRent"
+        ],
+        "properties": {
+          "id": {
+            "description": "ID",
+            "type": "integer"
+          },
+          "ru": {
+            "description": "Название на русском",
+            "type": "string"
+          },
+          "eng": {
+            "description": "Название на английском",
+            "type": "string"
+          },
+          "chinese": {
+            "description": "Название на китайском",
+            "type": "string"
+          },
+          "pt": {
+            "description": "Название на португальском",
+            "type": "string"
+          },
+          "es": {
+            "description": "Название на испанском",
+            "type": "string"
+          },
+          "simCount": {
+            "description": "Количество SIM",
+            "type": "string"
+          },
+          "code": {
+            "description": "Country code",
+            "type": "integer"
+          },
+          "show": {
+            "description": "Отображение страны",
+            "type": "boolean"
+          },
+          "sorting": {
+            "description": "сортировка, больше число - выше в списке",
+            "type": "integer"
+          },
+          "continent": {
+            "description": "0 - Европа, 1 - Азия, 2 - Африка, 3 - Северная Америка, 4 - Южная Америка, 5 - Австралия",
+            "type": "integer"
+          },
+          "promo": {
+            "description": "0 - без промо, 1 - пламя, 2 - new",
+            "type": "integer"
+          },
+          "addSms": {
+            "description": "Возможность приема дополнительной смс",
+            "type": "integer"
+          },
+          "rent": {
+            "description": "0-нельзя под аренду, 1-можно под аренду",
+            "type": "integer"
+          },
+          "otNote": {
+            "description": "Уведомление о пустом ot",
+            "type": "integer"
+          },
+          "multiService": {
+            "description": "Множественные услуги",
+            "type": "integer"
+          },
+          "addedToHub": {
+            "description": "Добавление в хаб",
+            "type": "boolean"
+          },
+          "countNullCheck": {
+            "description": "Используется для проверки наличия номеров",
+            "type": "integer"
+          },
+          "countNullCheckRent": {
+            "description": "Для проверки и отображения аренды",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "EmailActivationCreateDTO": {
+        "required": [
+          "userId",
+          "kopeechkaId",
+          "site",
+          "email",
+          "status",
+          "cost",
+          "nativeCost",
+          "vendor",
+          "currency",
+          "domain",
+          "userRank",
+          "source"
+        ],
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "example": 123
+          },
+          "kopeechkaId": {
+            "type": "integer",
+            "example": 456
+          },
+          "site": {
+            "type": "string",
+            "example": "example.com"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "test@example.com"
+          },
+          "status": {
+            "type": "integer",
+            "example": 1
+          },
+          "cost": {
+            "type": "number",
+            "format": "float",
+            "example": 0.25
+          },
+          "nativeCost": {
+            "type": "number",
+            "format": "float",
+            "example": 0.3
+          },
+          "vendor": {
+            "type": "integer",
+            "example": 1
+          },
+          "currency": {
+            "type": "integer",
+            "example": 840
+          },
+          "domain": {
+            "type": "string",
+            "example": "gmail.com"
+          },
+          "userRank": {
+            "type": "integer",
+            "example": 5
+          },
+          "source": {
+            "type": "integer",
+            "example": 1
+          }
+        },
+        "type": "object"
+      },
+      "EmailActivation": {
+        "description": "Activation by mail",
+        "required": [
+          "id",
+          "status",
+          "cost",
+          "currency",
+          "date"
+        ],
+        "properties": {
+          "id": {
+            "description": "ID",
+            "type": "integer"
+          },
+          "site": {
+            "description": "Website which an activation is purchased for",
+            "type": "string"
+          },
+          "email": {
+            "description": "Mail",
+            "type": "string"
+          },
+          "status": {
+            "description": "Activation status",
+            "type": "string",
+            "enum": [
+              "WAIT",
+              "CANCEL",
+              "SUCCESS"
+            ]
+          },
+          "value": {
+            "description": "Code",
+            "type": "string"
+          },
+          "cost": {
+            "description": "Price",
+            "type": "number",
+            "format": "float"
+          },
+          "currency": {
+            "description": "Currency",
+            "type": "string",
+            "enum": [
+              643,
+              840,
+              978,
+              156
+            ]
+          },
+          "date": {
+            "description": "Date of creation",
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-03-06T11:04:07.000000Z"
+          },
+          "full_message": {
+            "description": "Full text of the email",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PaginationMetaData": {
+        "description": "Pagination metadata",
+        "required": [
+          "page",
+          "size",
+          "sort",
+          "total"
+        ],
+        "properties": {
+          "page": {
+            "description": "Number of the page containing data",
+            "type": "integer",
+            "example": 1
+          },
+          "size": {
+            "description": "Size of the page containing data",
+            "type": "integer",
+            "example": 10
+          },
+          "sort": {
+            "description": "Sorting data by several fields",
+            "type": "object",
+            "additionalProperties": {
+              "type": "enum",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          "total": {
+            "description": "Total number",
+            "type": "integer",
+            "example": 100
+          },
+          "hasMore": {
+            "description": "Существует ли следущая страница",
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "type": "object"
+      }
+    },
+    "responses": {
+      "CurrencyResponse": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "required": [
+                    "updated_utc",
+                    "updated_unix",
+                    "rates"
+                  ],
+                  "properties": {
+                    "updated_utc": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2025-03-18T11:40:37Z"
+                    },
+                    "updated_unix": {
+                      "type": "integer",
+                      "example": 1742298037
+                    },
+                    "rates": {
+                      "type": "object",
+                      "example": {
+                        "643": 81.4522,
+                        "840": 1
+                      },
+                      "additionalProperties": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 81.4522
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "CurrenciesResponse": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "example": {
+                    "840": "USD"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "EmailActivationSuccessResponse": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "data"
+              ],
+              "properties": {
+                "data": {
+                  "$ref": "#/components/schemas/EmailActivation"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "EmailActivationBatchSuccessResponse": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmailActivationCreateDTO"
+                  }
+                },
+                "meta": {
+                  "properties": {
+                    "info": {
+                      "type": "string",
+                      "example": "Активация email успешна"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "example": 3
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "NotFoundResponse": {
+        "description": "NOT_FOUND",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "title",
+                "details"
+              ],
+              "properties": {
+                "title": {
+                  "description": "Error code",
+                  "type": "string"
+                },
+                "details": {
+                  "description": "Error details",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "ServerErrorResponse": {
+        "description": "SERVER_ERROR",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "title",
+                "details"
+              ],
+              "properties": {
+                "title": {
+                  "description": "Error code",
+                  "type": "string"
+                },
+                "details": {
+                  "description": "Error details",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "UnauthorizedResponse": {
+        "description": "UNAUTHORIZED",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "title",
+                "details"
+              ],
+              "properties": {
+                "title": {
+                  "description": "Error code",
+                  "type": "string",
+                  "enum": [
+                    "MISSING_API_KEY",
+                    "BAD_API_KEY"
+                  ]
+                },
+                "details": {
+                  "description": "Error details",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      },
+      "UnprocessableEntityResponse": {
+        "description": "UNPROCESSABLE_ENTITY",
+        "content": {
+          "application/json": {
+            "schema": {
+              "required": [
+                "title",
+                "details",
+                "errors"
+              ],
+              "properties": {
+                "title": {
+                  "description": "Error code",
+                  "type": "string"
+                },
+                "details": {
+                  "description": "Error details",
+                  "type": "string"
+                },
+                "errors": {
+                  "type": "object",
+                  "example": {
+                    "parameter1": [
+                      "The parameter1 is required.",
+                      "The parameter1 must be a number."
+                    ],
+                    "parameter2": [
+                      "The parameter2 must be a number."
+                    ]
+                  },
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "emailId": {
+        "name": "emailId",
+        "in": "path",
+        "description": "Email activation ID",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "search": {
+        "name": "search",
+        "in": "query",
+        "description": "Search bar",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "size": {
+        "name": "size",
+        "in": "query",
+        "description": "Size of the page containing data",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "description": "Number of the page containing data",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "sort": {
+        "name": "sort",
+        "in": "query",
+        "description": "Sorting data by several fields",
+        "required": false,
+        "style": "deepObject",
+        "explode": true,
+        "schema": {
+          "properties": {
+            "id": {
+              "description": "Parameters used for filtering and navigation in lists",
+              "type": "string",
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "from": {
+        "name": "from",
+        "in": "query",
+        "description": "Start date of the period in the format of ISO 8601 YYYY-MM-DDTHH:MM:SSZ",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "to": {
+        "name": "to",
+        "in": "query",
+        "description": "Date before the period in the format of ISO 8601 YYYY-MM-DDTHH:MM:SSZ",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "currencyQuery": {
+        "name": "currency",
+        "in": "query",
+        "description": "ISO currency code",
+        "schema": {
+          "type": "integer",
+          "default": 840,
+          "enum": [
+            840,
+            978,
+            156
+          ]
+        }
+      },
+      "currencyPath": {
+        "name": "currency",
+        "in": "path",
+        "description": "ISO currency code",
+        "schema": {
+          "type": "integer",
+          "default": 840,
+          "enum": [
+            840,
+            978,
+            156
+          ]
+        }
+      },
+      "userId": {
+        "name": "userId",
+        "in": "path",
+        "description": "User ID",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "country": {
+        "name": "country",
+        "in": "path",
+        "description": "Country ID",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "service": {
+        "name": "service",
+        "in": "path",
+        "description": "Service code",
+        "schema": {
+          "type": "string",
+          "maxLength": 4,
+          "minLength": 2
+        }
+      },
+      "services": {
+        "name": "services",
+        "in": "path",
+        "description": "Сервисы для мультисервиса",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4,
+            "minLength": 2
+          },
+          "maxItems": 5,
+          "minItems": 2
+        }
+      },
+      "operator": {
+        "name": "operator",
+        "in": "path",
+        "description": "Оператор",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "securitySchemes": {
+      "x_api_key": {
+        "type": "apiKey",
+        "description": "A short description for security scheme",
+        "name": "X-API-Key",
+        "in": "header"
+      },
+      "temp_mobile_key": {
+        "type": "apiKey",
+        "description": "Mobile app token",
+        "name": "X-Temp-Mobile-Key",
+        "in": "header"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Countries",
+      "description": "Countries"
+    },
+    {
+      "name": "Currencies",
+      "description": "Exchange rate"
+    },
+    {
+      "name": "Partners",
+      "description": "Partners"
+    },
+    {
+      "name": "Services",
+      "description": "Services"
+    },
+    {
+      "name": "Emails",
+      "description": "Emails"
+    },
+    {
+      "name": "Operators",
+      "description": "Operators"
+    }
+  ]
+}

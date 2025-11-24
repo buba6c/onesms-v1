@@ -1,0 +1,185 @@
+{
+  "app": {
+    "name": "One SMS",
+    "tagline": "Virtual Phone Numbers for SMS Verification"
+  },
+  "nav": {
+    "home": "Home",
+    "catalog": "Catalog",
+    "myNumbers": "My Numbers",
+    "transactions": "Transactions",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "admin": "Admin",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout"
+  },
+  "hero": {
+    "title": "Get Virtual Numbers Instantly",
+    "subtitle": "Receive SMS verification codes from anywhere in the world",
+    "cta": "Get a Number",
+    "stats": {
+      "users": "Active Users",
+      "sms": "SMS Received",
+      "countries": "Countries"
+    }
+  },
+  "features": {
+    "title": "Why Choose One SMS?",
+    "activation": {
+      "title": "Single Use Activation",
+      "description": "Perfect for one-time verifications. Pay only when you receive SMS."
+    },
+    "rental": {
+      "title": "Short & Long Rentals",
+      "description": "Rent numbers for extended use without service restrictions."
+    },
+    "instant": {
+      "title": "Instant Delivery",
+      "description": "Receive SMS in real-time with webhook integration."
+    },
+    "affordable": {
+      "title": "Pay As You Go",
+      "description": "No subscriptions. Pay only for what you use with credits."
+    }
+  },
+  "catalog": {
+    "title": "Available Services",
+    "search": "Search services...",
+    "filterByCountry": "Filter by Country",
+    "filterByCategory": "Filter by Category",
+    "all": "All",
+    "popular": "Popular",
+    "from": "From",
+    "credits": "credits",
+    "available": "Available Numbers",
+    "selectService": "Select a service to see pricing"
+  },
+  "purchase": {
+    "selectType": "Select Purchase Type",
+    "activation": "Activation",
+    "activationDesc": "Single use, ~20 min duration",
+    "shortRental": "Short Rental",
+    "shortRentalDesc": "Multiple use, limited duration",
+    "longRental": "Long Rental",
+    "longRentalDesc": "Extended use, no restrictions",
+    "selectCountry": "Select Country",
+    "selectOperator": "Select Operator",
+    "price": "Price",
+    "buyNow": "Buy Now",
+    "insufficientCredits": "Insufficient Credits",
+    "addCredits": "Add Credits"
+  },
+  "myNumbers": {
+    "title": "My Numbers",
+    "active": "Active",
+    "expired": "Expired",
+    "all": "All",
+    "number": "Number",
+    "service": "Service",
+    "status": "Status",
+    "expiresIn": "Expires In",
+    "createdAt": "Created",
+    "viewSMS": "View SMS",
+    "cancel": "Cancel",
+    "renew": "Renew",
+    "noNumbers": "No numbers found"
+  },
+  "sms": {
+    "title": "Received SMS",
+    "sender": "Sender",
+    "message": "Message",
+    "code": "Code",
+    "receivedAt": "Received",
+    "copy": "Copy",
+    "export": "Export",
+    "noSMS": "No SMS received yet"
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "balance": "Credit Balance",
+    "activeNumbers": "Active Numbers",
+    "totalSMS": "Total SMS",
+    "recentActivity": "Recent Activity",
+    "quickActions": "Quick Actions",
+    "buyNumber": "Buy Number",
+    "addCredits": "Add Credits",
+    "viewHistory": "View History"
+  },
+  "transactions": {
+    "title": "Transaction History",
+    "type": "Type",
+    "amount": "Amount",
+    "status": "Status",
+    "date": "Date",
+    "payment": "Payment",
+    "refund": "Refund",
+    "pending": "Pending",
+    "completed": "Completed",
+    "failed": "Failed",
+    "export": "Export"
+  },
+  "admin": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "providers": "Providers",
+    "services": "Services",
+    "countries": "Countries",
+    "transactions": "Transactions",
+    "pricing": "Pricing",
+    "analytics": "Analytics",
+    "logs": "Logs",
+    "settings": "Settings"
+  },
+  "auth": {
+    "loginTitle": "Login to Your Account",
+    "registerTitle": "Create New Account",
+    "email": "Email",
+    "password": "Password",
+    "fullName": "Full Name",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "dontHaveAccount": "Don't have an account?",
+    "alreadyHaveAccount": "Already have an account?",
+    "signInWithGoogle": "Sign in with Google",
+    "signInWithApple": "Sign in with Apple",
+    "orContinueWith": "Or continue with"
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "language": "Language",
+    "notifications": "Notifications",
+    "security": "Security",
+    "billing": "Billing",
+    "save": "Save Changes"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "refresh": "Refresh",
+    "noResults": "No results found"
+  },
+  "footer": {
+    "about": "About Us",
+    "contact": "Contact",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "faq": "FAQ",
+    "support": "Support",
+    "copyright": "© 2025 One SMS. All rights reserved."
+  }
+}

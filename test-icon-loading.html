@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chargement Icônes</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .test-item { border: 1px solid #ddd; padding: 10px; border-radius: 4px; text-align: center; }
+        .test-item img { width: 64px; height: 64px; object-fit: contain; margin: 10px auto; display: block; }
+        .status { padding: 5px; border-radius: 3px; font-size: 12px; margin-top: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .loading { background: #fff3cd; color: #856404; }
+        h1 { color: #333; }
+        .stats { background: #e7f3ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .code { font-family: monospace; font-size: 11px; color: #666; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test de Chargement des Icônes</h1>
+        
+        <div class="stats" id="stats">
+            <p>📊 Chargement en cours...</p>
+        </div>
+
+        <div class="test-grid" id="testGrid"></div>
+    </div>
+
+    <script>
+        const services = [
+            { code: 'whatsapp', name: 'WhatsApp' },
+            { code: 'google', name: 'Google' },
+            { code: 'facebook', name: 'Facebook' },
+            { code: 'telegram', name: 'Telegram' },
+            { code: 'instagram', name: 'Instagram' },
+            { code: 'tiktok', name: 'TikTok' },
+            { code: 'twitter', name: 'Twitter' },
+            { code: 'discord', name: 'Discord' },
+            { code: 'netflix', name: 'Netflix' },
+            { code: 'spotify', name: 'Spotify' },
+            { code: 'apple', name: 'Apple' },
+            { code: 'microsoft', name: 'Microsoft' }
+        ];
+
+        const results = {
+            success: 0,
+            error: 0,
+            details: []
+        };
+
+        async function testIcon(service) {
+            const item = document.createElement('div');
+            item.className = 'test-item';
+            item.innerHTML = `
+                <h3>${service.name}</h3>
+                <img id="img-${service.code}" alt="${service.name}">
+                <div class="status loading" id="status-${service.code}">Chargement...</div>
+                <div class="code" id="url-${service.code}"></div>
+            `;
+            document.getElementById('testGrid').appendChild(item);
+
+            // Test 1: S3 URL
+            const s3Url = `https://onesms.s3.eu-north-1.amazonaws.com/icons/${service.code}/icon.svg`;
+            const urlDiv = document.getElementById(`url-${service.code}`);
+            urlDiv.textContent = s3Url;
+
+            const img = document.getElementById(`img-${service.code}`);
+            const statusDiv = document.getElementById(`status-${service.code}`);
+
+            try {
+                const response = await fetch(s3Url, { method: 'HEAD' });
+                
+                if (response.ok) {
+                    img.src = s3Url;
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = `✅ OK (${response.status})`;
+                    results.success++;
+                    results.details.push({ service: service.name, status: 'success', url: s3Url });
+                    
+                    // Log headers
+                    console.log(`✅ ${service.name}:`, {
+                        status: response.status,
+                        contentType: response.headers.get('content-type'),
+                        lastModified: response.headers.get('last-modified'),
+                        cacheControl: response.headers.get('cache-control')
+                    });
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `❌ Error ${response.status}`;
+                    results.error++;
+                    results.details.push({ service: service.name, status: 'error', code: response.status, url: s3Url });
+                    
+                    console.error(`❌ ${service.name}: HTTP ${response.status}`);
+                }
+            } catch (err) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `❌ ${err.message}`;
+                results.error++;
+                results.details.push({ service: service.name, status: 'error', message: err.message });
+                
+                console.error(`❌ ${service.name}:`, err);
+            }
+
+            updateStats();
+        }
+
+        function updateStats() {
+            const total = results.success + results.error;
+            const percent = total > 0 ? Math.round((results.success / total) * 100) : 0;
+            
+            document.getElementById('stats').innerHTML = `
+                <h3>📊 Statistiques</h3>
+                <p><strong>Total testé:</strong> ${total} / ${services.length}</p>
+                <p><strong>✅ Succès:</strong> ${results.success}</p>
+                <p><strong>❌ Échecs:</strong> ${results.error}</p>
+                <p><strong>📈 Taux de réussite:</strong> ${percent}%</p>
+            `;
+
+            if (total === services.length) {
+                console.log('🎯 Résultats finaux:', results);
+            }
+        }
+
+        // Lancer les tests
+        services.forEach(service => testIcon(service));
+    </script>
+</body>
+</html>

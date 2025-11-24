@@ -1,0 +1,25 @@
+{
+  "name": "import-icons",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Automatic icon generator for 1300+ services",
+  "main": "import-icons.js",
+  "scripts": {
+    "import": "node import-icons.js",
+    "test": "node import-icons.js --limit 10"
+  },
+  "dependencies": {
+    "simple-icons": "^11.8.0",
+    "string-similarity": "^4.0.4",
+    "node-fetch": "^3.3.2",
+    "sharp": "^0.33.1",
+    "svgo": "^3.2.0",
+    "@thiagoelg/node-potrace": "^2.2.2",
+    "p-limit": "^5.0.0",
+    "@aws-sdk/client-s3": "^3.478.0",
+    "@supabase/supabase-js": "^2.39.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5"
+  }
+}

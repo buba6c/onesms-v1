@@ -1,0 +1,185 @@
+{
+  "app": {
+    "name": "One SMS",
+    "tagline": "Numéros Virtuels pour Vérification SMS"
+  },
+  "nav": {
+    "home": "Accueil",
+    "catalog": "Catalogue",
+    "myNumbers": "Mes Numéros",
+    "transactions": "Transactions",
+    "dashboard": "Tableau de bord",
+    "settings": "Paramètres",
+    "admin": "Admin",
+    "login": "Connexion",
+    "register": "Inscription",
+    "logout": "Déconnexion"
+  },
+  "hero": {
+    "title": "Obtenez des Numéros Virtuels Instantanément",
+    "subtitle": "Recevez des codes de vérification SMS du monde entier",
+    "cta": "Obtenir un Numéro",
+    "stats": {
+      "users": "Utilisateurs Actifs",
+      "sms": "SMS Reçus",
+      "countries": "Pays"
+    }
+  },
+  "features": {
+    "title": "Pourquoi Choisir One SMS ?",
+    "activation": {
+      "title": "Activation Usage Unique",
+      "description": "Parfait pour les vérifications ponctuelles. Payez uniquement à réception du SMS."
+    },
+    "rental": {
+      "title": "Location Courte & Longue",
+      "description": "Louez des numéros pour un usage prolongé sans restrictions de service."
+    },
+    "instant": {
+      "title": "Livraison Instantanée",
+      "description": "Recevez les SMS en temps réel avec intégration webhook."
+    },
+    "affordable": {
+      "title": "Paiement à l'Usage",
+      "description": "Pas d'abonnement. Payez uniquement ce que vous utilisez avec des crédits."
+    }
+  },
+  "catalog": {
+    "title": "Services Disponibles",
+    "search": "Rechercher des services...",
+    "filterByCountry": "Filtrer par Pays",
+    "filterByCategory": "Filtrer par Catégorie",
+    "all": "Tous",
+    "popular": "Populaires",
+    "from": "À partir de",
+    "credits": "crédits",
+    "available": "Numéros Disponibles",
+    "selectService": "Sélectionnez un service pour voir les prix"
+  },
+  "purchase": {
+    "selectType": "Sélectionnez le Type d'Achat",
+    "activation": "Activation",
+    "activationDesc": "Usage unique, durée ~20 min",
+    "shortRental": "Location Courte",
+    "shortRentalDesc": "Usage multiple, durée limitée",
+    "longRental": "Location Longue",
+    "longRentalDesc": "Usage étendu, sans restrictions",
+    "selectCountry": "Sélectionnez le Pays",
+    "selectOperator": "Sélectionnez l'Opérateur",
+    "price": "Prix",
+    "buyNow": "Acheter Maintenant",
+    "insufficientCredits": "Crédits Insuffisants",
+    "addCredits": "Ajouter des Crédits"
+  },
+  "myNumbers": {
+    "title": "Mes Numéros",
+    "active": "Actifs",
+    "expired": "Expirés",
+    "all": "Tous",
+    "number": "Numéro",
+    "service": "Service",
+    "status": "Statut",
+    "expiresIn": "Expire Dans",
+    "createdAt": "Créé le",
+    "viewSMS": "Voir SMS",
+    "cancel": "Annuler",
+    "renew": "Renouveler",
+    "noNumbers": "Aucun numéro trouvé"
+  },
+  "sms": {
+    "title": "SMS Reçus",
+    "sender": "Expéditeur",
+    "message": "Message",
+    "code": "Code",
+    "receivedAt": "Reçu le",
+    "copy": "Copier",
+    "export": "Exporter",
+    "noSMS": "Aucun SMS reçu pour le moment"
+  },
+  "dashboard": {
+    "welcome": "Bienvenue",
+    "balance": "Solde de Crédits",
+    "activeNumbers": "Numéros Actifs",
+    "totalSMS": "Total SMS",
+    "recentActivity": "Activité Récente",
+    "quickActions": "Actions Rapides",
+    "buyNumber": "Acheter un Numéro",
+    "addCredits": "Ajouter des Crédits",
+    "viewHistory": "Voir l'Historique"
+  },
+  "transactions": {
+    "title": "Historique des Transactions",
+    "type": "Type",
+    "amount": "Montant",
+    "status": "Statut",
+    "date": "Date",
+    "payment": "Paiement",
+    "refund": "Remboursement",
+    "pending": "En attente",
+    "completed": "Complété",
+    "failed": "Échoué",
+    "export": "Exporter"
+  },
+  "admin": {
+    "dashboard": "Tableau de bord",
+    "users": "Utilisateurs",
+    "providers": "Fournisseurs",
+    "services": "Services",
+    "countries": "Pays",
+    "transactions": "Transactions",
+    "pricing": "Tarification",
+    "analytics": "Analytiques",
+    "logs": "Journaux",
+    "settings": "Paramètres"
+  },
+  "auth": {
+    "loginTitle": "Connexion à Votre Compte",
+    "registerTitle": "Créer un Nouveau Compte",
+    "email": "Email",
+    "password": "Mot de passe",
+    "fullName": "Nom Complet",
+    "confirmPassword": "Confirmer le Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "dontHaveAccount": "Vous n'avez pas de compte ?",
+    "alreadyHaveAccount": "Vous avez déjà un compte ?",
+    "signInWithGoogle": "Se connecter avec Google",
+    "signInWithApple": "Se connecter avec Apple",
+    "orContinueWith": "Ou continuer avec"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "profile": "Profil",
+    "language": "Langue",
+    "notifications": "Notifications",
+    "security": "Sécurité",
+    "billing": "Facturation",
+    "save": "Enregistrer les Modifications"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "save": "Enregistrer",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "sort": "Trier",
+    "refresh": "Actualiser",
+    "noResults": "Aucun résultat trouvé"
+  },
+  "footer": {
+    "about": "À Propos",
+    "contact": "Contact",
+    "terms": "Conditions d'Utilisation",
+    "privacy": "Politique de Confidentialité",
+    "faq": "FAQ",
+    "support": "Support",
+    "copyright": "© 2025 One SMS. Tous droits réservés."
+  }
+}

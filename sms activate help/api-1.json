@@ -1,0 +1,4214 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API protocol for working with SMS-Activate",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "/stubs",
+      "description": "Main API server"
+    }
+  ],
+  "paths": {
+    "/handler_api.php?action=getCountries": {
+      "get": {
+        "tags": [
+          "sa ref"
+        ],
+        "summary": "Get the list of countries",
+        "description": "Returns an object with information about countries",
+        "operationId": "getCountries",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Country"
+                },
+                "examples": {
+                  "correctExample": {
+                    "$ref": "#/components/examples/countriesCorrectExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getServicesList": {
+      "get": {
+        "tags": [
+          "sa ref"
+        ],
+        "summary": "Get the list of services",
+        "description": "Этот метод возвращает список сервисов в зависимости от переданных параметров.\nЕсли указана страна, возвращаются только те сервисы, у которых есть цены для этой страны.",
+        "operationId": "getServicesList",
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country ID to filter services",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "description": "Language for displaying the service name",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "enum": [
+                "ru",
+                "en",
+                "es",
+                "cn"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                },
+                "examples": {
+                  "correctExample": {
+                    "$ref": "#/components/examples/servicesCorrectExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getUn1": {
+      "get": {
+        "tags": [
+          "sa ref"
+        ],
+        "summary": "Получить список всех операторов",
+        "operationId": "getUn1",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getUn2": {
+      "get": {
+        "tags": [
+          "sa ref"
+        ],
+        "summary": "Get the list of all partners",
+        "operationId": "getUn2",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getUn3": {
+      "get": {
+        "tags": [
+          "sa ref"
+        ],
+        "summary": "Get the list of languages for voice activations",
+        "operationId": "getUn3",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getNumbersStatus": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Request for the quantity of available numbers",
+        "description": "Этот метод возвращает количество доступных номеров для различных сервисов в зависимости от страны и оператора.\n**В ключе ответа до нижнего подчеркивания - название сервиса, после - обозначение нужно ли включать переадресацию. 0 - нет. 1 - да.**",
+        "operationId": "getNumbersStatus",
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 0
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "description": "Код оператора (можно передавать несколько через запятую).\nДля Украины (country=1): `kyivstar`, `life`, `utel`, `mts`, `vodafone`\nДля Казахстана (country=2): `tele2`, `beeline`, `activ`, `altel`\n**Доступно только для country = 1, 2**",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "mts,beeline"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberStatus"
+                },
+                "examples": {
+                  "correctExample": {
+                    "$ref": "#/components/examples/numbersCorrectExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getTopCountriesByService": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Request top countries by service",
+        "description": "Request top countries by service",
+        "operationId": "getTopCountriesByService",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service code. If it is not specified, then the top countries for all services will be displayed by default.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "freePrice",
+            "in": "query",
+            "description": "If true is passed, then the quantity and price will be passed according to Free Price.",
+            "required": false,
+            "explode": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopCountriesByService"
+                },
+                "examples": {
+                  "topCountriesAllServicesExample": {
+                    "$ref": "#/components/examples/topCountriesAllServicesExample"
+                  },
+                  "topCountriesOneServiceExample": {
+                    "$ref": "#/components/examples/topCountriesOneServiceExample"
+                  },
+                  "topCountriesAllServicesFreePriceExample": {
+                    "$ref": "#/components/examples/topCountriesAllServicesFreePriceExample"
+                  },
+                  "topCountriesOneServiceFreePriceExample": {
+                    "$ref": "#/components/examples/topCountriesOneServiceFreePriceExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getBalance": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the balance",
+        "description": "Returns a string with the balance in the format `ACCESS_BALANCE:number`",
+        "operationId": "getBalance",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successfully got the balance ",
+                    "value": "ACCESS_BALANCE:99.00"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getBalanceAndCashBack": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the balance including accumulated cashback",
+        "description": "Get the balance including accumulated cashback if the checkbox 'Spend cashback on activations' is selected in the cashback account settings.",
+        "operationId": "getBalanceAndCashBack",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successfully got the balance ",
+                    "value": "ACCESS_BALANCE:99.00"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getOperators": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Request available operators",
+        "description": "Returns all operators available for the specified country. If no country is specified, then all operators available for every country are returned.",
+        "operationId": "getOperators",
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country code",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "countryOperators": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "operatorsSuccessfulExample": {
+                    "$ref": "#/components/examples/operatorsSuccessfulExample"
+                  },
+                  "operatorsNotFoundExample": {
+                    "$ref": "#/components/examples/operatorsNotFoundExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getActiveActivations": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Request active activations",
+        "description": "Request active activations. The currency in the response is specified according to the ISO-4217 standard",
+        "operationId": "getActiveActivations",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "countryOperators": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ActiveActivation"
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "activationsSuccessfulExample": {
+                    "$ref": "#/components/examples/activationsSuccessfulExample"
+                  },
+                  "activationsNotFoundExample": {
+                    "$ref": "#/components/examples/activationsNotFoundExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getNumber": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Request a number",
+        "description": "Request a number",
+        "operationId": "getNumber",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service. View the table",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "forward",
+            "in": "query",
+            "description": "If it is necessary to request a number with call forwarding? 0 - do not perform, set by default, 1 - perform",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0,
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country. View the table",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "description": "Number's mobile operator, you can specify several separated by commas. Available for the following operators: For Ukraine (country=1): `kyivstar`, `life`, `utel`, `mts`, `vodafone` For Kazakhstan (country=2): `tele2`, `beeline`, `activ`, `altel` **Available only for country = 1, 2**",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "phoneException",
+            "in": "query",
+            "description": "Исключающие префиксы для номеров Казахстана.\nУказывать через запятую. Формат записи код страны и от 3 до 6 цифр маски (например 7918, 7900111).\nПо умолчанию берётся значение, заданное в профиле",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "in": "query",
+            "description": "The maximum price you are willing to pay for a number with Free Price. If not specified, the purchase will be made at the regular price",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "activationType",
+            "in": "query",
+            "description": "Activation type. 0 - SMS (default), 1 - by number, 2 - by voice",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0,
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "description": "Parsing language (required for voice activation) view the table",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "Идентификатор пользователя для бана за плохую статистику активаций, при этом не затрагивается аккаунт самого реселлера",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "useCashBack",
+            "in": "query",
+            "description": "ринимает значение boolean, при параметре 'true' покупка номера будет происходить за кешбэк.\nПосле окончания денег на кешбэке все последующие покупки будут покупаться за баланс.\nВАЖНО помнить, что все последующие покупки будут в первую очередь использовать кешбэк,\nа потом уже основной баланс (даже если после передать параметр 'false'.)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "description": "Referral identifier",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "successfulNumberExample": {
+                    "summary": "Successful got a number",
+                    "value": "ACCESS_NUMBER:123456789:7*********0"
+                  },
+                  "numbersNotFoundExample": {
+                    "$ref": "#/components/examples/noNumbersExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "badServiceExample": {
+                    "$ref": "#/components/examples/badServiceExample"
+                  },
+                  "bannedExample": {
+                    "$ref": "#/components/examples/bannedExample"
+                  },
+                  "wrongExceptionPhoneExample": {
+                    "$ref": "#/components/examples/wrongExceptionPhoneExample"
+                  },
+                  "noBalanceForwardExample": {
+                    "$ref": "#/components/examples/noBalanceForwardExample"
+                  },
+                  "wrongMaxPriceExample": {
+                    "$ref": "#/components/examples/wrongMaxPriceExample"
+                  },
+                  "channelsLimitExample": {
+                    "$ref": "#/components/examples/channelsLimitExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getNumberV2": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Request a number V2",
+        "description": "Метод работает аналогично методу getNumber, принимает те же параметры и дополнительно описанные ниже,\nно возвращает дополнительную информацию об активации",
+        "operationId": "getNumberV2",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service. View the table",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "forward",
+            "in": "query",
+            "description": "If it is necessary to request a number with call forwarding? 0 - do not perform, set by default, 1 - perform",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0,
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country. View the table",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "description": "Number's mobile operator, you can specify several separated by commas. Available for the following operators: For Ukraine (country=1): `kyivstar`, `life`, `utel`, `mts`, `vodafone` For Kazakhstan (country=2): `tele2`, `beeline`, `activ`, `altel` **Available only for country = 1, 2**",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "phoneException",
+            "in": "query",
+            "description": "Исключающие префиксы для номеров Казахстана. Указывать через запятую.\nФормат записи код страны и от 3 до 6 цифр маски (например 7918, 7900111).\nПо умолчанию берётся значение, заданное в профиле",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "in": "query",
+            "description": "The maximum price you are willing to pay for a number with Free Price. If not specified, the purchase will be made at the regular price",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "activationType",
+            "in": "query",
+            "description": "Activation type. 0 - SMS (default), 1 - by number, 2 - by voice",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 0,
+              "enum": [
+                0,
+                1,
+                2
+              ]
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "description": "Parsing language (required for voice activation) view the table",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "Идентификатор пользователя для бана за плохую статистику активаций, при этом не затрагивается аккаунт самого реселлера",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "useCashBack",
+            "in": "query",
+            "description": "Принимает значение boolean, при параметре 'true' покупка номера будет происходить за кешбэк.\nПосле окончания денег на кешбэке все последующие покупки будут покупаться за баланс.\nВАЖНО помнить, что все последующие покупки будут в первую очередь использовать кешбэк,\nа потом уже основной баланс (даже если после передать параметр 'false'.)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "description": "Referral identifier",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "query",
+            "description": "Id активации из системы реселлера. При покупке эти данные сопоставляются с id активации и реселлером в нашей системе.\nТаким образом хотим достичь идемпотентности (вновь один и тот же ордер не обработается).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "successfulNumberExample": {
+                    "$ref": "#/components/examples/successfulNumberv2Example"
+                  },
+                  "numbersNotFoundExample": {
+                    "$ref": "#/components/examples/noNumbersExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "badServiceExample": {
+                    "$ref": "#/components/examples/badServiceExample"
+                  },
+                  "bannedExample": {
+                    "$ref": "#/components/examples/bannedExample"
+                  },
+                  "orderAlreadyExists": {
+                    "summary": "Order has been created",
+                    "value": "ORDER_ALREADY_EXISTS"
+                  },
+                  "wrongExceptionPhoneExample": {
+                    "$ref": "#/components/examples/wrongExceptionPhoneExample"
+                  },
+                  "noBalanceForwardExample": {
+                    "$ref": "#/components/examples/noBalanceForwardExample"
+                  },
+                  "wrongMaxPriceExample": {
+                    "$ref": "#/components/examples/wrongMaxPriceExample"
+                  },
+                  "channelsLimitExample": {
+                    "$ref": "#/components/examples/channelsLimitExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getMultiServiceNumber": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Order a number for multiple services",
+        "description": "Order a number for multiple services",
+        "operationId": "getMultiServiceNumber",
+        "parameters": [
+          {
+            "name": "multiService",
+            "in": "query",
+            "description": "Accepts a value in the form of a list of services separated by commas",
+            "required": true,
+            "explode": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "multiForward",
+            "in": "query",
+            "description": "Необходимо ли запросить номер с переадресацией. Символы переадресации указываются через запятую,\nколичество цифр переадресации должно совпадать с количеством передаваемых сервисов в параметре multiService.\nДопустимо передавать только 1 сервис с переадресацией, например \"0,1,0,0\" - корректно, \"0,1,1,0\" - некорректно.\nПринимает 0 (не выполнять, установлено по умолчанию), 1 (выполнять)",
+            "required": false,
+            "explode": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "description": "Number's mobile operator, you can specify several separated by commas. Available for the following operators: For Ukraine (country=1): `kyivstar`, `life`, `utel`, `mts`, `vodafone` For Kazakhstan (country=2): `tele2`, `beeline`, `activ`, `altel` **Available only for country = 1, 2**",
+            "required": false,
+            "explode": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "description": "Referral identifier",
+            "required": false,
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "The country of ordered numbers",
+            "required": false,
+            "explode": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "properties": {
+                      "phone": {
+                        "type": "string"
+                      },
+                      "activation": {
+                        "type": "integer"
+                      },
+                      "service": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "examples": {
+                  "successfulNumberExample": {
+                    "$ref": "#/components/examples/successfulMultiserviceExample"
+                  },
+                  "numbersNotFoundExample": {
+                    "$ref": "#/components/examples/noNumbersExample"
+                  },
+                  "noBalanceExample": {
+                    "$ref": "#/components/examples/noBalanceExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "badServiceExample": {
+                    "$ref": "#/components/examples/badServiceExample"
+                  },
+                  "bannedExample": {
+                    "$ref": "#/components/examples/bannedExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=setStatus": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Activation status change",
+        "description": "Изменение статуса активации.\nЛогика работы следующая:\n* Получить номер используя метод getNumber\n* После этого доступны следующие действия:\n8 - отменить активацию (если номер Вам не подошел)\n1 - сообщить, что SMS отправлена (необязательно)\n* Для активации со статусом 1:\n8 - отменить активацию сразу после получения кода\n3 - запросить еще одну смс\n6 - подтвердить SMS-код и завершить активацию\n* Для активации со статусом 3:\n6 - подтвердить SMS-код и завершить активацию",
+        "operationId": "setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Activation ID to change the status",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "forward",
+            "in": "query",
+            "description": "Required only if the parameter forward=1 was passed with getNumber",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Статус активации: 1 - SMS отправлена, 3 - запросить код, 6 - завершить активацию, 8 - отменить активацию",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "default": 1,
+              "enum": [
+                1,
+                3,
+                6,
+                8
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "successfulAccessReadyExample": {
+                    "$ref": "#/components/examples/successfulAccessReadyExample"
+                  },
+                  "successfulRetryGetExample": {
+                    "$ref": "#/components/examples/successfulRetryGetExample"
+                  },
+                  "successfulAccessActivationExample": {
+                    "$ref": "#/components/examples/successfulAccessActivationExample"
+                  },
+                  "successfulAccessCancelExample": {
+                    "$ref": "#/components/examples/successfulAccessCancelExample"
+                  },
+                  "earlyCancelDeniedExample": {
+                    "$ref": "#/components/examples/earlyCancelDeniedExample"
+                  },
+                  "noActivationExample": {
+                    "$ref": "#/components/examples/noActivationExample"
+                  },
+                  "badStatusExample": {
+                    "$ref": "#/components/examples/badStatusExample"
+                  },
+                  "wrongActivationIdExample": {
+                    "$ref": "#/components/examples/wrongActivationIdExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "badServiceExample": {
+                    "$ref": "#/components/examples/badServiceExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getStatus": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the activation status",
+        "description": "Get the activation status",
+        "operationId": "getStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Activation ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный ответ.\nСтатус **STATUS_WAIT_RETRY** возвращает также прошлый, неподошедший код.\nСофт должен нажать повторно выслать смс и выполнить изменение статуса на 6 \nСтатус **STATUS_OK** возвращает также код.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "successfulWaitCodeExample": {
+                    "$ref": "#/components/examples/successfulWaitCodeExample"
+                  },
+                  "successfulWaitRetryExample": {
+                    "$ref": "#/components/examples/successfulWaitRetryExample"
+                  },
+                  "successfulWaitResendExample": {
+                    "$ref": "#/components/examples/successfulWaitResendExample"
+                  },
+                  "successfulCancelExample": {
+                    "$ref": "#/components/examples/successfulCancelExample"
+                  },
+                  "successfulOKExample": {
+                    "$ref": "#/components/examples/successfulOKExample"
+                  },
+                  "noActivationExample": {
+                    "$ref": "#/components/examples/noActivationExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getStatusV2": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the activation status Version 2",
+        "description": "Get the activation status Version 2",
+        "operationId": "getStatusV2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Activation ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationStatusV2"
+                },
+                "examples": {
+                  "correctActivationStatusExample": {
+                    "$ref": "#/components/examples/successfulActivationV2Example"
+                  },
+                  "successfulCancelExample": {
+                    "summary": "Activation canceled",
+                    "value": "STATUS_CANCEL"
+                  },
+                  "noActivationExample": {
+                    "summary": "Activation ID doesn't exist",
+                    "value": "NO_ACTIVATION"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getHistory": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the activation history",
+        "description": "Get the activation history",
+        "operationId": "getHistory",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "description": "Timestamp of the Unix Timestamp format means which date to consider activations from",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "description": "Timestamp of the Unix Timestamp format, which date to consider activations to",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset of the first element returned in the response. Default is 0",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The maximum number of returned records. Maximum is 100. Default is 50.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationsHistory"
+                },
+                "examples": {
+                  "correctActivationStatusExample": {
+                    "$ref": "#/components/examples/successfulActivationsHistoryExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getListOfTopCountriesByService": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the top 10 countries by the service",
+        "description": "Получить топ 10 стран по сервису.\n**share** - Покупки выбранного сервиса по стране в процентном отношении к общему количеству покупок у нас на сервисе\n**rate** - % успешных активаций среди общего количества по стране",
+        "operationId": "getListOfTopCountriesByService",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Top10Countries"
+                },
+                "examples": {
+                  "correctTop10CountriesExample": {
+                    "$ref": "#/components/examples/successfulTop10CountriesExample"
+                  },
+                  "wrongServiceExample": {
+                    "summary": "Service name incorrect",
+                    "value": "WRONG_SERVICE"
+                  },
+                  "wrongServiceExample2": {
+                    "summary": "Service name not specified",
+                    "value": {
+                      "status": "error",
+                      "error": "WRONG_SERVICE"
+                    }
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getIncomingCallStatus": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get a status of the incoming call ",
+        "description": "Получить статус входящего звонка\nВОЗМОЖНЫЕ СТАТУСЫ:\n2 - новая активация\n3 - успешно закрыта\n4 - отменена\n5 - возвращена",
+        "operationId": "getIncomingCallStatus",
+        "parameters": [
+          {
+            "name": "activationId",
+            "in": "query",
+            "description": "Activation ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncomingCallStatus"
+                },
+                "examples": {
+                  "correctIncomingCallStatusExample": {
+                    "summary": "Correct activation status (no phone number)",
+                    "value": {
+                      "status": "2",
+                      "phone": false
+                    }
+                  },
+                  "correctIncomingCallStatusExample3": {
+                    "summary": "Correct activation status (phone number available)",
+                    "value": {
+                      "status": "3",
+                      "phone": "7*********0"
+                    }
+                  },
+                  "wrongActivationIdExample": {
+                    "$ref": "#/components/examples/wrongActivationIdExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getPrices": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get current prices by countries",
+        "description": "Get current prices by countries",
+        "operationId": "getPrices",
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country. All countries by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service. All services by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricesByCountry"
+                },
+                "examples": {
+                  "correctIncomingCallStatusExample": {
+                    "summary": "Correct response with prices for services",
+                    "value": [
+                      {
+                        "baa": {
+                          "cost": 0.08,
+                          "count": 25370,
+                          "physicalCount": 14528
+                        }
+                      }
+                    ]
+                  },
+                  "incorrectServiceExample": {
+                    "$ref": "#/components/examples/incorrectServiceExample"
+                  },
+                  "incorrectCountryExample": {
+                    "$ref": "#/components/examples/incorrectCountryExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getPricesExtended": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get current prices by countries (FreePrice)",
+        "description": "Get current prices by countries (FreePrice)",
+        "operationId": "getPricesExtended",
+        "parameters": [
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country. All countries by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service. All services by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "freePrice",
+            "in": "query",
+            "description": "Optional parameter. If true is passed, the quantity and price will be passed according to Free Price",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricesByCountry"
+                },
+                "examples": {
+                  "correctIncomingCallStatusExample": {
+                    "summary": "Correct response with prices for services",
+                    "value": [
+                      {
+                        "baa": {
+                          "cost": 0.08,
+                          "count": 25370,
+                          "physicalCount": 14528
+                        }
+                      }
+                    ]
+                  },
+                  "incorrectServiceExample": {
+                    "$ref": "#/components/examples/incorrectServiceExample"
+                  },
+                  "incorrectCountryExample": {
+                    "$ref": "#/components/examples/incorrectCountryExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getPricesVerification": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get current prices of services for verification ",
+        "description": "Get current prices of services for verification ",
+        "operationId": "getPricesVerification",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service. All services by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricesByService"
+                },
+                "examples": {
+                  "correctIncomingCallStatusExample": {
+                    "summary": "Correct response with service prices",
+                    "value": {
+                      "go": [
+                        {
+                          "count": 1119,
+                          "price": 1.85,
+                          "retail_price": 2.75
+                        }
+                      ]
+                    }
+                  },
+                  "incorrectServiceExample": {
+                    "$ref": "#/components/examples/incorrectServiceExample"
+                  },
+                  "incorrectCountryExample": {
+                    "$ref": "#/components/examples/incorrectCountryExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getAdditionalService": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Additional service for numbers with call forwarding",
+        "description": "Additional service for numbers with call forwarding",
+        "operationId": "getAdditionalService",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "Service code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Parental activation ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "correctIncomingCallStatusExample": {
+                    "summary": "New activation successfully created",
+                    "value": "ADDITIONAL:<id>:<phone>"
+                  },
+                  "wrongAdditionalService": {
+                    "summary": "Incorrect additional service",
+                    "value": "WRONG_ADDITIONAL_SERVICE"
+                  },
+                  "wrongActivationIdExample": {
+                    "$ref": "#/components/examples/wrongActivationIdExample"
+                  },
+                  "wrongSecurityExample": {
+                    "summary": "Attempt to transmit the activation ID without call forwarding or an active one",
+                    "value": "WRONG_SECURITY"
+                  },
+                  "repeatAdditionalServiceExample": {
+                    "summary": "Attempt to order the purchased service again",
+                    "value": "REPEAT_ADDITIONAL_SERVICE"
+                  },
+                  "noBalanceExample": {
+                    "$ref": "#/components/examples/noBalanceExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getExtraActivation": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Additional number activation",
+        "description": "Additional number activation",
+        "operationId": "getExtraActivation",
+        "parameters": [
+          {
+            "name": "activationId",
+            "in": "query",
+            "description": "Activation ID to be prolonged",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "correctIncomingCallStatusExample": {
+                    "summary": "Additional activation successfully created",
+                    "value": "ACCESS_NUMBER:<id>:<phone>"
+                  },
+                  "wrongActivationIdExample": {
+                    "summary": "Unfinished parental activation",
+                    "value": {
+                      "status": "error",
+                      "msg": "Message",
+                      "error": "WRONG_ACTIVATION_ID"
+                    }
+                  },
+                  "simOfflineExample": {
+                    "summary": "Sim card is offline",
+                    "value": {
+                      "status": "error",
+                      "msg": "Message",
+                      "error": "SIM_OFFLINE"
+                    }
+                  },
+                  "renewActivationNotAvailableExample": {
+                    "summary": "It is not possible to prolong the activation",
+                    "value": {
+                      "status": "error",
+                      "msg": "Message",
+                      "error": "RENEW_ACTIVATION_NOT_AVAILABLE"
+                    }
+                  },
+                  "newActivationImpossibleExample": {
+                    "summary": "Additional activation is not possible",
+                    "value": "NEW_ACTIVATION_IMPOSSIBLE"
+                  },
+                  "noBalanceExample": {
+                    "$ref": "#/components/examples/noBalanceExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=checkExtraActivation": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Get the price for additional number activation",
+        "description": "Get the price for additional number activation",
+        "operationId": "checkExtraActivation",
+        "parameters": [
+          {
+            "name": "activationId",
+            "in": "query",
+            "description": "Activation ID to be prolonged",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "cost": {
+                      "type": "number"
+                    },
+                    "service": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "type": "integer"
+                    },
+                    "country": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful return of info about activation",
+                    "value": {
+                      "status": "success",
+                      "cost": 0.5,
+                      "service": "tw",
+                      "phone": 77777777777,
+                      "country": 2
+                    }
+                  },
+                  "simOfflineExample": {
+                    "summary": "Sim card is offline",
+                    "value": {
+                      "status": "error",
+                      "msg": "Message",
+                      "error": "SIM_OFFLINE"
+                    }
+                  },
+                  "wrongActivationIdExample": {
+                    "summary": "Activation ID is incorrect",
+                    "value": {
+                      "status": "error",
+                      "msg": "Message",
+                      "error": "RENEW_ACTIVATION_NOT_AVAILABLE"
+                    }
+                  },
+                  "renewActivationNotAvailableExample": {
+                    "summary": "It is not possible to prolong the activation",
+                    "value": {
+                      "status": "error",
+                      "msg": "Message",
+                      "error": "RENEW_ACTIVATION_NOT_AVAILABLE"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=parseCall": {
+      "get": {
+        "tags": [
+          "sa"
+        ],
+        "summary": "Repeated voice parsing",
+        "description": "Repeated voice parsing",
+        "operationId": "parseCall",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Activation ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "newLang",
+            "in": "query",
+            "description": "New parsing language",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful return of info about activation",
+                    "value": {
+                      "result": "OK"
+                    }
+                  },
+                  "successfulCancelExample": {
+                    "summary": "Activation canceled",
+                    "value": "STATUS_CANCEL"
+                  },
+                  "noCallExample": {
+                    "summary": "There was no call",
+                    "value": "NO_CALL"
+                  },
+                  "parceCountExceed": {
+                    "summary": "Parsing attempts limit (maximum is 4)",
+                    "value": "PARSE_COUNT_EXCEED"
+                  },
+                  "wrongActivationIdExample": {
+                    "$ref": "#/components/examples/wrongActivationIdExample"
+                  },
+                  "sqlServerErrorExample": {
+                    "$ref": "#/components/examples/sqlServerErrorExample"
+                  },
+                  "badActionExample": {
+                    "$ref": "#/components/examples/badActionExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getRentServicesAndCountries": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Request available countries and services",
+        "description": "Request available countries and services",
+        "operationId": "getRentServicesAndCountries",
+        "parameters": [
+          {
+            "name": "rent_time",
+            "in": "query",
+            "description": "Rental time in hours (default: 2 hours)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "description": "Mobile operator of a number. You can specify several (separated by commas). Any operator by default.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country. Kazakhstan by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "description": "iso code of the currency for displaying prices",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incomingCall",
+            "in": "query",
+            "description": "If true is provided, then get a number with the ability to receive calls",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "counties": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    },
+                    "operators": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "services": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "properties": {
+                          "cost": {
+                            "type": "number"
+                          },
+                          "retail_cost": {
+                            "type": "string"
+                          },
+                          "quant": {
+                            "properties": {
+                              "current": {
+                                "type": "integer"
+                              },
+                              "total": {
+                                "type": "integer"
+                              },
+                              "search_name": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExampleRent": {
+                    "summary": "Successful return of an object with rental information",
+                    "value": {
+                      "counties": [
+                        2,
+                        4
+                      ],
+                      "operators": [
+                        "beeline",
+                        "altel"
+                      ],
+                      "services": {
+                        "full": {
+                          "cost": 2.33,
+                          "retail_cost": "3.495",
+                          "quant": {
+                            "current": 100,
+                            "total": 110,
+                            "search_name": "Полная арендаFull rentполная аренда,full rent,gjkyfz,агдд"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentOutOfStockExample": {
+                    "$ref": "#/components/examples/rentOutOfStockExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getRentNumber": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Order a number for rent",
+        "description": "Order a number for rent",
+        "operationId": "getRentNumber",
+        "parameters": [
+          {
+            "name": "service",
+            "in": "query",
+            "description": "The service which you need to get a number for",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rent_time",
+            "in": "query",
+            "description": "Время аренды в часах (по умолчанию: 2 часа). Следующий доступный временной период 12 часов, далее 24 часа. \nПри запросе аренды на сутки и более, необходимо передавать: 24, 48, 72 и т.д.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "operator",
+            "in": "query",
+            "description": "Mobile operator of a number. You can specify several (separated by commas). Any operator by default.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "Country. Kazakhstan by default",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "description": "Link to the webhook",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incomingCall",
+            "in": "query",
+            "description": "If true is provided, then get a number with the ability to receive calls",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "endDate": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "string"
+                        },
+                        "lock_cancel_time": {
+                          "type": "integer"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulNumberExample": {
+                    "summary": "Successful nymber rent",
+                    "value": {
+                      "status": "success",
+                      "phone": {
+                        "id": 123456,
+                        "endDate": "0000-00-00 00:00:00",
+                        "number": "00000000000",
+                        "lock_cancel_time": 120
+                      }
+                    }
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  },
+                  "rentNotAuthorizedExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentBadServiceExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentNoBalanceExample": {
+                    "$ref": "#/components/examples/rentNoBalanceExample"
+                  },
+                  "rentNoNumbersExample": {
+                    "$ref": "#/components/examples/rentNoNumbersExample"
+                  },
+                  "rentAccountInactiveExample": {
+                    "$ref": "#/components/examples/rentAccountInactiveExample"
+                  },
+                  "rentServerErrorExample": {
+                    "$ref": "#/components/examples/rentServerErrorExample"
+                  },
+                  "rentChannelsLimitExample": {
+                    "$ref": "#/components/examples/rentChannelsLimitExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getRentStatus": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Get the rent status",
+        "description": "Get the rent status",
+        "operationId": "getRentStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Rent ID received in the response to a number order",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "The page number where the selection starts (pages start with 0, from new to old ones; default is 0)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Page size (default is 10)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "quantity": {
+                      "type": "string"
+                    },
+                    "values": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "properties": {
+                          "phoneFrom": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "service": {
+                            "type": "string"
+                          },
+                          "date": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulGetStatus": {
+                    "summary": "Successfully got the rent status",
+                    "value": {
+                      "status": "success",
+                      "quantity": "2",
+                      "values": [
+                        {
+                          "phoneFrom": "00000000000",
+                          "text": "5",
+                          "service": "ot",
+                          "date": "0000-00-00 00:00:00"
+                        },
+                        {
+                          "phoneFrom": "11111111111",
+                          "text": "4",
+                          "service": "ot",
+                          "date": "0000-00-00 00:00:00"
+                        }
+                      ]
+                    }
+                  },
+                  "incorrectKeyExample": {
+                    "summary": "Incorrect API key"
+                  },
+                  "rentNoIdRentExample": {
+                    "$ref": "#/components/examples/rentNoIdRentExample"
+                  },
+                  "rentInvalidPhoneExample": {
+                    "$ref": "#/components/examples/rentInvalidPhoneExample"
+                  },
+                  "rentStatusFinishExample": {
+                    "$ref": "#/components/examples/rentStatusFinishExample"
+                  },
+                  "rentStatusCancelExample": {
+                    "$ref": "#/components/examples/rentStatusCancelExample"
+                  },
+                  "rentStatusWaitCodeExample": {
+                    "$ref": "#/components/examples/rentStatusWaitCodeExample"
+                  },
+                  "rentStatusRevokeExample": {
+                    "$ref": "#/components/examples/rentStatusRevokeExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=setRentStatus": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Change of the rent status",
+        "description": "Change of the rent status",
+        "operationId": "setRentStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Rent ID received in the response to a number order",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Code for changing status (number). 1 - finish, 2 - cancel",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [
+                1,
+                2
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful status change",
+                    "value": {
+                      "status": "success"
+                    }
+                  },
+                  "rentNoIdRentExample": {
+                    "$ref": "#/components/examples/rentNoIdRentExample"
+                  },
+                  "rentInvalidPhoneExample": {
+                    "$ref": "#/components/examples/rentInvalidPhoneExample"
+                  },
+                  "rentNotAuthorizedExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentIncorectStatusExample": {
+                    "$ref": "#/components/examples/rentIncorectStatusExample"
+                  },
+                  "rentCantCancelExample": {
+                    "$ref": "#/components/examples/rentCantCancelExample"
+                  },
+                  "rentAlreadyFinishExample": {
+                    "$ref": "#/components/examples/rentAlreadyFinishExample"
+                  },
+                  "rentAlreadyCancelExample": {
+                    "$ref": "#/components/examples/rentAlreadyCancelExample"
+                  },
+                  "rentServerErrorExample": {
+                    "$ref": "#/components/examples/rentServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getRentList": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Display the list of current activations",
+        "description": "Вывести список текущих активаций. Внимание! Данный метод отображает только последние 10 номеров.\nЕсли вам необходимо большее количество, воспользуйтесь методом getRentStatus для проверки статусов.",
+        "operationId": "getRentList",
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "values": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "phone": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful return of the rented numbers' list",
+                    "value": {
+                      "status": "success",
+                      "values": [
+                        {
+                          "id": "12345",
+                          "phone": "00000000000"
+                        },
+                        {
+                          "id": "12346",
+                          "phone": "00000000000"
+                        }
+                      ]
+                    }
+                  },
+                  "rentNotAuthorizedExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentServerErrorExample": {
+                    "$ref": "#/components/examples/rentServerErrorExample"
+                  },
+                  "rentNoNumbersExample": {
+                    "$ref": "#/components/examples/rentNoNumbersExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=continueRentNumber": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Prolong the rent",
+        "description": "Prolong the rent",
+        "operationId": "continueRentNumber",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Rent ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rent_time",
+            "in": "query",
+            "description": "Rental time in hours (default: 2 hours)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "endDate": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Number successfully prolonged",
+                    "value": {
+                      "status": "success",
+                      "phone": {
+                        "id": "12345",
+                        "endDate": "2020-01-31T12:01:52",
+                        "phone": "00000000000"
+                      }
+                    }
+                  },
+                  "rentNotAuthorizedExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentNoIdRentExample": {
+                    "$ref": "#/components/examples/rentNoIdRentExample"
+                  },
+                  "rentInvalidTimeExample": {
+                    "$ref": "#/components/examples/rentInvalidTimeExample"
+                  },
+                  "rentMaxHoursExceedExample": {
+                    "$ref": "#/components/examples/rentMaxHoursExceedExample"
+                  },
+                  "rentInvalidPhoneExample": {
+                    "$ref": "#/components/examples/rentInvalidPhoneExample"
+                  },
+                  "rentRentDieExample": {
+                    "$ref": "#/components/examples/rentRentDieExample"
+                  },
+                  "rentNoBalanceExample": {
+                    "$ref": "#/components/examples/rentNoBalanceExample"
+                  },
+                  "rentChannelsLimitExample": {
+                    "$ref": "#/components/examples/rentChannelsLimitExample"
+                  },
+                  "rentServerErrorExample": {
+                    "$ref": "#/components/examples/rentServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=getContinueRentPriceNumber": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Get the cost of the rent prolongation",
+        "description": "Get the cost of the rent prolongation",
+        "operationId": "getContinueRentPriceNumber",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Rent ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rent_time",
+            "in": "query",
+            "description": "Rental time in hours (default: 2 hours)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "description": "ISO code of the currency for displaying the price",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "currency": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful return of the number prolongation cost",
+                    "value": {
+                      "status": "success",
+                      "price": 6.33,
+                      "currency": 840
+                    }
+                  },
+                  "rentNotAuthorizedExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentNoIdRentExample": {
+                    "$ref": "#/components/examples/rentNoIdRentExample"
+                  },
+                  "rentInvalidTimeExample": {
+                    "$ref": "#/components/examples/rentInvalidTimeExample"
+                  },
+                  "rentMaxHoursExceedExample": {
+                    "$ref": "#/components/examples/rentMaxHoursExceedExample"
+                  },
+                  "rentInvalidPhoneExample": {
+                    "$ref": "#/components/examples/rentInvalidPhoneExample"
+                  },
+                  "rentRentDieExample": {
+                    "$ref": "#/components/examples/rentRentDieExample"
+                  },
+                  "rentServerErrorExample": {
+                    "$ref": "#/components/examples/rentServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=continueRentInfo": {
+      "get": {
+        "tags": [
+          "sa rent"
+        ],
+        "summary": "Get the maximum term for  rent extension",
+        "description": "Get the maximum term for  rent extension",
+        "operationId": "continueRentInfo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Rent ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "Rental time in hours (default: 2 hours)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "needHistory",
+            "in": "query",
+            "description": "Get the full list of extension",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "price": {
+                      "type": "number"
+                    },
+                    "currency": {
+                      "type": "integer"
+                    },
+                    "hours": {
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful response",
+                    "value": {
+                      "status": "success",
+                      "price": 6.33,
+                      "currency": 840,
+                      "hours": 4
+                    }
+                  },
+                  "rentNotAuthorizedExample": {
+                    "$ref": "#/components/examples/rentNotAuthorizedExample"
+                  },
+                  "rentNoIdRentExample": {
+                    "$ref": "#/components/examples/rentNoIdRentExample"
+                  },
+                  "rentInvalidTimeExample": {
+                    "$ref": "#/components/examples/rentInvalidTimeExample"
+                  },
+                  "rentMaxHoursExceedExample": {
+                    "$ref": "#/components/examples/rentMaxHoursExceedExample"
+                  },
+                  "rentInvalidPhoneExample": {
+                    "$ref": "#/components/examples/rentInvalidPhoneExample"
+                  },
+                  "rentRentDieExample": {
+                    "$ref": "#/components/examples/rentRentDieExample"
+                  },
+                  "rentServerErrorExample": {
+                    "$ref": "#/components/examples/rentServerErrorExample"
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=buyPartnerProduct": {
+      "get": {
+        "tags": [
+          "sa partners soft"
+        ],
+        "summary": "Buy a partner software",
+        "description": "Buy a partner software",
+        "operationId": "buyPartnerProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "ID of the software you want to buy",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "manual": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Software successfully purchased",
+                    "value": {
+                      "status": "success",
+                      "key": "1111",
+                      "manual": "manual"
+                    }
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  },
+                  "badActionExample": {
+                    "summary": "Incorrect action or reseller is not verified.",
+                    "value": "BAD_ACTION"
+                  },
+                  "badDataExample": {
+                    "summary": "Incorrect ID or ID is not a number",
+                    "value": "BAD_DATA"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=returnMoneyActivation": {
+      "get": {
+        "tags": [
+          "sa partners soft"
+        ],
+        "summary": "Refund through the partner software",
+        "description": "Refund through the partner software (only administrators can view)",
+        "operationId": "returnMoneyActivation",
+        "parameters": [
+          {
+            "name": "activation",
+            "in": "query",
+            "description": "Activation ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "description": "Software name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "description": "Secret key in the form of a hash sha256: activation_id + secret",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Successful return",
+                    "value": {
+                      "status": "success"
+                    }
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  },
+                  "partnersServerErrorExample": {
+                    "$ref": "#/components/examples/partnersServerErrorExample"
+                  },
+                  "partnersInvalidSignatureExample": {
+                    "$ref": "#/components/examples/partnersInvalidSignatureExample"
+                  },
+                  "partnersWrongActivationIdExample": {
+                    "$ref": "#/components/examples/partnersWrongActivationIdExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/handler_api.php?action=manageActivationFailures": {
+      "get": {
+        "tags": [
+          "sa partners soft"
+        ],
+        "summary": "Управление неудачными активациями",
+        "description": "Отмена или управление статусом неудачных активаций через партнерский софт",
+        "operationId": "manageActivationFailures",
+        "parameters": [
+          {
+            "name": "activationId",
+            "in": "query",
+            "description": "Activation ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activationStatus",
+            "in": "query",
+            "description": "Activation status",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "description": "Software name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "description": "Secret key in the form of a hash sha256: activation_id + secret",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "examples": {
+                  "successfulExample": {
+                    "summary": "Activation successfully canceled",
+                    "value": {
+                      "status": "success"
+                    }
+                  },
+                  "missingKeyExample": {
+                    "$ref": "#/components/examples/missingKeyExample"
+                  },
+                  "incorrectKeyExample": {
+                    "$ref": "#/components/examples/incorrectKeyExample"
+                  },
+                  "partnersServerErrorExample": {
+                    "$ref": "#/components/examples/partnersServerErrorExample"
+                  },
+                  "partnersInvalidSignatureExample": {
+                    "$ref": "#/components/examples/partnersInvalidSignatureExample"
+                  },
+                  "partnersWrongActivationIdExample": {
+                    "$ref": "#/components/examples/partnersWrongActivationIdExample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Country": {
+        "properties": {
+          "id": {
+            "description": "Country ID",
+            "type": "integer",
+            "example": 0
+          },
+          "rus": {
+            "description": "Country name in Russian",
+            "type": "string",
+            "example": "Казахстан"
+          },
+          "eng": {
+            "description": "Country name in English",
+            "type": "string",
+            "example": "Kazakhstan"
+          },
+          "chn": {
+            "description": "Country name in Chinese",
+            "type": "string",
+            "example": "Kazakhstan"
+          },
+          "visible": {
+            "description": "1 - country is displayed, 0 - not displayed",
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "example": 1
+          },
+          "retry": {
+            "description": "1 - one more sms is available, 0 - not available",
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "example": 1
+          },
+          "rent": {
+            "description": "1 - country included in rent, 0 - no",
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "example": 1
+          },
+          "multiService": {
+            "description": "1 - available for multiservice, 0 - not available",
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "example": 1
+          }
+        },
+        "type": "object"
+      },
+      "Service": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "aoo"
+          },
+          "name": {
+            "type": "string",
+            "example": "Pegasus Airlines"
+          }
+        },
+        "type": "object"
+      },
+      "NumberStatus": {
+        "type": "object",
+        "example": {
+          "vk_2": 76,
+          "ok_2": 139,
+          "wa_2": 90,
+          "vi_2": 223
+        },
+        "additionalProperties": {
+          "type": "integer"
+        }
+      },
+      "TopCountriesOneService": {
+        "properties": {
+          "physicalTotalCount": {
+            "type": "integer",
+            "example": 9405
+          },
+          "physicalCountForDefaultPrice": {
+            "type": "integer",
+            "example": 4066
+          },
+          "physicalPriceMap": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "example": 0.018
+            }
+          },
+          "retail_price": {
+            "type": "number",
+            "example": 0.2
+          },
+          "country": {
+            "type": "integer",
+            "example": 6
+          },
+          "price": {
+            "type": "number",
+            "example": 0.045
+          },
+          "count": {
+            "type": "integer",
+            "example": 4528
+          }
+        },
+        "type": "object"
+      },
+      "TopCountriesOneServiceFreePrice": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/TopCountriesOneService"
+          },
+          {
+            "properties": {
+              "freePriceMap": {
+                "type": "object",
+                "example": {
+                  "15.00": 43242,
+                  "18.00": 333
+                },
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "TopCountriesAllServices": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/TopCountriesOneService"
+        }
+      },
+      "TopCountriesAllServicesFreePrice": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/TopCountriesOneServiceFreePrice"
+        }
+      },
+      "TopCountriesByService": {
+        "type": "object",
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "$ref": "#/components/schemas/TopCountriesAllServices"
+            },
+            {
+              "$ref": "#/components/schemas/TopCountriesOneService"
+            },
+            {
+              "$ref": "#/components/schemas/TopCountriesAllServicesFreePrice"
+            },
+            {
+              "$ref": "#/components/schemas/TopCountriesOneServiceFreePrice"
+            }
+          ]
+        }
+      },
+      "ActiveActivation": {
+        "properties": {
+          "activationId": {
+            "type": "string",
+            "example": "635468021"
+          },
+          "serviceCode": {
+            "type": "string",
+            "example": "vk"
+          },
+          "phoneNumber": {
+            "type": "string",
+            "example": "79********1"
+          },
+          "activationCost": {
+            "type": "number",
+            "example": 12.5
+          },
+          "activationStatus": {
+            "type": "string",
+            "example": "4"
+          },
+          "smsCode": {
+            "type": "string",
+            "example": "[Код sms]",
+            "nullable": true
+          },
+          "smsText": {
+            "type": "string",
+            "example": "[Ваш код для регистрации CODE]",
+            "nullable": true
+          },
+          "activationTime": {
+            "type": "string",
+            "example": "2022-06-01 16:59:16"
+          },
+          "discount": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "repeated": {
+            "type": "string",
+            "example": "0"
+          },
+          "countryCode": {
+            "type": "string",
+            "example": "2"
+          },
+          "countryName": {
+            "type": "string",
+            "example": "Kazakhstan"
+          },
+          "canGetAnotherSms": {
+            "type": "string",
+            "example": "1"
+          },
+          "currency": {
+            "type": "string",
+            "example": "840"
+          }
+        },
+        "type": "object"
+      },
+      "NumberV2": {
+        "properties": {
+          "activationId": {
+            "type": "integer",
+            "example": 12345
+          }
+        },
+        "type": "object"
+      },
+      "ActivationStatusV2": {
+        "properties": {
+          "verificationType": {
+            "type": "integer",
+            "example": 2
+          },
+          "sms": {
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "format": "date-time",
+                "example": "0000-00-00 00:00:00"
+              },
+              "code": {
+                "type": "string",
+                "example": "code"
+              },
+              "text": {
+                "type": "string",
+                "example": "sms text"
+              }
+            },
+            "type": "object"
+          },
+          "call": {
+            "properties": {
+              "from": {
+                "type": "string",
+                "example": "phone"
+              },
+              "text": {
+                "type": "string",
+                "example": "voice text"
+              },
+              "code": {
+                "type": "string",
+                "example": "12345"
+              },
+              "dateTime": {
+                "type": "string",
+                "format": "date-time",
+                "example": "0000-00-00 00:00:00"
+              },
+              "url": {
+                "type": "string",
+                "example": "voice file url"
+              },
+              "parsingCount": {
+                "type": "integer",
+                "example": 1
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ActivationsHistory": {
+        "type": "array",
+        "items": {
+          "properties": {
+            "id": {
+              "type": "string",
+              "example": "635468024"
+            },
+            "date": {
+              "type": "string",
+              "format": "date-time",
+              "example": "0000-00-00 00:00:00"
+            },
+            "phone": {
+              "type": "string",
+              "example": "7*********0"
+            },
+            "sms": {
+              "type": "string",
+              "example": "Your code is ****"
+            },
+            "cost": {
+              "type": "number",
+              "example": 0
+            },
+            "status": {
+              "type": "string",
+              "example": "4"
+            },
+            "currency": {
+              "type": "integer",
+              "example": 840
+            }
+          },
+          "type": "object"
+        }
+      },
+      "Top10Countries": {
+        "type": "array",
+        "items": {
+          "properties": {
+            "country": {
+              "type": "string",
+              "example": "0"
+            },
+            "share": {
+              "type": "string",
+              "example": "50"
+            },
+            "rate": {
+              "type": "string",
+              "example": "51"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "IncomingCallStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "2"
+          },
+          "phone": {
+            "type": "string",
+            "example": "false"
+          }
+        },
+        "type": "object"
+      },
+      "PricesByCountry": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "properties": {
+              "cost": {
+                "type": "number",
+                "example": 0.5
+              },
+              "count": {
+                "type": "integer",
+                "example": 10
+              },
+              "physicalCount": {
+                "type": "integer",
+                "example": 10
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "PricesByService": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "properties": {
+              "count": {
+                "type": "integer",
+                "example": 10
+              },
+              "price": {
+                "type": "number",
+                "example": 1.5
+              },
+              "retail_price": {
+                "type": "number",
+                "example": 2.5
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    },
+    "examples": {
+      "countriesCorrectExample": {
+        "summary": "Correct example",
+        "value": [
+          {
+            "id": 2,
+            "rus": "Казахстан",
+            "eng": "Kazakhstan",
+            "chn": "俄罗斯",
+            "visible": 1,
+            "retry": 1,
+            "rent": 1,
+            "multiService": 1
+          }
+        ]
+      },
+      "servicesCorrectExample": {
+        "summary": "Correct example of an answer",
+        "value": {
+          "status": "success",
+          "services": [
+            {
+              "code": "aoo",
+              "name": "Pegasus Airlines"
+            }
+          ]
+        }
+      },
+      "numbersCorrectExample": {
+        "summary": "Correct example of an answer",
+        "value": {
+          "vk_2": 76,
+          "ok_2": 139,
+          "wa_2": 90,
+          "vi_2": 223
+        }
+      },
+      "topCountriesAllServicesExample": {
+        "summary": "Correct example without parameters",
+        "value": [
+          {
+            "ig": [
+              {
+                "physicalTotalCount": 7933,
+                "physicalCountForDefaultPrice": 5198,
+                "physicalPriceMap": {
+                  "0.04": 24,
+                  "0.0415": 439,
+                  "0.0419": 3229
+                },
+                "retail_price": 0.2,
+                "country": 6,
+                "price": 0.045,
+                "count": 5477
+              }
+            ]
+          }
+        ]
+      },
+      "topCountriesOneServiceExample": {
+        "summary": "Correct example with the “service” parameter",
+        "value": [
+          {
+            "physicalTotalCount": 7933,
+            "physicalCountForDefaultPrice": 5198,
+            "physicalPriceMap": {
+              "0.04": 24,
+              "0.0415": 439,
+              "0.0419": 3229
+            },
+            "retail_price": 0.2,
+            "country": 6,
+            "price": 0.045,
+            "count": 5477
+          }
+        ]
+      },
+      "topCountriesAllServicesFreePriceExample": {
+        "summary": "Correct example with the “freePrice” = true parameter",
+        "value": [
+          {
+            "ig": [
+              {
+                "physicalTotalCount": 7933,
+                "physicalCountForDefaultPrice": 5198,
+                "physicalPriceMap": {
+                  "0.04": 24,
+                  "0.0415": 439,
+                  "0.0419": 3229
+                },
+                "retail_price": 0.2,
+                "country": 6,
+                "freePriceMap": {
+                  "0.0423": 5,
+                  "0.0424": 433,
+                  "0.0427": 3396
+                },
+                "price": 0.045,
+                "count": 5477
+              }
+            ]
+          }
+        ]
+      },
+      "topCountriesOneServiceFreePriceExample": {
+        "summary": "Correct example with the “freePrice” and “service” parameters ",
+        "value": [
+          {
+            "physicalTotalCount": 7933,
+            "physicalCountForDefaultPrice": 5198,
+            "physicalPriceMap": {
+              "0.04": 24,
+              "0.0415": 439,
+              "0.0419": 3229
+            },
+            "retail_price": 0.2,
+            "country": 6,
+            "freePriceMap": {
+              "0.0423": 5,
+              "0.0424": 433,
+              "0.0427": 3396
+            },
+            "price": 0.045,
+            "count": 5477
+          }
+        ]
+      },
+      "operatorsSuccessfulExample": {
+        "summary": "Successfully got the list of operators",
+        "value": {
+          "status": "success",
+          "countryOperators": {
+            "175": [
+              "optus",
+              "vodafone",
+              "telstra",
+              "lebara"
+            ]
+          }
+        }
+      },
+      "operatorsNotFoundExample": {
+        "summary": "Operators not found",
+        "value": "OPERATORS_NOT_FOUND"
+      },
+      "activationsSuccessfulExample": {
+        "summary": "Successful return of activations",
+        "value": {
+          "status": "success",
+          "activeActivations": [
+            {
+              "activationId": "635468021",
+              "serviceCode": "vk",
+              "phoneNumber": "79********1",
+              "activationCost": 12.5,
+              "activationStatus": "4",
+              "smsCode": "[CODE]",
+              "smsText": "[Ваш код для регистрации CODE]",
+              "activationTime": "2022-06-01 16:59:16",
+              "discount": "0.00",
+              "repeated": "0",
+              "countryCode": "2",
+              "countryName": "Kazakhstan",
+              "canGetAnotherSms": "1",
+              "currency": 840
+            }
+          ]
+        }
+      },
+      "successfulNumberv2Example": {
+        "summary": "Successful return of information about the number",
+        "value": {
+          "activationId": 635468024,
+          "phoneNumber": "79584******",
+          "activationCost": 12.5,
+          "currency": 840,
+          "countryCode": "2",
+          "canGetAnotherSms": "1",
+          "activationTime": "2022-06-01 17:30:57",
+          "activationOperator": "mtt"
+        }
+      },
+      "successfulMultiserviceExample": {
+        "summary": "Successfully got numbers",
+        "value": [
+          {
+            "phone": "7**********",
+            "activation": 1234567890,
+            "service": "go"
+          },
+          {
+            "phone": "7**********",
+            "activation": 1234567891,
+            "service": "ig"
+          }
+        ]
+      },
+      "successfulActivationV2Example": {
+        "summary": "Successfully got activation status",
+        "value": {
+          "verificationType": 2,
+          "sms": {
+            "dateTime": "0000-00-00 00:00:00",
+            "code": "code",
+            "text": "sms text"
+          },
+          "call": {
+            "from": "phone",
+            "text": "voice text",
+            "code": "12345",
+            "dateTime": "0000-00-00 00:00:00",
+            "url": "voice file url",
+            "parsingCount": 1
+          }
+        }
+      },
+      "successfulActivationsHistoryExample": {
+        "summary": "Successfully got the activations history",
+        "value": [
+          {
+            "id": "635468024",
+            "date": "0000-00-00 00:00:00",
+            "phone": "7*********0",
+            "sms": "Your code is ****",
+            "cost": 0,
+            "status": "4",
+            "currency": 840
+          }
+        ]
+      },
+      "successfulTop10CountriesExample": {
+        "summary": "Successfully got the list of top countries",
+        "value": [
+          {
+            "country": "6",
+            "share": "29.74",
+            "rate": "61.73"
+          }
+        ]
+      },
+      "activationsNotFoundExample": {
+        "summary": "Activations not found",
+        "value": {
+          "status": "error",
+          "error": "NO_ACTIVATIONS"
+        }
+      },
+      "noNumbersExample": {
+        "summary": "Numbers not found",
+        "value": "NO_NUMBERS"
+      },
+      "wrongMaxPriceExample": {
+        "summary": "The specified maximum value is less than the minimum value allowed. The minimum price is specified in the answer",
+        "value": "WRONG_MAX_PRICE:0.025"
+      },
+      "badServiceExample": {
+        "summary": "Incorrect service specified",
+        "value": "BAD_SERVICE"
+      },
+      "badActionExample": {
+        "summary": "Incorrect action specified",
+        "value": "BAD_ACTION"
+      },
+      "bannedExample": {
+        "summary": "The user is blocked until the specified date",
+        "value": "BANNED:'YYYY-m-d H-i-s'"
+      },
+      "wrongExceptionPhoneExample": {
+        "summary": "Incorrect excluding prefixes",
+        "value": "WRONG_EXCEPTION_PHONE"
+      },
+      "noBalanceExample": {
+        "summary": "Insufficient funds",
+        "value": "NO_BALANCE"
+      },
+      "noBalanceForwardExample": {
+        "summary": "Insufficient funds to purchase call forwarding",
+        "value": "NO_BALANCE_FORWARD"
+      },
+      "channelsLimitExample": {
+        "summary": "Account blocked",
+        "value": "CHANNELS_LIMIT"
+      },
+      "missingKeyExample": {
+        "summary": "There is no API key",
+        "value": "NO_KEY"
+      },
+      "incorrectKeyExample": {
+        "summary": "Incorrect API key",
+        "value": "BAD_KEY"
+      },
+      "sqlServerErrorExample": {
+        "summary": "Server error",
+        "value": "ERROR_SQL"
+      },
+      "incorrectCountryExample": {
+        "summary": "Country entered incorrectly",
+        "value": {
+          "status": "false",
+          "msg": "country is incorrect"
+        }
+      },
+      "incorrectServiceExample": {
+        "summary": "Address entered incorrectly",
+        "value": {
+          "status": "false",
+          "msg": "service is incorrect"
+        }
+      },
+      "wrongActivationIdExample": {
+        "summary": "Activation ID is incorrect",
+        "value": "WRONG_ACTIVATION_ID"
+      },
+      "rentOutOfStockExample": {
+        "summary": "Numbers for rent have run out",
+        "value": {
+          "status": "error",
+          "message": "OUT_OF_STOCK",
+          "errorMsg": "message"
+        }
+      },
+      "rentBadServiceExample": {
+        "summary": "Service is not specified or the name is incorrect",
+        "value": {
+          "status": "error",
+          "message": "BAD_SERVICE"
+        }
+      },
+      "rentNoBalanceExample": {
+        "summary": "No funds on the balance",
+        "value": {
+          "status": "error",
+          "message": "NO_BALANCE"
+        }
+      },
+      "rentNoNumbersExample": {
+        "summary": "There are no available numbers",
+        "value": {
+          "status": "error",
+          "message": "NO_NUMBERS"
+        }
+      },
+      "rentAccountInactiveExample": {
+        "summary": "Account is not active",
+        "value": {
+          "status": "error",
+          "message": "ACCOUNT_INACTIVE"
+        }
+      },
+      "rentServerErrorExample": {
+        "summary": "Server error",
+        "value": {
+          "status": "error",
+          "message": "SERVER_ERROR"
+        }
+      },
+      "rentChannelsLimitExample": {
+        "summary": "Account blocked",
+        "value": {
+          "status": "error",
+          "message": "CHANNELS_LIMIT"
+        }
+      },
+      "rentNotAuthorizedExample": {
+        "summary": "Authorization is not complete",
+        "value": {
+          "status": "error",
+          "message": "NOT_AUTHORIZED",
+          "errorMsg": "message"
+        }
+      },
+      "rentNoIdRentExample": {
+        "summary": "Rent ID not specified",
+        "value": {
+          "status": "error",
+          "message": "NO_ID_RENT"
+        }
+      },
+      "rentInvalidPhoneExample": {
+        "summary": "Rent ID incorrect",
+        "value": {
+          "status": "error",
+          "message": "INVALID_PHONE",
+          "errorMsg": "message"
+        }
+      },
+      "rentStatusFinishExample": {
+        "summary": "Rent is paid and finished",
+        "value": {
+          "status": "error",
+          "message": "STATUS_FINISH",
+          "errorMsg": "message"
+        }
+      },
+      "rentStatusCancelExample": {
+        "summary": "Rent was canceled with a refund",
+        "value": {
+          "status": "error",
+          "message": "STATUS_CANCEL",
+          "errorMsg": "message"
+        }
+      },
+      "rentStatusWaitCodeExample": {
+        "summary": "Waiting for the first SMS",
+        "value": {
+          "status": "error",
+          "message": "STATUS_WAIT_CODE",
+          "errorMsg": "message"
+        }
+      },
+      "rentStatusRevokeExample": {
+        "summary": "Number is blocked, your funds have been refunded",
+        "value": {
+          "status": "error",
+          "message": "STATUS_REVOKE",
+          "errorMsg": "message"
+        }
+      },
+      "rentIncorectStatusExample": {
+        "summary": "Incorrect status",
+        "value": {
+          "status": "error",
+          "message": "INCORECT_STATUS",
+          "errorMsg": "message"
+        }
+      },
+      "rentCantCancelExample": {
+        "summary": "Rent cancellation is not possible (over 20 min)",
+        "value": {
+          "status": "error",
+          "message": "CANT_CANCEL",
+          "errorMsg": "message"
+        }
+      },
+      "rentAlreadyFinishExample": {
+        "summary": "Rent has been finished",
+        "value": {
+          "status": "error",
+          "message": "ALREADY_FINISH",
+          "errorMsg": "message"
+        }
+      },
+      "rentAlreadyCancelExample": {
+        "summary": "Rent has been canceled",
+        "value": {
+          "status": "error",
+          "message": "ALREADY_CANCEL",
+          "errorMsg": "message"
+        }
+      },
+      "rentMaxHoursExceedExample": {
+        "summary": "The maximum available time has been exceeded",
+        "value": {
+          "status": "error",
+          "message": "MAX_HOURS_EXCEED",
+          "errorMsg": "message",
+          "info": {
+            "max": 10
+          }
+        }
+      },
+      "rentInvalidTimeExample": {
+        "summary": "Incorrect time. Available quantity of hours is from 4 to 1344",
+        "value": {
+          "status": "error",
+          "message": "INVALID_TIME",
+          "errorMsg": "message"
+        }
+      },
+      "rentRentDieExample": {
+        "summary": "The rent can't be prolonged because the validity of the number has expired",
+        "value": {
+          "status": "error",
+          "message": "RENT_DIE",
+          "errorMsg": "message"
+        }
+      },
+      "partnersServerErrorExample": {
+        "summary": "Server error",
+        "value": {
+          "status": "error",
+          "msg": "SERVER_ERROR"
+        }
+      },
+      "partnersInvalidSignatureExample": {
+        "summary": "Incorrect signature",
+        "value": {
+          "status": "error",
+          "msg": "INVALID_SIGNATURE"
+        }
+      },
+      "partnersWrongActivationIdExample": {
+        "summary": "Activation ID is incorrect",
+        "value": {
+          "status": "error",
+          "msg": "WRONG_ACTIVATION_ID"
+        }
+      },
+      "successfulAccessReadyExample": {
+        "summary": "Number availability confirmed",
+        "value": "ACCESS_READY"
+      },
+      "successfulRetryGetExample": {
+        "summary": "Waiting for a new SMS",
+        "value": "ACCESS_RETRY_GET"
+      },
+      "successfulAccessActivationExample": {
+        "summary": "Service is successfully activated",
+        "value": "ACCESS_ACTIVATION"
+      },
+      "successfulAccessCancelExample": {
+        "summary": "Activation canceled",
+        "value": "ACCESS_CANCEL"
+      },
+      "earlyCancelDeniedExample": {
+        "summary": "You can't cancel a number within the first 2 minutes",
+        "value": "EARLY_CANCEL_DENIED"
+      },
+      "noActivationExample": {
+        "summary": "Activation ID doesn't exist",
+        "value": "NO_ACTIVATION"
+      },
+      "badStatusExample": {
+        "summary": "Incorrect status",
+        "value": "BAD_STATUS"
+      },
+      "successfulWaitCodeExample": {
+        "summary": "Waiting for an SMS",
+        "value": "STATUS_WAIT_CODE"
+      },
+      "successfulWaitRetryExample": {
+        "summary": "Waiting for the code clarification",
+        "value": "STATUS_WAIT_RETRY:Код"
+      },
+      "successfulWaitResendExample": {
+        "summary": "Waiting for SMS to be resent",
+        "value": "STATUS_WAIT_RESEND"
+      },
+      "successfulCancelExample": {
+        "summary": "Activation canceled",
+        "value": "STATUS_CANCEL"
+      },
+      "successfulOKExample": {
+        "summary": "Code received",
+        "value": "STATUS_OK:Код"
+      }
+    },
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "name": "api_key",
+        "in": "query"
+      },
+      "x_api_key": {
+        "type": "apiKey",
+        "description": "A short description for security scheme",
+        "name": "X-API-Key",
+        "in": "header"
+      },
+      "temp_mobile_key": {
+        "type": "apiKey",
+        "description": "Mobile app token",
+        "name": "X-Temp-Mobile-Key",
+        "in": "header"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "sa ref",
+      "description": "sa ref"
+    },
+    {
+      "name": "sa",
+      "description": "sa"
+    },
+    {
+      "name": "sa rent",
+      "description": "sa rent"
+    },
+    {
+      "name": "sa partners soft",
+      "description": "sa partners soft"
+    }
+  ]
+}

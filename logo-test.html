@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logo & Flag Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #6366f1;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #666;
+      margin-top: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .item:hover {
+      border-color: #6366f1;
+      box-shadow: 0 4px 12px rgba(99,102,241,0.2);
+      transform: translateY(-2px);
+    }
+    .logo-box {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .logo-box img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+    }
+    .flag-box {
+      width: 64px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .flag-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .name {
+      font-weight: 600;
+      color: #374151;
+    }
+    .error {
+      color: #ef4444;
+      font-size: 12px;
+    }
+    .success {
+      color: #10b981;
+      font-size: 12px;
+    }
+    .fallback {
+      font-size: 32px;
+      display: none;
+    }
+    .stats {
+      display: flex;
+      gap: 20px;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      flex: 1;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #6366f1;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #6b7280;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 Logo & Flag Implementation Test</h1>
+  
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="serviceCount">0</div>
+      <div class="stat-label">Services Tested</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="serviceSuccess">0</div>
+      <div class="stat-label">Logos Loaded</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="countryCount">0</div>
+      <div class="stat-label">Countries Tested</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="countrySuccess">0</div>
+      <div class="stat-label">Flags Loaded</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📱 Service Logos (Clearbit API)</h2>
+    <div class="grid" id="services"></div>
+  </div>
+
+  <div class="section">
+    <h2>🌍 Country Flags (Flagcdn)</h2>
+    <div class="grid" id="countries"></div>
+  </div>
+
+  <script>
+    // Service logo function
+    function getServiceLogo(serviceCode) {
+      const serviceDomains = {
+        'instagram': 'instagram.com',
+        'whatsapp': 'whatsapp.com',
+        'google': 'google.com',
+        'facebook': 'facebook.com',
+        'telegram': 'telegram.org',
+        'tiktok': 'tiktok.com',
+        'twitter': 'twitter.com',
+        'apple': 'apple.com',
+        'microsoft': 'microsoft.com',
+        'discord': 'discord.com',
+        'snapchat': 'snapchat.com',
+        'linkedin': 'linkedin.com',
+        'netflix': 'netflix.com',
+        'spotify': 'spotify.com',
+        'uber': 'uber.com',
+        'amazon': 'amazon.com',
+        'paypal': 'paypal.com',
+        'viber': 'viber.com',
+        'reddit': 'reddit.com',
+        'youtube': 'youtube.com'
+      }
+      const domain = serviceDomains[serviceCode.toLowerCase()] || `${serviceCode}.com`
+      return `https://logo.clearbit.com/${domain}?size=64`
+    }
+
+    // Country flag function
+    function getCountryFlag(countryCode) {
+      const countryCodeMap = {
+        'russia': 'ru', 'ukraine': 'ua', 'usa': 'us', 'france': 'fr',
+        'germany': 'de', 'england': 'gb', 'uk': 'gb', 'spain': 'es',
+        'italy': 'it', 'canada': 'ca', 'brazil': 'br', 'india': 'in',
+        'china': 'cn', 'japan': 'jp', 'southkorea': 'kr', 'singapore': 'sg'
+      }
+      const isoCode = countryCodeMap[countryCode.toLowerCase()] || countryCode.toLowerCase().slice(0, 2)
+      return `https://flagcdn.com/64x48/${isoCode}.png`
+    }
+
+    // Test services
+    const services = [
+      'instagram', 'whatsapp', 'google', 'facebook', 'telegram',
+      'tiktok', 'twitter', 'apple', 'microsoft', 'discord',
+      'snapchat', 'linkedin', 'netflix', 'spotify', 'uber',
+      'amazon', 'paypal', 'viber', 'reddit', 'youtube'
+    ]
+
+    // Test countries
+    const countries = [
+      'russia', 'ukraine', 'usa', 'france', 'germany',
+      'england', 'spain', 'italy', 'canada', 'brazil',
+      'india', 'china', 'japan', 'southkorea', 'singapore'
+    ]
+
+    const servicesContainer = document.getElementById('services')
+    const countriesContainer = document.getElementById('countries')
+    
+    let serviceSuccessCount = 0
+    let countrySuccessCount = 0
+
+    // Render services
+    services.forEach(service => {
+      const item = document.createElement('div')
+      item.className = 'item'
+      item.innerHTML = `
+        <div class="logo-box">
+          <img 
+            src="${getServiceLogo(service)}" 
+            alt="${service}"
+            onload="this.nextElementSibling.style.display='none'; updateStats('service', true)"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; updateStats('service', false)"
+          />
+          <span class="fallback">📱</span>
+        </div>
+        <span class="name">${service}</span>
+      `
+      servicesContainer.appendChild(item)
+    })
+
+    // Render countries
+    countries.forEach(country => {
+      const item = document.createElement('div')
+      item.className = 'item'
+      item.innerHTML = `
+        <div class="flag-box">
+          <img 
+            src="${getCountryFlag(country)}" 
+            alt="${country}"
+            onload="this.nextElementSibling.style.display='none'; updateStats('country', true)"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; updateStats('country', false)"
+          />
+          <span class="fallback">🌍</span>
+        </div>
+        <span class="name">${country}</span>
+      `
+      countriesContainer.appendChild(item)
+    })
+
+    // Update stats
+    document.getElementById('serviceCount').textContent = services.length
+    document.getElementById('countryCount').textContent = countries.length
+
+    function updateStats(type, success) {
+      if (type === 'service' && success) {
+        serviceSuccessCount++
+        document.getElementById('serviceSuccess').textContent = serviceSuccessCount
+      } else if (type === 'country' && success) {
+        countrySuccessCount++
+        document.getElementById('countrySuccess').textContent = countrySuccessCount
+      }
+    }
+  </script>
+</body>
+</html>

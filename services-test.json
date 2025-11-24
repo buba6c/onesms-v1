@@ -1,0 +1,32 @@
+[
+  {
+    "id": "test-1",
+    "code": "instagram",
+    "name": "Instagram",
+    "display_name": "Instagram"
+  },
+  {
+    "id": "test-2",
+    "code": "whatsapp",
+    "name": "WhatsApp",
+    "display_name": "WhatsApp"
+  },
+  {
+    "id": "test-3",
+    "code": "google",
+    "name": "Google",
+    "display_name": "Google"
+  },
+  {
+    "id": "test-4",
+    "code": "facebook",
+    "name": "Facebook",
+    "display_name": "Facebook"
+  },
+  {
+    "id": "test-5",
+    "code": "unknown-test-service",
+    "name": "Unknown Test Service",
+    "display_name": "Unknown Test Service"
+  }
+]
