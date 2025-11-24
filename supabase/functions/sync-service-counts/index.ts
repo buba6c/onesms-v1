@@ -16,8 +16,8 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('PROJECT_URL') || 'https://htfqmamvmhdoixqcbbbw.supabase.co'
+    const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     console.log('🔄 [SYNC-COUNTS] Démarrage de la synchronisation des counts...')
@@ -136,8 +136,8 @@ serve(async (req) => {
     
     // Log error
     try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      const supabaseUrl = Deno.env.get('PROJECT_URL') || 'https://htfqmamvmhdoixqcbbbw.supabase.co'
+      const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY')!
       const supabase = createClient(supabaseUrl, supabaseKey)
       
       await supabase.from('sync_logs').insert({
