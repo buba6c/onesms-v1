@@ -416,12 +416,11 @@ export default function DashboardPage() {
             '15': 'poland', '16': 'egypt', '17': 'nigeria', '18': 'macau', '19': 'morocco',
             '20': 'ghana', '21': 'argentina', '22': 'india', '23': 'uzbekistan', '24': 'cambodia',
             '25': 'cameroon', '26': 'chad', '27': 'germany', '28': 'lithuania', '29': 'croatia',
-            '30': 'sweden', '31': 'iraq', '32': 'netherlands', '33': 'latvia', '34': 'austria',
-            '35': 'belarus', '36': 'thailand', '37': 'saudiarabia', '38': 'mexico', '39': 'taiwan',
-            '40': 'spain', '41': 'iran', '42': 'algeria', '43': 'slovenia', '44': 'bangladesh',
-            '15': 'poland', '22': 'india', '32': 'romania', '33': 'colombia', '36': 'canada',
-            '39': 'argentina', '43': 'germany', '52': 'thailand', '56': 'spain', '58': 'italy',
-            '73': 'brazil', '78': 'france', '82': 'mexico', '175': 'australia', '187': 'usa'
+            '30': 'sweden', '31': 'iraq', '32': 'romania', '33': 'colombia', '34': 'austria',
+            '35': 'belarus', '36': 'canada', '37': 'saudiarabia', '38': 'mexico', '39': 'argentina',
+            '40': 'spain', '41': 'iran', '42': 'algeria', '43': 'germany', '44': 'bangladesh',
+            '52': 'thailand', '56': 'spain', '58': 'italy', '73': 'brazil', '78': 'france',
+            '82': 'mexico', '175': 'australia', '187': 'usa'
           };
           
           // Récupérer les infos des pays depuis notre DB
@@ -564,20 +563,47 @@ export default function DashboardPage() {
       } catch (error) {
         console.error('❌ [LIVE] Erreur get-country-availability:', error);
         
-        // Fallback: utiliser données statiques
-        const topCountries = Object.values(SMS_ACTIVATE_COUNTRIES)
-          .filter(c => c.popular)
-          .sort((a, b) => b.priority - a.priority);
-        
-        return topCountries.map(country => ({
-          id: country.id.toString(),
-          name: country.name,
-          code: country.code,
-          flag: getFlagEmoji(country.code),
-          successRate: 95,
-          count: 999,
-          price: priceMap.get(country.code.toLowerCase()) || 1.0
-        }));
+        // Fallback: récupérer depuis pricing_rules
+        try {
+          const { data: pricingRules } = await supabase
+            .from('pricing_rules')
+            .select('country_code, available_count, activation_price')
+            .eq('service_code', selectedService.code)
+            .eq('active', true)
+            .gt('available_count', 0);
+          
+          if (!pricingRules || pricingRules.length === 0) {
+            console.warn('⚠️ [FALLBACK] Aucune pricing_rule trouvée');
+            return [];
+          }
+          
+          // Grouper par pays et additionner les quantités
+          const countryMap = new Map<string, { count: number; price: number }>();
+          pricingRules.forEach(rule => {
+            const existing = countryMap.get(rule.country_code) || { count: 0, price: rule.activation_price };
+            existing.count += rule.available_count;
+            countryMap.set(rule.country_code, existing);
+          });
+          
+          // Récupérer les infos pays depuis la DB
+          const { data: dbCountries } = await supabase
+            .from('countries')
+            .select('id, code, name, success_rate')
+            .in('code', Array.from(countryMap.keys()));
+          
+          return (dbCountries || []).map(country => ({
+            id: country.id,
+            name: country.name,
+            code: country.code,
+            flag: getFlagEmoji(country.code),
+            successRate: country.success_rate || 90,
+            count: countryMap.get(country.code)?.count || 0,
+            price: countryMap.get(country.code)?.price || 1.0
+          }));
+        } catch (fallbackError) {
+          console.error('❌ [FALLBACK] Erreur:', fallbackError);
+          return [];
+        }
       }
     },
     enabled: !!selectedService?.code,
