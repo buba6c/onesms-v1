@@ -115,6 +115,12 @@ serve(async (req) => {
 
     console.log('💰 [SYNC-SMS-ACTIVATE] Total price entries:', Object.keys(allPricesData).length)
     
+    // Debug: Afficher un exemple de données
+    const firstKey = Object.keys(allPricesData)[0]
+    if (firstKey) {
+      console.log('🔍 [DEBUG] Example price data:', firstKey, '→', JSON.stringify(allPricesData[firstKey]))
+    }
+    
     // Use merged data
     const pricesData = allPricesData
 
@@ -179,9 +185,20 @@ serve(async (req) => {
         })
       }
 
-      // Add pricing rule
-      const cost = parseFloat(priceInfo.retail_cost || priceInfo.cost || '0')
-      const count = parseInt(priceInfo.count || '0', 10)
+      // Add pricing rule - SMS-Activate peut retourner plusieurs formats
+      let cost = 0
+      let count = 0
+      
+      // Essayer différents formats de prix
+      if (typeof priceInfo === 'object') {
+        cost = parseFloat(priceInfo.retail_cost || priceInfo.cost || priceInfo.price || '0')
+        count = parseInt(priceInfo.count || priceInfo.quantity || '0', 10)
+      } else if (typeof priceInfo === 'number') {
+        cost = priceInfo
+        count = 100 // Default si pas de count
+      }
+
+      console.log(`💵 [PRICING] ${serviceCode}@${countryCode}: cost=${cost}, count=${count}`)
 
       if (cost > 0 && count > 0) {
         pricingRulesToUpsert.push({
