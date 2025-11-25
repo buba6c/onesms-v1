@@ -47,13 +47,6 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode
       emoji.style.display = 'flex'
     }
   }
-  
-  target.src = TRANSPARENT_PIXEL
-  const emoji = target.nextElementSibling as HTMLSpanElement
-  if (emoji) {
-    emoji.style.display = 'block'
-    target.style.display = 'none'
-  }
 }
 
 export default function AdminServices() {
