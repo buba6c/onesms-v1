@@ -94,7 +94,8 @@ serve(async (req) => {
     
     for (const countryId of topCountries) {
       try {
-        const pricesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=${countryId}`
+        // Utiliser getPrices au lieu de getNumbersStatus pour avoir cost + count
+        const pricesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&country=${countryId}`
         const pricesResponse = await fetch(pricesUrl)
         const pricesData = await pricesResponse.json()
         
@@ -103,8 +104,12 @@ serve(async (req) => {
         
         console.log(`📊 [SYNC-SMS-ACTIVATE] Country ${countryId}: ${serviceCount} services`)
         
+        // getPrices retourne {187: {service1: {...}, service2: {...}}}
+        // Extraire les services du pays
+        const countryServices = pricesData[countryId.toString()] || pricesData
+        
         // Merge prices (country-specific keys)
-        for (const [service, priceInfo] of Object.entries(pricesData)) {
+        for (const [service, priceInfo] of Object.entries(countryServices)) {
           const key = `${service}_${countryId}`
           allPricesData[key] = priceInfo
         }
