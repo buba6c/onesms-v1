@@ -87,12 +87,12 @@ export interface SyncLog {
   triggered_by: string | null
 }
 
-// Trigger 5sim synchronization
+// Trigger SMS-Activate synchronization
 export const triggerSync = async (): Promise<{ success: boolean; message?: string; stats?: any; error?: string }> => {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     
-    console.log('🚀 [SYNC] Démarrage de la synchronisation...')
+    console.log('🚀 [SYNC] Démarrage de la synchronisation SMS-Activate...')
     
     // L'Edge Function crée son propre sync_log, pas besoin de le faire ici
     
@@ -101,7 +101,7 @@ export const triggerSync = async (): Promise<{ success: boolean; message?: strin
     const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 min
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-5sim`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-sms-activate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
@@ -309,6 +309,7 @@ export const getServices = async (filters?: {
     // popularity_score suit l'ordre exact de la homepage 5sim.net
     .order('popularity_score', { ascending: false })
     .order('total_available', { ascending: false })
+    .limit(10000) // Récupérer tous les services sans limitation
 
   if (filters?.active !== undefined) {
     query = query.eq('active', filters.active)
@@ -477,24 +478,42 @@ export const updateServiceIcon = async (serviceCode: string, updates: Partial<Se
 
 // Get service statistics
 export const getServiceStats = async () => {
+  // Récupérer le COUNT total des services
+  const { count: totalServicesCount } = await supabase
+    .from('services')
+    .select('*', { count: 'exact', head: true })
+
+  // Récupérer le COUNT des services actifs
+  const { count: activeServicesCount } = await supabase
+    .from('services')
+    .select('*', { count: 'exact', head: true })
+    .eq('active', true)
+
+  // Récupérer les services pour calculer popularServices
   const { data: services } = await supabase
     .from('services')
-    .select('*')
+    .select('popularity_score')
+    .limit(50000)
 
   const { data: countries } = await supabase
     .from('countries')
     .select('*')
+    .limit(10000)
 
+  // Récupérer TOUTES les pricing_rules sans limite
   const { data: pricing } = await supabase
     .from('pricing_rules')
-    .select('*')
+    .select('available_count')
+    .limit(50000)
 
-  const totalServices = services?.length || 0
-  const activeServices = services?.filter(s => s.active).length || 0
+  const totalServices = totalServicesCount || 0
+  const activeServices = activeServicesCount || 0
   const popularServices = services?.filter(s => s.popularity_score >= 50).length || 0
   const totalCountries = countries?.length || 0
   const activeCountries = countries?.filter(c => c.active).length || 0
   const totalAvailable = pricing?.reduce((sum, p) => sum + (p.available_count || 0), 0) || 0
+
+  console.log('📊 [STATS] Services:', totalServices, 'Active:', activeServices, 'Popular:', popularServices, 'Pricing rules:', pricing?.length, 'Total available:', totalAvailable)
 
   return {
     totalServices,

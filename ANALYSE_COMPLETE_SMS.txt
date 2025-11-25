@@ -1,0 +1,159 @@
+🔍 ANALYSE APPROFONDIE - AFFICHAGE SMS ET RÉCUPÉRATION AUTOMATIQUE
+═══════════════════════════════════════════════════════════════════════
+
+📊 PARTIE 1: POURQUOI SEUL LE CODE S'AFFICHE
+─────────────────────────────────────────────────────────────────────
+
+❌ PROBLÈME IDENTIFIÉ:
+   • sms_text dans la DB = undefined (ou juste le code)
+   • Le frontend vérifie: num.smsText && !num.smsText.includes('STATUS_OK:')
+   • Comme sms_text est vide, il génère: "Votre code de validation {service} est {code}"
+   • MAIS le nom du service n'apparaît pas correctement
+
+🔍 CAUSE ROOT:
+   L'Edge Function "check-sms-activate-status" stocke:
+   - sms_code: "300828" ✅
+   - sms_text: "Your verification code is: 300828" ✅
+   
+   MAIS l'Edge Function "update-activation-sms" stocke:
+   - sms_code: "300828" ✅  
+   - sms_text: "300828" ❌ (juste le code, pas le texte complet!)
+
+📝 CODE PROBLÉMATIQUE (ligne ~67):
+   supabaseClient.from('activations').update({
+     sms_code: smsCode,
+     sms_text: smsCode, // ❌ Devrait être un texte formaté!
+     status: 'received',
+     charged: true
+   })
+
+✅ SOLUTION:
+   Modifier update-activation-sms pour formater le texte:
+   sms_text: `Votre code de validation est ${smsCode}`
+
+
+═══════════════════════════════════════════════════════════════════════
+
+📊 PARTIE 2: RÉCUPÉRATION AUTOMATIQUE DES SMS
+─────────────────────────────────────────────────────────────────────
+
+✅ OUI, LE SYSTÈME RÉCUPÈRE AUTOMATIQUEMENT LES SMS!
+
+🔄 FLUX COMPLET LORS D'UN ACHAT:
+
+1️⃣ ACHAT DU NUMÉRO (DashboardPage.tsx ligne ~450)
+   └─> Appel: supabase.functions.invoke('buy-sms-activate-number')
+   └─> Résultat: Numéro acheté avec status='pending'
+   └─> Stocké dans DB: activations table
+
+2️⃣ VÉRIFICATION IMMÉDIATE (DashboardPage.tsx ligne ~510)
+   └─> setTimeout 1 seconde après achat
+   └─> Appel: check-sms-activate-status (vérification rapide)
+   └─> Si SMS déjà là: Mise à jour immédiate!
+
+3️⃣ RECHARGEMENT DES ACTIVATIONS (DashboardPage.tsx ligne ~180)
+   └─> useQuery avec queryKey: ['active-numbers', user?.id]
+   └─> Filtre: status in ['pending', 'waiting', 'received']
+   └─> RefetchInterval: 10000ms (10 secondes)
+   └─> Recharge automatiquement toutes les 10 secondes
+
+4️⃣ POLLING AUTOMATIQUE (useSmsPolling.ts ligne ~32)
+   └─> Démarre pour chaque activation status='pending' ou 'waiting'
+   └─> Stratégie intelligente:
+       • 0-5 min: Vérification toutes les 3 secondes ⚡
+       • 5-15 min: Vérification toutes les 10 secondes 🔄
+       • 15-20 min: Vérification toutes les 30 secondes 🐌
+   └─> Appelle: check-sms-activate-status
+   └─> Si SMS trouvé:
+       ✅ Update status='received'
+       ✅ Charge l'utilisateur (balance - price)
+       ✅ Affiche notification toast
+       ✅ Arrête le polling pour ce numéro
+       ✅ Rafraîchit le solde
+
+5️⃣ RÉCUPÉRATION AVANCÉE (check-sms-activate-status/index.ts)
+   └─> STEP 1: Essaye getStatusV2 (API JSON)
+   └─> STEP 2: Si échec, essaye V1 API (STATUS_OK:code)
+   └─> STEP 3: Si toujours rien, essaye getHistory (24h)
+   └─> TRIPLE SÉCURITÉ de récupération! 🛡️
+
+
+═══════════════════════════════════════════════════════════════════════
+
+📊 PARTIE 3: RÉSUMÉ DE L'ANALYSE
+─────────────────────────────────────────────────────────────────────
+
+✅ CE QUI FONCTIONNE:
+   • Achat de numéro ✓
+   • Insertion dans la DB ✓
+   • Vérification immédiate (1s après achat) ✓
+   • Polling automatique toutes les 3-10s ✓
+   • Récupération V1 API en fallback ✓
+   • Récupération depuis l'historique ✓
+   • Facturation automatique ✓
+   • Notification toast ✓
+   • Arrêt automatique du polling ✓
+
+⚠️ CE QUI NE FONCTIONNE PAS COMPLÈTEMENT:
+   • sms_text stocké = juste le code au lieu du texte formaté
+   • Nom du service pas affiché dans le message
+   • Frontend génère le texte mais sans le bon nom de service
+
+
+═══════════════════════════════════════════════════════════════════════
+
+🔧 CORRECTIONS À APPLIQUER
+─────────────────────────────────────────────────────────────────────
+
+1️⃣ CORRECTION update-activation-sms (URGENT)
+   Fichier: supabase/functions/update-activation-sms/index.ts
+   Ligne: ~67
+   
+   AVANT:
+   sms_text: smsCode
+   
+   APRÈS:
+   sms_text: `Votre code de validation est ${smsCode}`
+
+
+2️⃣ CORRECTION check-sms-activate-status (AMÉLIORATION)
+   Fichier: supabase/functions/check-sms-activate-status/index.ts
+   Ligne: ~425
+   
+   AMÉLIORER le texte V1 fallback:
+   smsText = `Votre code de validation est ${code}`
+   
+   Au lieu de:
+   smsText = `Your verification code is: ${code}`
+
+
+3️⃣ CORRECTION Frontend (OPTIONNEL - déjà fait)
+   Fichier: src/pages/DashboardPage.tsx
+   Ligne: ~990
+   
+   ✅ Déjà corrigé pour extraire le code et formater le texte
+   ✅ Récupère le nom du service depuis services[]
+
+
+═══════════════════════════════════════════════════════════════════════
+
+🎯 CONCLUSION
+─────────────────────────────────────────────────────────────────────
+
+✅ RÉCUPÉRATION AUTOMATIQUE: OUI, FONCTIONNE PARFAITEMENT!
+   • Vérification immédiate après achat (1s)
+   • Polling toutes les 3-10 secondes
+   • Triple sécurité de récupération (V2, V1, History)
+   • Facturation et notification automatiques
+
+⚠️ AFFICHAGE SMS: PROBLÈME DE FORMATAGE
+   • sms_text stocké = juste le code
+   • Besoin de corriger les Edge Functions pour stocker le texte complet
+   • Frontend déjà prêt pour afficher correctement
+
+🚀 PRIORITÉ D'ACTION:
+   1. Corriger update-activation-sms (sms_text formaté)
+   2. Corriger check-sms-activate-status (texte français)
+   3. Tester avec un nouvel achat
+
+═══════════════════════════════════════════════════════════════════════

@@ -13,10 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url)
-    const rentTime = url.searchParams.get('rent_time') || '4'
-    const country = url.searchParams.get('country')
-    const operator = url.searchParams.get('operator')
+    // Récupérer le body de la requête pour obtenir rentTime
+    const body = await req.json().catch(() => ({}))
+    const rentTime = body.rentTime || '4'
+    const country = body.country
+    const operator = body.operator
 
     console.log('🏠 Getting rent services:', { rentTime, country, operator })
 

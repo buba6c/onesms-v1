@@ -18,6 +18,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { formatDate, formatCurrency, calculateTimeRemaining } from '@/lib/utils';
+import { formatPhoneNumber } from '@/utils/phoneFormatter';
 import { toast } from '@/hooks/use-toast';
 
 interface VirtualNumber {
@@ -209,7 +210,7 @@ export default function MyNumbersPage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl font-mono">{number.phone_number}</CardTitle>
+                        <CardTitle className="text-xl font-mono">{formatPhoneNumber(number.phone_number)}</CardTitle>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -288,7 +289,7 @@ export default function MyNumbersPage() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg font-mono">{number.phone_number}</CardTitle>
+                      <CardTitle className="text-lg font-mono">{formatPhoneNumber(number.phone_number)}</CardTitle>
                       <CardDescription className="capitalize">
                         {number.country} - {number.service}
                       </CardDescription>

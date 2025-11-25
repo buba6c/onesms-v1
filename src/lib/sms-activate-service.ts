@@ -5,7 +5,7 @@
 import { supabase } from '@/lib/supabase'
 
 const SMS_ACTIVATE_API_KEY = import.meta.env.VITE_SMS_ACTIVATE_API_KEY
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
 
 // Country mapping: code → numeric ID
 const COUNTRY_TO_ID: Record<string, number> = {

@@ -14,14 +14,23 @@ serve(async (req) => {
   }
 
   try {
+    // Support both URL params and body
     const url = new URL(req.url)
-    const rentId = url.searchParams.get('rent_id')
-    const page = url.searchParams.get('page') || '1'
-    const size = url.searchParams.get('size') || '20'
+    let rentId = url.searchParams.get('rent_id') || url.searchParams.get('rentId')
+    let page = url.searchParams.get('page') || '1'
+    let size = url.searchParams.get('size') || '20'
+    
+    // If not in URL, try body
+    if (!rentId && req.method === 'POST') {
+      const body = await req.json()
+      rentId = body.rentId || body.rent_id
+      page = body.page || page
+      size = body.size || size
+    }
     
     if (!rentId) {
       return new Response(
-        JSON.stringify({ error: 'Missing rent_id parameter' }),
+        JSON.stringify({ error: 'Missing rentId parameter' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -41,8 +50,9 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token!)
 
     if (authError || !user) {
+      console.error('❌ Auth error:', authError)
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: authError?.message }),
         { 
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -50,17 +60,29 @@ serve(async (req) => {
       )
     }
 
-    // Vérifier que le rental appartient à l'utilisateur
+    console.log('✅ User authenticated:', user.id)
+
+    // Vérifier que le rental appartient à l'utilisateur (support both column names)
+    console.log('🔍 Querying rental with:', { rentId, userId: user.id })
+    
     const { data: rental, error: fetchError } = await supabase
       .from('rentals')
       .select('*')
-      .eq('rent_id', rentId)
       .eq('user_id', user.id)
+      .or(`rent_id.eq.${rentId},rental_id.eq.${rentId}`)
       .single()
 
+    console.log('📋 Rental query result:', { rental, fetchError })
+
     if (fetchError || !rental) {
+      console.error('❌ Rental not found:', { rentId, userId: user.id, error: fetchError })
       return new Response(
-        JSON.stringify({ error: 'Rental not found' }),
+        JSON.stringify({ 
+          error: 'Rental not found',
+          details: fetchError?.message,
+          rentId,
+          userId: user.id
+        }),
         { 
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -107,7 +129,8 @@ serve(async (req) => {
             message_count: parseInt(data.quantity || '0'),
             updated_at: new Date().toISOString()
           })
-          .eq('rent_id', rentId)
+          .eq('user_id', user.id)
+          .or(`rent_id.eq.${rentId},rental_id.eq.${rentId}`)
       }
 
       return new Response(

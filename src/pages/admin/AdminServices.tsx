@@ -156,64 +156,19 @@ export default function AdminServices() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="default" 
-            className="bg-purple-600 hover:bg-purple-700"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || latestSync?.status === 'running'}
-          >
-            {syncMutation.isPending || latestSync?.status === 'running' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Sync with 5sim
-          </Button>
-          <Button 
-            variant="outline" 
-            className="border-blue-600 text-blue-600 hover:bg-blue-50"
-            onClick={async () => {
-              try {
-                toast({ title: '🔄 Updating scores...', description: 'This may take a few seconds' });
-                const result = await updatePopularityScores();
-                if (result.success) {
-                  toast({ title: '✅ Popularity scores updated!', description: result.message });
-                  queryClient.invalidateQueries({ queryKey: ['admin-services'] });
-                  queryClient.invalidateQueries({ queryKey: ['service-stats'] });
-                } else {
-                  toast({ title: '❌ Update failed', description: result.error, variant: 'destructive' });
-                }
-              } catch (err: any) {
-                toast({ title: '❌ Update failed', description: err.message, variant: 'destructive' });
-              }
-            }}
-          >
-            <Star className="w-4 h-4 mr-2" />
-            Update Scores
-          </Button>
-          <Button 
-            variant="outline" 
-            className="border-green-600 text-green-600 hover:bg-green-50"
-            onClick={async () => {
-              try {
-                toast({ title: '🌍 Updating rates...', description: 'Calculating from real data' });
-                const result = await updateSuccessRates();
-                if (result.success) {
-                  toast({ title: '✅ Success rates updated!', description: result.message });
-                  queryClient.invalidateQueries({ queryKey: ['admin-services'] });
-                } else {
-                  toast({ title: '❌ Update failed', description: result.error, variant: 'destructive' });
-                }
-              } catch (err: any) {
-                toast({ title: '❌ Update failed', description: err.message, variant: 'destructive' });
-              }
-            }}
-          >
+        <Button 
+          variant="default" 
+          className="bg-purple-600 hover:bg-purple-700"
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending || latestSync?.status === 'running'}
+        >
+          {syncMutation.isPending || latestSync?.status === 'running' ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
             <RefreshCw className="w-4 h-4 mr-2" />
-            Update Rates
-          </Button>
-        </div>
+          )}
+          Synchroniser avec SMS-Activate
+        </Button>
       </div>
 
       {/* Filters */}
@@ -276,7 +231,7 @@ export default function AdminServices() {
             <p className="text-gray-500 mb-4">No services found</p>
             <Button onClick={() => syncMutation.mutate()} className="bg-purple-600">
               <RefreshCw className="w-4 h-4 mr-2" />
-              Sync with 5sim
+              Synchroniser avec SMS-Activate
             </Button>
           </div>
         ) : (

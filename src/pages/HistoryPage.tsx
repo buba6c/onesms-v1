@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { formatPhoneNumber } from '@/utils/phoneFormatter';
 import { 
   Copy,
   Clock,
@@ -345,14 +346,15 @@ export default function HistoryPage() {
                         <p className="text-[13px] text-gray-500 leading-tight">{getCountryName(order.country_code)}</p>
                       </div>
 
-                      {/* Phone number avec fond gris (180px) */}
-                      <div className="flex items-center gap-2 w-[180px] flex-shrink-0">
-                        <span className="font-mono text-[15px] font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                          {order.phone}
+                      {/* Phone number avec fond gris (240px pour le format complet) */}
+                      <div className="flex items-center gap-2 w-[240px] flex-shrink-0">
+                        <span className="font-mono text-[14px] font-semibold text-gray-900 bg-gray-100 px-2.5 py-1 rounded whitespace-nowrap">
+                          {formatPhoneNumber(order.phone)}
                         </span>
                         <button
                           onClick={() => copyToClipboard(order.phone)}
                           className="p-1 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Copier le numéro"
                         >
                           <Copy className="h-4 w-4 text-blue-500" />
                         </button>
@@ -364,7 +366,16 @@ export default function HistoryPage() {
                         {actualStatus === 'received' && order.sms_code ? (
                           <div className="bg-[#007AFF] text-white rounded-2xl rounded-tr-md px-4 py-2.5 shadow-md max-w-md">
                             <span className="font-medium text-[14px] leading-relaxed">
-                              {order.sms_text || `Votre code de validation est ${order.sms_code}`}
+                              {(() => {
+                                // Extraire le code SMS si le format est STATUS_OK:code
+                                const cleanCode = order.sms_code.includes('STATUS_OK:') 
+                                  ? order.sms_code.split(':')[1] 
+                                  : order.sms_code;
+                                
+                                return order.sms_text && !order.sms_text.includes('STATUS_OK:') 
+                                  ? order.sms_text 
+                                  : `Votre code de validation ${order.service_code} est ${cleanCode}`;
+                              })()}
                             </span>
                           </div>
                         ) : actualStatus === 'waiting' ? (

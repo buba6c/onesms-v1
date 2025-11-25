@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SMS-Activate API Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        pre {
+            background: #333;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 SMS-Activate API Tester</h1>
+    
+    <div class="test-section">
+        <h2>Configuration</h2>
+        <label>API Key:</label>
+        <input type="text" id="apiKey" placeholder="Enter your SMS-Activate API key">
+        
+        <label>Order ID:</label>
+        <input type="text" id="orderId" value="4450554107" placeholder="Enter order ID">
+    </div>
+
+    <div class="test-section">
+        <h2>Test 1: Get Status V2</h2>
+        <button onclick="testGetStatusV2()">Test getStatusV2</button>
+        <pre id="statusV2Result">Click button to test...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Get History (Last 24h)</h2>
+        <button onclick="testGetHistory24h()">Test getHistory (24h)</button>
+        <pre id="history24hResult">Click button to test...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Get History (Last 7 days)</h2>
+        <button onclick="testGetHistory7d()">Test getHistory (7 days)</button>
+        <pre id="history7dResult">Click button to test...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Get Active Activations</h2>
+        <button onclick="testGetActiveActivations()">Test getActiveActivations</button>
+        <pre id="activeResult">Click button to test...</pre>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php';
+
+        async function testGetStatusV2() {
+            const apiKey = document.getElementById('apiKey').value;
+            const orderId = document.getElementById('orderId').value;
+            const resultElement = document.getElementById('statusV2Result');
+            
+            if (!apiKey) {
+                resultElement.textContent = 'Please enter API key';
+                return;
+            }
+
+            try {
+                resultElement.textContent = 'Loading...';
+                const url = `${BASE_URL}?api_key=${apiKey}&action=getStatusV2&id=${orderId}`;
+                console.log('URL:', url);
+                
+                const response = await fetch(url);
+                const text = await response.text();
+                
+                resultElement.textContent = JSON.stringify({
+                    status: response.status,
+                    response: text
+                }, null, 2);
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function testGetHistory24h() {
+            const apiKey = document.getElementById('apiKey').value;
+            const resultElement = document.getElementById('history24hResult');
+            
+            if (!apiKey) {
+                resultElement.textContent = 'Please enter API key';
+                return;
+            }
+
+            try {
+                resultElement.textContent = 'Loading...';
+                const now = Math.floor(Date.now() / 1000);
+                const yesterday = now - (24 * 60 * 60);
+                const url = `${BASE_URL}?api_key=${apiKey}&action=getHistory&start=${yesterday}&end=${now}`;
+                console.log('URL:', url);
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                resultElement.textContent = JSON.stringify({
+                    status: response.status,
+                    count: Array.isArray(data) ? data.length : 0,
+                    data: data
+                }, null, 2);
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function testGetHistory7d() {
+            const apiKey = document.getElementById('apiKey').value;
+            const resultElement = document.getElementById('history7dResult');
+            
+            if (!apiKey) {
+                resultElement.textContent = 'Please enter API key';
+                return;
+            }
+
+            try {
+                resultElement.textContent = 'Loading...';
+                const now = Math.floor(Date.now() / 1000);
+                const sevenDaysAgo = now - (7 * 24 * 60 * 60);
+                const url = `${BASE_URL}?api_key=${apiKey}&action=getHistory&start=${sevenDaysAgo}&end=${now}`;
+                console.log('URL:', url);
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                resultElement.textContent = JSON.stringify({
+                    status: response.status,
+                    count: Array.isArray(data) ? data.length : 0,
+                    data: data
+                }, null, 2);
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        async function testGetActiveActivations() {
+            const apiKey = document.getElementById('apiKey').value;
+            const resultElement = document.getElementById('activeResult');
+            
+            if (!apiKey) {
+                resultElement.textContent = 'Please enter API key';
+                return;
+            }
+
+            try {
+                resultElement.textContent = 'Loading...';
+                const url = `${BASE_URL}?api_key=${apiKey}&action=getActiveActivations`;
+                console.log('URL:', url);
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                resultElement.textContent = JSON.stringify({
+                    status: response.status,
+                    data: data
+                }, null, 2);
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+
+    <div class="test-section">
+        <h2>📖 Instructions</h2>
+        <ol>
+            <li>Entrez votre clé API SMS-Activate</li>
+            <li>Vérifiez l'Order ID (4450554107)</li>
+            <li>Testez chaque endpoint pour voir les résultats</li>
+            <li>Partagez les résultats pour diagnostic</li>
+        </ol>
+        <p><strong>Note:</strong> Si getHistory ne retourne rien, l'activation est peut-être trop vieille ou n'a jamais reçu de SMS sur SMS-Activate.</p>
+    </div>
+</body>
+</html>

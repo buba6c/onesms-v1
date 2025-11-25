@@ -1,21 +1,255 @@
-// @ts-nocheck
-import { Card, CardContent } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, Users, Phone } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { supabase } from '@/lib/supabase'
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts'
+import { TrendingUp, TrendingDown, Users, Phone, DollarSign, Activity } from 'lucide-react'
 
 export default function AdminAnalytics() {
-  const stats = [
-    { label: 'Revenue This Month', value: '12,456€', trend: '+18.2%', trendUp: true, icon: '💰' },
-    { label: 'New Users', value: '342', trend: '+12.5%', trendUp: true, icon: '👥' },
-    { label: 'Numbers Sold', value: '1,234', trend: '+8.3%', trendUp: true, icon: '📱' },
-    { label: 'Conversion Rate', value: '23.4%', trend: '-2.1%', trendUp: false, icon: '📊' }
-  ]
+  // Fetch revenue chart data (last 7 days)
+  const { data: revenueData = [] } = useQuery({
+    queryKey: ['analytics-revenue'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('amount, created_at')
+        .eq('status', 'completed')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
 
-  const popularServices = [
-    { name: 'WhatsApp', uses: 456, revenue: '1234€' },
-    { name: 'Telegram', uses: 389, revenue: '987€' },
-    { name: 'Facebook', uses: 267, revenue: '756€' },
-    { name: 'Instagram', uses: 198, revenue: '543€' },
-    { name: 'Twitter', uses: 145, revenue: '421€' }
+      // Group by day
+      const grouped: Record<string, number> = {}
+      data?.forEach(t => {
+        const date = new Date(t.created_at).toLocaleDateString()
+        grouped[date] = (grouped[date] || 0) + parseFloat(t.amount || '0')
+      })
+
+      return Object.entries(grouped).map(([date, revenue]) => ({
+        date,
+        revenue: Math.round(revenue)
+      }))
+    },
+    refetchInterval: 60000
+  })
+
+  // Fetch users growth data (last 7 days)
+  const { data: usersData = [] } = useQuery({
+    queryKey: ['analytics-users'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('created_at')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+
+      // Group by day
+      const grouped: Record<string, number> = {}
+      data?.forEach(u => {
+        const date = new Date(u.created_at).toLocaleDateString()
+        grouped[date] = (grouped[date] || 0) + 1
+      })
+
+      return Object.entries(grouped).map(([date, count]) => ({
+        date,
+        users: count
+      }))
+    },
+    refetchInterval: 60000
+  })
+
+  // Fetch popular services
+  const { data: servicesData = [] } = useQuery({
+    queryKey: ['analytics-services'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('activations')
+        .select('service, price')
+        .eq('status', 'completed')
+
+      // Group by service
+      const grouped: Record<string, { count: number; revenue: number }> = {}
+      data?.forEach(a => {
+        if (!grouped[a.service]) {
+          grouped[a.service] = { count: 0, revenue: 0 }
+        }
+        grouped[a.service].count++
+        grouped[a.service].revenue += parseFloat(a.price || '0')
+      })
+
+      return Object.entries(grouped)
+        .map(([service, stats]) => ({
+          name: service,
+          count: stats.count,
+          revenue: Math.round(stats.revenue)
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+    },
+    refetchInterval: 60000
+  })
+
+  // Fetch countries distribution
+  const { data: countriesData = [] } = useQuery({
+    queryKey: ['analytics-countries'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('activations')
+        .select('country')
+        .eq('status', 'completed')
+
+      // Group by country
+      const grouped: Record<string, number> = {}
+      data?.forEach(a => {
+        grouped[a.country] = (grouped[a.country] || 0) + 1
+      })
+
+      return Object.entries(grouped)
+        .map(([country, count]) => ({
+          name: country,
+          value: count
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5)
+    },
+    refetchInterval: 60000
+  })
+
+  // Fetch summary stats
+  const { data: stats } = useQuery({
+    queryKey: ['analytics-stats'],
+    queryFn: async () => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+
+      // Today stats
+      const { data: todayTransactions } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('status', 'completed')
+        .gte('created_at', today.toISOString())
+
+      const { data: yesterdayTransactions } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('status', 'completed')
+        .gte('created_at', yesterday.toISOString())
+        .lt('created_at', today.toISOString())
+
+      const todayRevenue = todayTransactions?.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) || 0
+      const yesterdayRevenue = yesterdayTransactions?.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) || 0
+      const revenueTrend = yesterdayRevenue > 0
+        ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(1)
+        : '0'
+
+      // Users
+      const { count: todayUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', today.toISOString())
+
+      const { count: yesterdayUsers } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', yesterday.toISOString())
+        .lt('created_at', today.toISOString())
+
+      const usersTrend = yesterdayUsers && yesterdayUsers > 0
+        ? (((todayUsers || 0) - yesterdayUsers) / yesterdayUsers * 100).toFixed(1)
+        : '0'
+
+      // Numbers sold
+      const { count: todayNumbers } = await supabase
+        .from('activations')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed')
+        .gte('created_at', today.toISOString())
+
+      const { count: yesterdayNumbers } = await supabase
+        .from('activations')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed')
+        .gte('created_at', yesterday.toISOString())
+        .lt('created_at', today.toISOString())
+
+      const numbersTrend = yesterdayNumbers && yesterdayNumbers > 0
+        ? (((todayNumbers || 0) - yesterdayNumbers) / yesterdayNumbers * 100).toFixed(1)
+        : '0'
+
+      // Conversion rate (completed / total activations)
+      const { count: totalActivations } = await supabase
+        .from('activations')
+        .select('*', { count: 'exact', head: true })
+
+      const { count: completedActivations } = await supabase
+        .from('activations')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed')
+
+      const conversionRate = totalActivations && totalActivations > 0
+        ? ((completedActivations || 0) / totalActivations * 100).toFixed(1)
+        : '0'
+
+      return {
+        revenue: Math.round(todayRevenue),
+        revenueTrend: parseFloat(revenueTrend),
+        users: todayUsers || 0,
+        usersTrend: parseFloat(usersTrend),
+        numbers: todayNumbers || 0,
+        numbersTrend: parseFloat(numbersTrend),
+        conversionRate: parseFloat(conversionRate)
+      }
+    },
+    refetchInterval: 60000
+  })
+
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+
+  const statCards = [
+    {
+      label: 'Revenue Today',
+      value: `${stats?.revenue || 0} Ⓐ`,
+      trend: `${stats?.revenueTrend || 0}%`,
+      trendUp: (stats?.revenueTrend || 0) >= 0,
+      icon: DollarSign,
+      color: 'text-green-500'
+    },
+    {
+      label: 'New Users',
+      value: stats?.users || 0,
+      trend: `${stats?.usersTrend || 0}%`,
+      trendUp: (stats?.usersTrend || 0) >= 0,
+      icon: Users,
+      color: 'text-blue-500'
+    },
+    {
+      label: 'Numbers Sold',
+      value: stats?.numbers || 0,
+      trend: `${stats?.numbersTrend || 0}%`,
+      trendUp: (stats?.numbersTrend || 0) >= 0,
+      icon: Phone,
+      color: 'text-purple-500'
+    },
+    {
+      label: 'Conversion Rate',
+      value: `${stats?.conversionRate || 0}%`,
+      trend: 'Global',
+      trendUp: true,
+      icon: Activity,
+      color: 'text-orange-500'
+    }
   ]
 
   return (
@@ -28,7 +262,7 @@ export default function AdminAnalytics() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
+        {statCards.map((stat, i) => (
           <Card key={i}>
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
@@ -44,10 +278,10 @@ export default function AdminAnalytics() {
                     <span className={stat.trendUp ? 'text-green-500' : 'text-red-500'}>
                       {stat.trend}
                     </span>
-                    <span className="text-gray-500 ml-1">vs last month</span>
+                    <span className="text-gray-500 ml-1">vs yesterday</span>
                   </div>
                 </div>
-                <span className="text-3xl">{stat.icon}</span>
+                <stat.icon className={`w-8 h-8 ${stat.color}`} />
               </div>
             </CardContent>
           </Card>
@@ -58,62 +292,126 @@ export default function AdminAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Revenue Chart */}
         <Card>
-          <div className="p-6 border-b">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-500">📊</span>
-              <h3 className="font-semibold">Revenue Chart</h3>
-            </div>
-          </div>
-          <CardContent className="p-6">
-            <div className="h-64 bg-gray-800 rounded-lg flex items-center justify-center">
-              <p className="text-gray-400">Chart will be here (use Chart.js or Recharts)</p>
-            </div>
+          <CardHeader>
+            <CardTitle>Revenue (Last 7 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* Users Growth */}
         <Card>
-          <div className="p-6 border-b">
-            <div className="flex items-center gap-2">
-              <Users className="text-green-500" />
-              <h3 className="font-semibold">Users Growth</h3>
-            </div>
-          </div>
-          <CardContent className="p-6">
-            <div className="h-64 bg-gray-800 rounded-lg flex items-center justify-center">
-              <p className="text-gray-400">Chart will be here</p>
-            </div>
+          <CardHeader>
+            <CardTitle>New Users (Last 7 Days)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={usersData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="users" stroke="#10b981" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Top Services */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 10 Services</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={servicesData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill="#8b5cf6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Countries Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 5 Countries</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={countriesData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => `${entry.name}: ${entry.value}`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {countriesData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Popular Services */}
+      {/* Popular Services Table */}
       <Card>
-        <div className="p-6 border-b">
-          <h3 className="font-semibold">Popular Services</h3>
-        </div>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            {popularServices.map((service, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg hover:bg-gray-750">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
-                    {service.name.charAt(0)}
-                  </div>
-                  <span className="font-medium text-white">{service.name}</span>
-                </div>
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400">Uses</div>
-                    <div className="font-medium text-white">{service.uses}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400">Revenue</div>
-                    <div className="font-medium text-green-500">{service.revenue}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
+        <CardHeader>
+          <CardTitle>Popular Services Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uses</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {servicesData.map((service, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
+                          {service.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-medium capitalize">{service.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium">{service.count}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-green-600">{service.revenue} Ⓐ</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

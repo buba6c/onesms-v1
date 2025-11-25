@@ -7,7 +7,7 @@
 import axios from 'axios'
 
 const API_KEY = import.meta.env.VITE_SMS_ACTIVATE_API_KEY
-const BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
 
 const apiSmsActivate = axios.create({
   baseURL: BASE_URL,

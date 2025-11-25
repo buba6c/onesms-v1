@@ -118,12 +118,6 @@ export default function Header() {
           <nav className="hidden md:flex items-center space-x-1">
             {user && user.role !== 'admin' ? (
               <>
-                <Link to="/dashboard">
-                  <Button variant="ghost" className="font-medium">Activation</Button>
-                </Link>
-                <Link to="/rent">
-                  <Button variant="ghost" className="font-medium">Rent</Button>
-                </Link>
                 <Link to="/top-up">
                   <Button variant="ghost" className="font-medium">Top up</Button>
                 </Link>
@@ -209,8 +203,6 @@ export default function Header() {
               <Link to="/catalog" className="py-2">{t('nav.catalog')}</Link>
               {user && user.role !== 'admin' && (
                 <>
-                  <Link to="/dashboard" className="py-2">Activation</Link>
-                  <Link to="/rent" className="py-2">Rent</Link>
                   <Link to="/my-numbers" className="py-2">{t('nav.myNumbers')}</Link>
                   <Link to="/history" className="py-2">{t('nav.history')}</Link>
                 </>

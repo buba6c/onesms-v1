@@ -55,6 +55,7 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
         console.log('🔍 [CHECK] Vérification SMS...', num.orderId);
 
         try {
+          // 1. Vérification normale avec getStatusV2
           const { data: checkData, error: checkError } = await supabase.functions.invoke('check-sms-activate-status', {
             body: {
               activationId: num.activationId || num.id,
@@ -64,13 +65,13 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
 
           if (checkError) {
             console.error('❌ [CHECK] Erreur:', checkError);
-            return false;
+            // Continue pour essayer la récupération depuis l'historique
           }
 
           console.log('📊 [CHECK] Résultat:', checkData);
 
           // SMS reçu et facturé
-          if (checkData.data?.status === 'received' && checkData.data?.charged) {
+          if (checkData?.data?.status === 'received' && checkData.data?.charged) {
             console.log('✅ [CHECK] SMS reçu et facturé !');
             
             // Arrêter le polling pour ce numéro
@@ -104,11 +105,10 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
             return true;
           }
 
-          // Timeout (fonds dégelés automatiquement)
-          if (checkData.data?.status === 'timeout') {
-            console.log('⏰ [CHECK] Timeout - fonds dégelés');
+          // Timeout ou Cancelled - la récupération automatique a déjà été tentée par check-sms-activate-status
+          if (checkData?.data?.status === 'timeout' || checkData?.data?.status === 'cancelled') {
+            console.log('⏰ [CHECK] Timeout/Cancelled - Aucun SMS trouvé après récupération automatique');
             
-            // Arrêter le polling
             if (intervalsRef.current[num.orderId]) {
               clearInterval(intervalsRef.current[num.orderId]);
               delete intervalsRef.current[num.orderId];
@@ -125,11 +125,10 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
 
             toast({
               title: '⏰ Timeout',
-              description: `${num.phone} - Fonds dégelés (pas de déduction).`,
+              description: `${num.phone} - Aucun SMS reçu, fonds remboursés.`,
               variant: 'destructive'
             });
 
-            // Rafraîchir le solde
             if (onBalanceUpdate) {
               onBalanceUpdate();
             }

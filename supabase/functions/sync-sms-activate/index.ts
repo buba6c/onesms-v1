@@ -131,10 +131,9 @@ serve(async (req) => {
       countriesToUpsert.push({
         code: countryCode,
         name: info.eng || info.rus,
-        available: true,
+        active: true,
         provider: 'sms-activate',
-        popularity_score: popularityScore, // Add popularity for sorting
-        display_order: topCountries.includes(id) ? (1000 - topCountries.indexOf(id) * 100) : popularityScore // Top countries first
+        available_numbers: 0 // Will be updated from pricing_rules
       })
     }
 
@@ -171,9 +170,12 @@ serve(async (req) => {
         servicesToUpsert.push({
           code: serviceCode,
           name: serviceCode.charAt(0).toUpperCase() + serviceCode.slice(1),
-          icon: `/${serviceCode}.svg`,
-          available: true,
-          provider: 'sms-activate'
+          display_name: serviceCode.charAt(0).toUpperCase() + serviceCode.slice(1),
+          category: 'social',
+          icon: '📱',
+          active: true,
+          popularity_score: 0,
+          total_available: 0
         })
       }
 
@@ -186,9 +188,14 @@ serve(async (req) => {
           service_code: serviceCode,
           country_code: countryCode,
           operator: 'any',
-          price: cost,
-          available: count > 0,
-          provider: 'sms-activate'
+          activation_cost: cost * 0.8, // 20% margin
+          activation_price: cost,
+          rent_cost: 0,
+          rent_price: 0,
+          available_count: count,
+          active: count > 0,
+          provider: 'sms-activate',
+          last_synced_at: new Date().toISOString()
         })
       }
     }

@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSmsPolling } from '@/hooks/useSmsPolling';
+import { useRentPolling } from '@/hooks/useRentPolling';
+import { useRealtimeSms } from '@/hooks/useRealtimeSms';
+import { formatPhoneNumber } from '@/utils/phoneFormatter';
 import { 
   Search,
   X,
@@ -100,11 +103,16 @@ interface ActiveNumber {
   country: string;
   timeRemaining: number;
   expiresAt: string; // ISO timestamp pour recalculer timeRemaining
-  status: 'pending' | 'waiting' | 'received' | 'timeout' | 'cancelled';
+  status: 'pending' | 'waiting' | 'received' | 'timeout' | 'cancelled' | 'active';
   smsCode?: string;
   smsText?: string;
   price: number;
   charged: boolean;
+  // Champs spécifiques aux rentals
+  type?: 'activation' | 'rental';
+  rentalId?: string;
+  durationHours?: number;
+  messageCount?: number;
 }
 
 type Step = 'service' | 'country' | 'confirm' | 'active';
@@ -140,7 +148,18 @@ export default function DashboardPage() {
       
       if (error) {
         console.error('❌ [SERVICES] Erreur DB:', error);
-        // Fallback: utiliser get-services-counts si DB échoue
+        toast({
+          title: 'Erreur de chargement',
+          description: 'Impossible de charger les services. Réessayez.',
+          variant: 'destructive'
+        });
+        return [];
+      }
+      
+      if (!dbServices || dbServices.length === 0) {
+        console.warn('⚠️ [SERVICES] Aucun service disponible');        
+        // Fallback: utiliser get-services-counts si DB est vide
+        console.error('⚠️ [SERVICES] Fallback vers API Edge function...');
         const { data: fallbackData } = await supabase.functions.invoke('get-services-counts', {
           body: { countries: [187, 4, 6] }
         });
@@ -226,44 +245,242 @@ export default function DashboardPage() {
     refetchInterval: 10000 // Recharger toutes les 10 secondes
   });
 
-  // Synchroniser activeNumbers avec la DB
+  // Charger les rentals actifs depuis la DB
+  const { data: dbRentals = [], refetch: refetchRentals } = useQuery<ActiveNumber[]>({
+    queryKey: ['active-rentals', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      console.log('🏠 [LOAD] Chargement rentals DB...');
+      
+      const { data, error } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ [LOAD] Erreur rentals:', error);
+        return [];
+      }
+
+      console.log('✅ [LOAD] Rentals chargés:', data?.length || 0);
+      
+      // DIAGNOSTIC: Afficher les données brutes
+      if (data && data.length > 0) {
+        console.log('📋 [LOAD] Premier rental (raw):', data[0]);
+        console.log('📋 [LOAD] Phone:', data[0].phone);
+        console.log('📋 [LOAD] Service:', data[0].service_code);
+        console.log('📋 [LOAD] Country:', data[0].country_code);
+        console.log('📋 [LOAD] Status:', data[0].status);
+      } else {
+        console.warn('⚠️ [LOAD] Aucun rental actif trouvé');
+        console.warn('⚠️ [LOAD] User ID:', user.id);
+        console.warn('⚠️ [LOAD] Vérifier: 1) status=active 2) user_id correspond');
+      }
+
+      // Mapper les rentals DB vers le format ActiveNumber
+      return data?.map(rent => {
+        // Support both column naming conventions
+        const expiresAt = new Date(rent.expires_at || rent.end_date).getTime();
+        const now = Date.now();
+        const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+
+        return {
+          id: rent.id,
+          orderId: rent.rental_id || rent.rent_id,
+          activationId: rent.id,
+          rentalId: rent.rental_id || rent.rent_id,
+          phone: rent.phone,
+          service: rent.service_code,
+          country: rent.country_code,
+          timeRemaining,
+          expiresAt: rent.expires_at || rent.end_date,
+          status: timeRemaining > 0 ? 'active' : 'timeout',
+          price: rent.total_cost || rent.hourly_rate * (rent.rent_hours || rent.duration_hours),
+          charged: true,
+          type: 'rental' as const,
+          durationHours: rent.duration_hours || rent.rent_hours,
+          messageCount: rent.message_count || 0
+        } as ActiveNumber;
+      }) || [];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 10000 // Recharger toutes les 10 secondes
+  });
+
+  // Synchroniser activeNumbers avec la DB (fusionner activations + rentals)
   useEffect(() => {
-    if (dbActivations) {
-      setActiveNumbers(dbActivations);
+    const combined = [
+      ...dbActivations.map(a => ({ ...a, type: 'activation' as const })),
+      ...dbRentals
+    ];
+    console.log('🔄 [SYNC] Synchronisation activeNumbers:', {
+      activations: dbActivations.length,
+      rentals: dbRentals.length,
+      total: combined.length
+    });
+    if (dbRentals.length > 0) {
+      console.log('📋 [SYNC] Premier rental dans combined:', combined.find(n => n.type === 'rental'));
     }
-  }, [dbActivations]);
+    setActiveNumbers(combined);
+  }, [dbActivations, dbRentals]);
+
+  // Polling automatique pour les rentals actifs
+  const activeRentalIds = dbRentals.map(r => r.rentalId).filter(Boolean) as string[];
+  useRentPolling({
+    enabled: activeRentalIds.length > 0,
+    rentalIds: activeRentalIds,
+    onUpdate: () => {
+      refetchRentals(); // Rafraîchir la liste quand nouveaux messages
+    },
+    intervalMs: 5000 // Vérifier toutes les 5 secondes
+  });
 
   // Fetch countries LIVE - OPTIMISÉ: Vraies quantités via get-country-availability
   const { data: countries = [], isLoading: loadingCountries } = useQuery<Country[]>({
-    queryKey: ['countries-live', selectedService?.code],
+    queryKey: ['countries-live', selectedService?.code, mode, rentDuration],
     queryFn: async () => {
       if (!selectedService?.code) return [];
       
-      console.log('🌐 [LIVE] Chargement pays avec quantités réelles...');
+      console.log(`🌐 [LIVE] Chargement pays mode=${mode} service=${selectedService.code}`);
       
-      // Mapper les codes longs vers les codes courts de l'API SMS-Activate
-      const serviceCodeMapping: Record<string, string> = {
-        'whatsapp': 'wa',
-        'telegram': 'tg',
-        'facebook': 'fb',
-        'instagram': 'ig',
-        'google': 'go',
-        'twitter': 'tw',
-        'discord': 'dr',
-        'uber': 'uk',
-        'netflix': 'ne',
-        'spotify': 'sp',
-        'tiktok': 'ti',
-        'linkedin': 'li',
-        'amazon': 'am',
-        'paypal': 'pm',
-        'microsoft': 'microsoft'
-      };
+      // ✅ En mode RENT, utiliser getRentServicesAndCountries (API différente)
+      if (mode === 'rent') {
+        console.log(`🏠 [RENT] Récupération pays pour location (${rentDuration})...`);
+        
+        try {
+          // Convertir rentDuration en rentTime pour l'API
+          const rentTimeMap = {
+            '4hours': '4',
+            '1day': '24', 
+            '1week': '168',
+            '1month': '720'
+          };
+          const rentTime = rentTimeMap[rentDuration];
+          
+          const { data: rentData, error } = await supabase.functions.invoke('get-rent-services', {
+            body: { rentTime }
+          });
+          
+          if (error) {
+            console.error('❌ [RENT] Erreur get-rent-services:', error);
+            throw error;
+          }
+          
+          console.log('📡 [RENT] Response:', rentData);
+          
+          // Structure: { countries: {"0": 2, "1": 6}, services: {"wa": {cost: 21.95, quant: {...}}} }
+          const countriesMap = rentData?.countries || {};
+          const services = rentData?.services || {};
+          
+          // Récupérer le service actuel dans la réponse
+          const serviceCode = selectedService.code;
+          let serviceData = services[serviceCode];
+          let priceToUse = 0;
+          let serviceName = selectedService.name;
+          
+          // Vérifier si le service existe dans la réponse API
+          if (!serviceData) {
+            console.warn(`⚠️ [RENT] Service ${serviceCode} pas disponible pour location`);
+            
+            // Fallback vers "full" (service universel)
+            const fullService = services['full'];
+            
+            if (!fullService) {
+              console.error(`❌ [RENT] Aucun service disponible (ni ${serviceCode}, ni full)`);
+              return [];
+            }
+            
+            serviceData = fullService;
+            serviceName = 'Full rent';
+            console.log(`🔄 [RENT] Fallback sur service "full": cost=${fullService.cost}`);
+          }
+          
+          // Extraire le prix (peut être dans cost ou retail_cost selon l'API)
+          priceToUse = serviceData.cost || parseFloat(serviceData.retail_cost) || 0;
+          
+          if (!priceToUse || priceToUse <= 0) {
+            console.error(`❌ [RENT] Prix invalide pour ${serviceName}: ${priceToUse}`);
+            return [];
+          }
+          
+          console.log(`✅ [RENT] Service ${serviceName}: cost=${priceToUse}`);
+          
+          // Mapping SMS-Activate ID → Country code (complet)
+          const SMS_ACTIVATE_COUNTRY_MAP: Record<string, string> = {
+            '0': 'russia', '1': 'ukraine', '2': 'kazakhstan', '3': 'china', '4': 'philippines',
+            '5': 'myanmar', '6': 'indonesia', '7': 'malaysia', '8': 'kenya', '9': 'tanzania',
+            '10': 'vietnam', '11': 'kyrgyzstan', '12': 'england', '13': 'israel', '14': 'hongkong',
+            '15': 'poland', '16': 'egypt', '17': 'nigeria', '18': 'macau', '19': 'morocco',
+            '20': 'ghana', '21': 'argentina', '22': 'india', '23': 'uzbekistan', '24': 'cambodia',
+            '25': 'cameroon', '26': 'chad', '27': 'germany', '28': 'lithuania', '29': 'croatia',
+            '30': 'sweden', '31': 'iraq', '32': 'netherlands', '33': 'latvia', '34': 'austria',
+            '35': 'belarus', '36': 'thailand', '37': 'saudiarabia', '38': 'mexico', '39': 'taiwan',
+            '40': 'spain', '41': 'iran', '42': 'algeria', '43': 'slovenia', '44': 'bangladesh',
+            '15': 'poland', '22': 'india', '32': 'romania', '33': 'colombia', '36': 'canada',
+            '39': 'argentina', '43': 'germany', '52': 'thailand', '56': 'spain', '58': 'italy',
+            '73': 'brazil', '78': 'france', '82': 'mexico', '175': 'australia', '187': 'usa'
+          };
+          
+          // Récupérer les infos des pays depuis notre DB
+          const { data: dbCountries } = await supabase
+            .from('countries')
+            .select('id, code, name, success_rate')
+            .eq('active', true);
+          
+          // Mapper par code pays (pas par ID)
+          const dbCountriesMap = new Map(
+            dbCountries?.map(c => [c.code.toLowerCase(), c]) || []
+          );
+          
+          console.log(`📍 [RENT] Mapping ${Object.keys(countriesMap).length} pays de l'API avec DB...`);
+          
+          // Mapper les pays disponibles
+          const availableCountries = Object.entries(countriesMap)
+            .map(([countryId, quantity]) => {
+              // Convertir l'ID API en code pays
+              const countryCode = SMS_ACTIVATE_COUNTRY_MAP[countryId];
+              if (!countryCode) {
+                console.warn(`⚠️ [RENT] ID ${countryId} non mappé dans SMS_ACTIVATE_COUNTRY_MAP`);
+                return null;
+              }
+              
+              // Récupérer les infos depuis la DB
+              const countryInfo = dbCountriesMap.get(countryCode.toLowerCase());
+              if (!countryInfo) {
+                console.warn(`⚠️ [RENT] Pays ${countryCode} (ID ${countryId}) non trouvé dans DB`);
+                return null;
+              }
+              
+              return {
+                id: countryInfo.id,
+                name: countryInfo.name,
+                code: countryInfo.code,
+                flag: getFlagEmoji(countryInfo.code),
+                successRate: countryInfo.success_rate || null,
+                count: quantity as number,
+                price: priceToUse, // Prix du service sélectionné
+                compositeScore: quantity as number, // Utiliser la quantité comme score
+                rank: parseInt(countryId),
+                share: 0
+              };
+            })
+            .filter(Boolean) as Country[];
+          
+          console.log(`✅ [RENT] ${availableCountries.length} pays disponibles pour ${serviceName}`);
+          return availableCountries;
+          
+        } catch (error) {
+          console.error('❌ [RENT] Erreur:', error);
+          throw error;
+        }
+      }
       
-      // Utiliser le code court si disponible, sinon le code original
-      const apiServiceCode = serviceCodeMapping[selectedService.code.toLowerCase()] || selectedService.code;
-      
-      console.log(`📝 [LIVE] Service: ${selectedService.code} → API code: ${apiServiceCode}`);
+      // ✅ MODE ACTIVATION (code existant)
+      const apiServiceCode = selectedService.code;
+      console.log(`📝 [ACTIVATION] Service: ${selectedService.name} → API code: ${apiServiceCode}`);
       
       // 1️⃣ Récupérer les prix depuis pricing_rules (notre marge 20%)
       const { data: pricingData } = await supabase
@@ -378,7 +595,7 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Polling automatique pour vérifier les SMS reçus
+  // Polling automatique pour vérifier les SMS reçus (backup)
   useSmsPolling({
     activeNumbers,
     userId: user?.id,
@@ -390,6 +607,20 @@ export default function DashboardPage() {
     onBalanceUpdate: () => {
       // Recharger le solde utilisateur
       console.log('💰 [POLLING] Rafraîchissement du solde...');
+    }
+  });
+
+  // WebSocket temps réel pour détection instantanée des SMS
+  useRealtimeSms({
+    userId: user?.id,
+    onSmsReceived: (activation) => {
+      console.log('⚡ [REALTIME] SMS reçu, rechargement des activations...');
+      // Recharger immédiatement les activations
+      refetchActivations();
+    },
+    onBalanceUpdate: () => {
+      console.log('💰 [REALTIME] Rafraîchissement du solde...');
+      // TODO: Ajouter refetch du solde si nécessaire
     }
   });
 
@@ -627,10 +858,10 @@ export default function DashboardPage() {
       {/* Sidebar - Order Number */}
       <aside className="w-[380px] bg-white border-r border-gray-200 overflow-y-auto">
         <div className="p-5">
-          <h1 className="text-xl font-bold text-gray-900 mb-5">Order number</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">Order number</h1>
 
           {/* Mode Toggle */}
-          <div className="flex bg-gray-100 rounded-full p-1 mb-5">
+          <div className="flex bg-gray-100 rounded-full p-1 mb-4">
             <button
               onClick={() => setMode('activation')}
               className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
@@ -656,34 +887,6 @@ export default function DashboardPage() {
           {/* STEP 1: Service Selection */}
           {currentStep === 'service' && (
             <>
-              {/* CATEGORY TABS - ULTRA RAPIDE */}
-              <div className="mb-4 flex flex-wrap gap-2">
-                {[
-                  { id: 'all', name: '🌟 All', emoji: '' },
-                  { id: 'social', name: 'Social', emoji: '💬' },
-                  { id: 'shopping', name: 'Shopping', emoji: '🛍️' },
-                  { id: 'finance', name: 'Finance', emoji: '💰' },
-                  { id: 'delivery', name: 'Delivery', emoji: '🚗' },
-                  { id: 'tech', name: 'Tech', emoji: '💻' },
-                  { id: 'dating', name: 'Dating', emoji: '❤️' },
-                  { id: 'gaming', name: 'Gaming', emoji: '🎮' },
-                  { id: 'entertainment', name: 'Media', emoji: '🎬' }
-                ].map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedCategory === cat.id
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {cat.emoji && <span className="mr-1">{cat.emoji}</span>}
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -695,11 +898,35 @@ export default function DashboardPage() {
                 />
               </div>
 
+              {/* Special Service for Rent Mode */}
+              {mode === 'rent' && (
+                <div className="mb-4">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">
+                    IF THE REQUIRED SERVICE IS NOT IN THE LIST
+                  </p>
+                  <div className="space-y-2 mb-4">
+                    {/* Full rent - Universal service */}
+                    <div
+                      onClick={() => handleServiceSelect({ id: 'full', name: 'Full rent', code: 'full', count: 597, icon: '🏠', category: 'other', active: true })}
+                      className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-blue-500 hover:shadow-sm transition-all"
+                    >
+                      <div className="w-11 h-11 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-2xl">🏠</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-900">Full rent</p>
+                        <p className="text-xs text-gray-500">Receive SMS from any service</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">
-                {selectedCategory === 'all' ? 'POPULAR' : selectedCategory.toUpperCase()} ({filteredServices.length} services)
+                POPULAR ({filteredServices.length} services)
               </p>
 
-              <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto">
+              <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
                 {filteredServices.map((service) => (
                   <div
                     key={service.id}
@@ -913,7 +1140,7 @@ export default function DashboardPage() {
                     </div>
                   </Button>
 
-                  <p className="text-center text-sm text-gray-500 mt-4">
+                  <p className="text-center text-sm text-gray-500 mt-4 mb-0">
                     {mode === 'rent' 
                       ? 'The number will be available for the selected duration and can receive multiple SMS'
                       : 'If the number does not receive an SMS, the funds will be returned to the balance'
@@ -929,54 +1156,7 @@ export default function DashboardPage() {
       {/* Main Content - Active Numbers */}
       <main className="flex-1 overflow-y-auto bg-white">
         <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Active numbers</h2>
-            
-            {/* Sync Button - Pour récupérer les SMS manqués */}
-            {activeNumbers.length > 0 && (
-              <Button
-                onClick={async () => {
-                  try {
-                    toast({
-                      title: '🔄 Synchronisation...',
-                      description: 'Vérification des SMS sur SMS-Activate',
-                    });
-                    
-                    const { data, error } = await supabase.functions.invoke('sync-sms-activate-activations');
-                    
-                    if (error) throw error;
-                    
-                    if (data.updated > 0) {
-                      toast({
-                        title: '✅ SMS Récupéré !',
-                        description: `${data.updated} SMS trouvé(s)`,
-                      });
-                      refetchActivations();
-                    } else {
-                      toast({
-                        title: '⏳ Aucun nouveau SMS',
-                        description: `${data.synced} activation(s) vérifiée(s)`,
-                      });
-                    }
-                  } catch (error: any) {
-                    toast({
-                      title: 'Erreur de synchronisation',
-                      description: error.message,
-                      variant: 'destructive'
-                    });
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Sync SMS
-              </Button>
-            )}
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Active numbers</h2>
 
           {activeNumbers.length === 0 ? (
             <div className="text-center py-16">
@@ -1013,16 +1193,26 @@ export default function DashboardPage() {
 
                     {/* Service + Country (140px) */}
                     <div className="w-[140px] flex-shrink-0">
-                      <p className="font-semibold text-[15px] text-gray-900 leading-tight truncate">{num.service} + ...</p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-semibold text-[15px] text-gray-900 leading-tight truncate">{num.service} + ...</p>
+                        {num.type === 'rental' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700">
+                            RENT
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[13px] text-gray-500 leading-tight">{num.country}</p>
                     </div>
 
-                    {/* Phone (180px) */}
-                    <div className="flex items-center gap-2 w-[180px] flex-shrink-0">
-                      <span className="font-mono text-[15px] font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">{num.phone}</span>
+                    {/* Phone (240px pour le format complet) */}
+                    <div className="flex items-center gap-2 w-[240px] flex-shrink-0">
+                      <span className="font-mono text-[14px] font-semibold text-gray-900 bg-gray-100 px-2.5 py-1 rounded whitespace-nowrap">
+                        {formatPhoneNumber(num.phone)}
+                      </span>
                       <button
                         onClick={() => copyToClipboard(num.phone)}
                         className="p-1 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Copier le numéro"
                       >
                         <Copy className="h-4 w-4 text-blue-500" />
                       </button>
@@ -1030,21 +1220,53 @@ export default function DashboardPage() {
 
                     {/* Flexible right section */}
                     <div className="flex items-center gap-4 flex-1 justify-end">
-                      {/* Code bleu OU Waiting spinner */}
-                      {num.smsCode ? (
-                        <div className="bg-[#007AFF] text-white rounded-2xl rounded-tr-md px-4 py-2.5 shadow-md max-w-md">
-                          <span className="font-medium text-[14px] leading-relaxed">
-                            {num.smsText || `Votre code de validation YouTube est ${num.smsCode}`}
-                          </span>
-                        </div>
-                      ) : (num.status === 'waiting' || num.status === 'pending') ? (
+                      {/* Pour RENTAL: afficher le compteur de messages */}
+                      {num.type === 'rental' ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-[2.5px] border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-                          <span className="text-[14px] text-gray-400">Waiting for SMS...</span>
+                          <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[14px] text-purple-700 font-medium">
+                                📨 {num.messageCount || 0} message{(num.messageCount || 0) !== 1 ? 's' : ''}
+                              </span>
+                              {num.durationHours && (
+                                <span className="text-[12px] text-purple-600">
+                                  • {num.durationHours}h rental
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      ) : num.status === 'timeout' ? (
-                        <span className="text-[14px] text-gray-400">No SMS</span>
-                      ) : null}
+                      ) : (
+                        <>
+                          {/* Code bleu OU Waiting spinner (pour activation) */}
+                          {num.smsCode ? (
+                            <div className="bg-[#007AFF] text-white rounded-2xl rounded-tr-md px-4 py-2.5 shadow-md max-w-md">
+                              <span className="font-medium text-[14px] leading-relaxed">
+                                {(() => {
+                                  // Extraire le code SMS si le format est STATUS_OK:code
+                                  const cleanCode = num.smsCode.includes('STATUS_OK:') 
+                                    ? num.smsCode.split(':')[1] 
+                                    : num.smsCode;
+                                  
+                                  // Récupérer le nom du service
+                                  const serviceName = services.find(s => s.code === num.service)?.name || num.service;
+                                  
+                                  return num.smsText && !num.smsText.includes('STATUS_OK:') 
+                                    ? num.smsText 
+                                    : `Votre code de validation ${serviceName} est ${cleanCode}`;
+                                })()}
+                              </span>
+                            </div>
+                          ) : (num.status === 'waiting' || num.status === 'pending') ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 border-[2.5px] border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                              <span className="text-[14px] text-gray-400">Waiting for SMS...</span>
+                            </div>
+                          ) : num.status === 'timeout' ? (
+                            <span className="text-[14px] text-gray-400">No SMS</span>
+                          ) : null}
+                        </>
+                      )}
 
                       {/* Badge (40px fixe) */}
                       <div className="flex items-center justify-center w-[40px] h-[40px] bg-[#E5E5E5] text-gray-600 rounded-full flex-shrink-0">
@@ -1052,55 +1274,142 @@ export default function DashboardPage() {
                         <span className="text-[11px] ml-0.5">Ⓐ</span>
                       </div>
 
-                      {/* Timer (only when waiting) */}
-                      {(num.status === 'waiting' || num.status === 'pending') && (
+                      {/* Timer */}
+                      {(num.status === 'waiting' || num.status === 'pending' || num.status === 'active') && (
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Clock className="h-4 w-4 text-gray-400" />
                           <div className="text-[13px]">
                             <span className="text-gray-400">Remaining:</span>
                             <br/>
-                            <span className="font-semibold text-gray-900">{Math.floor(getRealTimeRemaining(num.expiresAt) / 60)} min.</span>
+                            <span className="font-semibold text-gray-900">
+                              {num.type === 'rental' && num.durationHours && num.durationHours >= 24
+                                ? `${Math.floor(getRealTimeRemaining(num.expiresAt) / 3600)}h`
+                                : `${Math.floor(getRealTimeRemaining(num.expiresAt) / 60)} min.`
+                              }
+                            </span>
                           </div>
                         </div>
                       )}
 
-                      {/* Menu dropdown - Show actions based on status */}
-                      {!num.smsCode && (num.status === 'waiting' || num.status === 'pending') ? (
+                      {/* Menu dropdown - Show actions based on type and status */}
+                      {num.type === 'rental' ? (
+                        /* Menu pour RENTAL */
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
                               <MoreVertical className="h-5 w-5 text-gray-400" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem
                               onClick={async () => {
                                 try {
-                                  const { data, error } = await supabase.functions.invoke('retry-sms-activate', {
-                                    body: { orderId: num.orderId }
+                                  const { data, error } = await supabase.functions.invoke('get-rent-status', {
+                                    body: { rentId: num.rentalId }
                                   });
                                   if (error || !data?.success) throw new Error(data?.error || error?.message);
-                                  toast({ title: 'SMS retry demandé', description: 'Nouveau SMS en cours d\'envoi...' });
-                                  refetchActivations();
+                                  const messages = data.messages || [];
+                                  toast({ 
+                                    title: `${messages.length} message(s)`, 
+                                    description: messages.length > 0 ? messages[0].text : 'No messages yet' 
+                                  });
+                                  refetchRentals();
                                 } catch (e: any) {
                                   toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                 }
                               }}
+                              className="cursor-pointer"
+                            >
+                              <span className="text-blue-600">📨 Refresh messages</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                try {
+                                  const { data, error } = await supabase.functions.invoke('continue-sms-activate-rent', {
+                                    body: { rentalId: num.rentalId, rentTime: 4 }
+                                  });
+                                  if (error || !data?.success) throw new Error(data?.error || error?.message);
+                                  toast({ title: 'Location prolongée', description: '+4h ajoutées' });
+                                  refetchRentals();
+                                } catch (e: any) {
+                                  toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                }
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <span className="text-green-600">➕ Extend rental (+4h)</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                try {
+                                  const { data, error } = await supabase.functions.invoke('set-rent-status', {
+                                    body: { rentalId: num.rentalId, status: 1 }
+                                  });
+                                  if (error || !data?.success) throw new Error(data?.error || error?.message);
+                                  toast({ title: 'Location terminée', description: 'Numéro libéré' });
+                                  refetchRentals();
+                                } catch (e: any) {
+                                  toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                }
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <span className="text-orange-600">✅ Finish rental</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        /* Menu pour ACTIVATION */
+                        !num.smsCode && (num.status === 'waiting' || num.status === 'pending') && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
+                                <MoreVertical className="h-5 w-5 text-gray-400" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  try {
+                                    const { data, error } = await supabase.functions.invoke('retry-sms-activate', {
+                                      body: { orderId: num.orderId }
+                                    });
+                                    if (error || !data?.success) throw new Error(data?.error || error?.message);
+                                    toast({ title: 'SMS retry demandé', description: 'Nouveau SMS en cours d\'envoi...' });
+                                    refetchActivations();
+                                  } catch (e: any) {
+                                    toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                  }
+                                }}
                               className="text-blue-600 focus:text-blue-600 focus:bg-blue-50 cursor-pointer"
                             >
                               <Clock className="h-4 w-4 mr-2" />
                               Demander un autre SMS
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => cancelActivation(num.id, num.orderId)}
-                              className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                              onClick={async () => {
+                                try {
+                                  const { data, error } = await supabase.functions.invoke('cancel-sms-activate', {
+                                    body: { orderId: num.orderId }
+                                  });
+                                  if (error || !data?.success) throw new Error(data?.error || error?.message);
+                                  toast({ title: 'Annulation effectuée', description: 'Le numéro a été annulé.' });
+                                  refetchActivations();
+                                } catch (e: any) {
+                                  toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                }
+                              }}
+                              className="cursor-pointer"
                             >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Annuler
+                              <span className="text-red-600">❌ Cancel</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      ) : num.smsCode ? (
+                        )
+                      )}
+                      
+                      {/* Menu dropdown for completed activation with SMS code */}
+                      {num.type !== 'rental' && num.smsCode && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
@@ -1123,12 +1432,16 @@ export default function DashboardPage() {
                               }}
                               className="text-green-600 focus:text-green-600 focus:bg-green-50 cursor-pointer"
                             >
-                              <Clock className="h-4 w-4 mr-2" />
-                              Marquer comme terminé
+                                <span className="text-green-600">✅ Marquer comme terminé</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      ) : (
+                      )}
+                      
+                      {/* Empty space if no menu */}
+                      {!((num.type === 'rental') || 
+                          (num.type !== 'rental' && !num.smsCode && (num.status === 'waiting' || num.status === 'pending')) ||
+                          (num.type !== 'rental' && num.smsCode)) && (
                         <div className="w-9 h-9 flex-shrink-0"></div>
                       )}
                     </div>

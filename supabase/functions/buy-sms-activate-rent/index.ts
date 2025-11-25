@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.org/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -106,18 +106,29 @@ serve(async (req) => {
 
     console.log('📞 [BUY-RENT] Request:', { country, product, userId, duration })
 
-    // 1. Get service from database
-    const { data: service, error: serviceError } = await supabaseClient
-      .from('services')
-      .select('*')
-      .eq('code', product)
-      .single()
+    // 1. Get service from database (skip for universal service "full")
+    let service = null
+    let serviceName = product
+    
+    if (product !== 'full') {
+      const { data: serviceData, error: serviceError } = await supabaseClient
+        .from('services')
+        .select('*')
+        .eq('code', product)
+        .single()
 
-    if (serviceError || !service) {
-      throw new Error(`Service not found: ${product}`)
+      if (serviceError || !serviceData) {
+        console.warn(`⚠️ [BUY-RENT] Service ${product} not found in DB, will use as-is for API`)
+      } else {
+        service = serviceData
+        serviceName = serviceData.name
+      }
+    } else {
+      console.log(`🔄 [BUY-RENT] Using universal service: full`)
+      serviceName = 'Full rent'
     }
 
-    const smsActivateService = mapServiceCode(product)
+    const smsActivateService = product === 'full' ? product : mapServiceCode(product)
     const smsActivateCountry = mapCountryCode(country)
     const rentTime = RENT_DURATIONS[duration] || 4
 
@@ -132,15 +143,27 @@ serve(async (req) => {
     
     // Find price for the requested service
     let price = 0
+    let actualService = smsActivateService
+    
     if (servicesData.services && servicesData.services[smsActivateService]) {
       price = servicesData.services[smsActivateService].cost || 0
+      console.log(`✅ [BUY-RENT] Service ${smsActivateService} found: ${price}`)
+    } else {
+      // Fallback vers "full" (service universel) si le service spécifique n'existe pas
+      console.warn(`⚠️ [BUY-RENT] Service ${smsActivateService} not available, trying fallback to 'full'...`)
+      
+      if (servicesData.services && servicesData.services['full']) {
+        price = servicesData.services['full'].cost || 0
+        actualService = 'full'
+        console.log(`🔄 [BUY-RENT] Fallback to 'full' service: ${price}`)
+      }
     }
     
     if (!price || price <= 0) {
-      throw new Error(`Rent not available for ${service.name} in ${country} for ${duration}`)
+      throw new Error(`Rent not available for ${serviceName} in ${country} for ${duration}. No service found (tried: ${smsActivateService}, full)`)
     }
 
-    console.log(`💰 [BUY-RENT] Rent price: $${price} for ${rentTime} hours`)
+    console.log(`💰 [BUY-RENT] Rent price: $${price} for ${rentTime} hours using service: ${actualService}`)
 
     // 3. Check user balance
     const { data: userProfile, error: profileError } = await supabaseClient
@@ -161,7 +184,7 @@ serve(async (req) => {
     const rentParams = new URLSearchParams({
       api_key: SMS_ACTIVATE_API_KEY!,
       action: 'getRentNumber',
-      service: smsActivateService,
+      service: actualService,
       country: smsActivateCountry.toString(),
       rent_time: rentTime.toString()
     })
@@ -175,7 +198,13 @@ serve(async (req) => {
     console.log('📥 [BUY-RENT] API Response:', rentData)
 
     if (rentData.status !== 'success' || !rentData.phone) {
-      throw new Error(rentData.message || 'Failed to rent number')
+      // Handle specific error messages
+      if (rentData.message === 'NO_BALANCE') {
+        throw new Error('Solde insuffisant sur SMS-Activate. Veuillez recharger votre compte sur sms-activate.org')
+      } else if (rentData.message === 'NO_NUMBERS') {
+        throw new Error(`Aucun numéro disponible pour ${serviceName} dans ce pays actuellement. Réessayez plus tard.`)
+      }
+      throw new Error(rentData.message || rentData.errorMsg || 'Failed to rent number')
     }
 
     const {
@@ -195,16 +224,21 @@ serve(async (req) => {
       .from('rentals')
       .insert({
         user_id: userId,
-        rental_id: rentId.toString(),
+        rent_id: rentId.toString(),
+        rental_id: rentId.toString(), // Duplicate for compatibility
         phone: phone,
         service_code: product,
         country_code: country,
         operator: 'auto', // SMS-Activate selects automatically
-        price: price,
+        total_cost: price,
+        hourly_rate: price / rentTime,
         status: 'active',
-        expires_at: endDate,
-        duration_hours: rentTime,
-        provider: 'sms-activate'
+        end_date: endDate,
+        expires_at: endDate, // Duplicate for compatibility
+        rent_hours: rentTime,
+        duration_hours: rentTime, // Duplicate for compatibility
+        provider: 'sms-activate',
+        message_count: 0
       })
       .select()
       .single()
@@ -221,6 +255,19 @@ serve(async (req) => {
       
       throw new Error(`Failed to create rental record: ${rentalError.message}`)
     }
+    
+    // DIAGNOSTIC: Vérifier que toutes les colonnes critiques sont bien insérées
+    console.log('✅ [BUY-RENT] Rental créé avec succès:', {
+      id: rental.id,
+      user_id: rental.user_id,
+      rental_id: rental.rental_id,
+      phone: rental.phone,
+      service_code: rental.service_code,
+      country_code: rental.country_code,
+      status: rental.status,
+      expires_at: rental.expires_at,
+      duration_hours: rental.duration_hours
+    })
 
     // 6. Deduct balance and create transaction
     const { error: balanceError } = await supabaseClient
@@ -238,13 +285,9 @@ serve(async (req) => {
         user_id: userId,
         type: 'rental',
         amount: -price,
-        description: `Rent ${service.name} in ${country} for ${duration}`,
+        description: `Rent ${serviceName} in ${country} for ${duration}`,
         status: 'completed',
-        metadata: {
-          rental_id: rental.id,
-          duration: duration,
-          rent_time_hours: rentTime
-        }
+        related_rental_id: rental.id
       })
 
     if (transactionError) {
@@ -264,13 +307,17 @@ serve(async (req) => {
         data: {
           id: rental.id,
           rental_id: rentId,
+          rent_id: rentId, // Compatibility
           phone: phone,
           service: product,
           country: country,
           price: price,
+          total_cost: price,
           status: 'active',
           expires: endDate,
-          duration_hours: rentTime
+          end_date: endDate,
+          duration_hours: rentTime,
+          rent_hours: rentTime
         }
       }),
       {

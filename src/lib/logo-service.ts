@@ -51,7 +51,15 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'stripe': 'stripe.com',
   'coinbase': 'coinbase.com',
   'binance': 'binance.com',
+  'bn': 'binance.com',    // Binance (code SMS-Activate)
   'revolut': 'revolut.com',
+  // Dating apps - codes SMS-Activate
+  'oi': 'tinder.com',     // Tinder
+  'qv': 'badoo.com',      // Badoo
+  'tinder': 'tinder.com',
+  'badoo': 'badoo.com',
+  // Special SMS-Activate services
+  'full': 'sms-activate.org', // Full rent (universal service)
 }
 
 /**
@@ -111,6 +119,13 @@ export const getServiceIcon = (serviceCode: string): string => {
     'airbnb': '🏠',
     'amazon': '📦',
     'paypal': '💳',
+    // Dating apps
+    'oi': '❤️',        // Tinder
+    'tinder': '❤️',
+    'qv': '💙',        // Badoo
+    'badoo': '💙',
+    // Special services
+    'full': '🏠',      // Full rent
   }
   return iconMap[serviceCode.toLowerCase()] || '📱'
 }

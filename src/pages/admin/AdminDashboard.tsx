@@ -1,12 +1,14 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
-import { Users, DollarSign, Phone, MessageSquare, TrendingUp, TrendingDown } from 'lucide-react'
+import { Users, DollarSign, Phone, MessageSquare, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  // Auto-refresh every 30s
+  const { data: stats = {
     totalUsers: 0,
     totalRevenue: 0,
     activeNumbers: 1,
@@ -16,13 +18,45 @@ export default function AdminDashboard() {
     conversionRate: 0,
     newUsersToday: 0,
     revenueToday: 0
+  }, isLoading: statsLoading } = useQuery({
+    queryKey: ['admin-dashboard-stats'],
+    queryFn: fetchDashboardStats,
+    refetchInterval: 30000 // 30 seconds
   })
-  const [recentTransactions, setRecentTransactions] = useState([])
-  const [recentUsers, setRecentUsers] = useState([])
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
+  const { data: recentTransactions = [] } = useQuery({
+    queryKey: ['admin-recent-transactions'],
+    queryFn: fetchRecentTransactions,
+    refetchInterval: 30000
+  })
+
+  const { data: recentUsers = [] } = useQuery({
+    queryKey: ['admin-recent-users'],
+    queryFn: fetchRecentUsers,
+    refetchInterval: 30000
+  })
+
+  async function fetchDashboardStats() {
+    return await fetchDashboardData()
+  }
+
+  async function fetchRecentTransactions() {
+    const { data } = await supabase
+      .from('transactions')
+      .select('*, user:users(email)')
+      .order('created_at', { ascending: false })
+      .limit(5)
+    return data || []
+  }
+
+  async function fetchRecentUsers() {
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5)
+    return data || []
+  }
 
   const fetchDashboardData = async () => {
     // Fetch users
@@ -35,7 +69,6 @@ export default function AdminDashboard() {
       .from('transactions')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(10)
 
     // Fetch virtual numbers
     const { count: numbersCount } = await supabase
@@ -54,7 +87,7 @@ export default function AdminDashboard() {
 
     const newUsersToday = users?.filter(u => u.created_at?.startsWith(today)).length || 0
 
-    setStats({
+    return {
       totalUsers: usersCount || 0,
       totalRevenue: totalRevenue,
       activeNumbers: numbersCount || 1,
@@ -64,10 +97,7 @@ export default function AdminDashboard() {
       conversionRate: 0,
       newUsersToday: newUsersToday,
       revenueToday: revenueToday
-    })
-
-    setRecentTransactions(transactions?.slice(0, 3) || [])
-    setRecentUsers(users?.slice(0, 4) || [])
+    }
   }
 
   const statCards = [

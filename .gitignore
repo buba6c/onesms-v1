@@ -33,3 +33,6 @@ dist-ssr
 out-icons/
 import-results.json
 import-results.ndjson
+
+# Local Netlify folder
+.netlify

@@ -1,222 +1,346 @@
-// @ts-nocheck
 import { useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { useQuery } from '@tanstack/react-query'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, CheckCircle, Activity, DollarSign, Plus, Settings, Power, Zap, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase'
+import { 
+  RefreshCw, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  Activity,
+  DollarSign,
+  Zap,
+  Globe,
+  Clock
+} from 'lucide-react'
+
+interface ProviderStatus {
+  name: string
+  status: 'active' | 'inactive' | 'error'
+  balance: number
+  currency: string
+  apiUrl: string
+  lastCheck: string
+  error?: string
+  stats?: {
+    todayPurchases: number
+    totalAvailable: number
+    avgResponseTime: number
+  }
+}
 
 export default function AdminProviders() {
-  const [providers] = useState([
-    {
-      id: 1,
-      name: '5sim Global',
-      code: '5SIM',
-      status: 'active',
-      priority: 1,
-      rating: '96/96',
-      countries: 180,
-      successRate: 100,
-      usageToday: 0,
-      usageMax: 10000,
-      cost: 0.0000,
-      markup: 300
-    }
-  ])
+  const { toast } = useToast()
+  const [refreshing, setRefreshing] = useState(false)
 
-  const stats = [
-    { label: 'Active Providers', value: 1, icon: CheckCircle, color: 'text-green-500' },
-    { label: 'Avg Success Rate', value: '100.0%', icon: Activity, color: 'text-blue-500' },
-    { label: 'Total SMS Today', value: 0, icon: Activity, color: 'text-purple-500' },
-    { label: 'Countries Covered', value: 0, icon: AlertCircle, color: 'text-orange-500' }
-  ]
+  // Fetch provider status
+  const { data: providers = [], isLoading, refetch } = useQuery<ProviderStatus[]>({
+    queryKey: ['providers-status'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-providers-status`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch provider status')
+      }
+
+      const result = await response.json()
+      return result.providers || []
+    },
+    refetchInterval: 60000 // Refresh every minute
+  })
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await refetch()
+    setRefreshing(false)
+    toast({
+      title: '✅ Status actualisé',
+      description: 'Les informations des providers ont été mises à jour'
+    })
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active': return <CheckCircle className="w-5 h-5 text-green-500" />
+      case 'error': return <XCircle className="w-5 h-5 text-red-500" />
+      default: return <AlertCircle className="w-5 h-5 text-gray-400" />
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const config = {
+      active: { label: 'Active', class: 'bg-green-100 text-green-800' },
+      error: { label: 'Error', class: 'bg-red-100 text-red-800' },
+      inactive: { label: 'Inactive', class: 'bg-gray-100 text-gray-800' }
+    }
+    return config[status as keyof typeof config] || config.inactive
+  }
+
+  // Calculate totals
+  const totalBalance = providers.reduce((sum, p) => sum + p.balance, 0)
+  const activeProviders = providers.filter(p => p.status === 'active').length
+  const todayPurchases = providers.reduce((sum, p) => sum + (p.stats?.todayPurchases || 0), 0)
+  const avgResponseTime = providers.length > 0
+    ? providers.reduce((sum, p) => sum + (p.stats?.avgResponseTime || 0), 0) / providers.length
+    : 0
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Providers Management</h1>
-          <p className="text-gray-500">SMS & Payment providers configuration</p>
+          <h1 className="text-3xl font-bold">SMS Providers</h1>
+          <p className="text-gray-500">Real-time monitoring and status</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="default" className="bg-purple-600">
-            <Plus className="w-4 h-4 mr-2" />
-            Add 5sim (180+ countries)
-          </Button>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Other Provider
-          </Button>
-        </div>
+        <Button 
+          onClick={handleRefresh} 
+          disabled={refreshing || isLoading}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          Actualiser
+        </Button>
       </div>
 
-      {/* Alert */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-        <p className="text-sm text-yellow-800">
-          Balance check désactivé (nécessite backend)
-        </p>
-      </div>
-
-      {/* SMS Providers Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">SMS Providers</h2>
-          <p className="text-sm text-gray-500">1 active / 1 total</p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          {stats.map((stat, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">{stat.label}</p>
-                    <h3 className="text-2xl font-bold mt-1">{stat.value}</h3>
-                  </div>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Providers Table */}
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Countries</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Success Rate</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage Today</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost/SMS</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {providers.map(provider => (
-                  <tr key={provider.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Activity className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{provider.name}</div>
-                          <div className="text-xs text-gray-500">{provider.code}</div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="text-xs">⭐ Rating:</span>
-                            <span className="text-xs font-medium text-green-600">{provider.rating}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <Badge variant="success">active</Badge>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge className="bg-blue-600">#1</Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-4 bg-green-500 rounded"></div>
-                        <span className="font-medium">100%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm">{provider.usageToday} / {provider.usageMax.toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">{((provider.usageToday / provider.usageMax) * 100).toFixed(1)}%</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="font-medium">${provider.cost.toFixed(4)}</div>
-                        <div className="text-xs text-green-600">+{provider.markup}%</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button className="p-2 hover:bg-gray-100 rounded">
-                          <Settings className="w-4 h-4 text-blue-500" />
-                        </button>
-                        <button className="p-2 hover:bg-gray-100 rounded">
-                          <Power className="w-4 h-4 text-red-500" />
-                        </button>
-                        <button className="p-2 hover:bg-gray-100 rounded">
-                          <Zap className="w-4 h-4 text-purple-500" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Active Providers</p>
+                <h3 className="text-2xl font-bold mt-1">
+                  {activeProviders}/{providers.length}
+                </h3>
+              </div>
+              <CheckCircle className="w-6 h-6 text-green-500" />
+            </div>
+          </CardContent>
         </Card>
 
-        {/* Tips */}
-        <Card className="mt-6 bg-blue-50 border-blue-200">
+        <Card>
           <CardContent className="p-6">
-            <h3 className="font-semibold text-blue-900 mb-3">📱 SMS Provider Tips</h3>
-            <ul className="space-y-2 text-sm text-blue-800">
-              <li><strong>• Priority:</strong> Lower number = higher priority. Provider #1 is used first.</li>
-              <li><strong>• Markup:</strong> Add % to provider cost to set your selling price.</li>
-              <li><strong>• Health Check:</strong> Test provider API connection and performance.</li>
-              <li><strong>• Daily Limits:</strong> Prevent overspending by setting max SMS per day.</li>
-            </ul>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Balance</p>
+                <h3 className="text-2xl font-bold mt-1">
+                  {totalBalance.toFixed(2)} ₽
+                </h3>
+              </div>
+              <DollarSign className="w-6 h-6 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Today Purchases</p>
+                <h3 className="text-2xl font-bold mt-1">{todayPurchases}</h3>
+              </div>
+              <Activity className="w-6 h-6 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Avg Response</p>
+                <h3 className="text-2xl font-bold mt-1">{avgResponseTime.toFixed(0)}ms</h3>
+              </div>
+              <Zap className="w-6 h-6 text-orange-500" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Payment Providers Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold">Payment Providers</h2>
-            <p className="text-sm text-gray-500">3 active / 3 total</p>
-          </div>
-          <Button className="bg-green-600">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Payment Provider
-          </Button>
-        </div>
+      {/* Providers List */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <p className="text-gray-500">Chargement des providers...</p>
+          </CardContent>
+        </Card>
+      ) : providers.length === 0 ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-orange-500" />
+            <h3 className="text-lg font-semibold mb-2">Aucun provider configuré</h3>
+            <p className="text-gray-500 mb-4">
+              Configurez vos clés API dans les paramètres système
+            </p>
+            <Button onClick={() => window.location.href = '/admin/settings'}>
+              Aller aux paramètres
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {providers.map((provider) => {
+            const statusBadge = getStatusBadge(provider.status)
+            const isHealthy = provider.status === 'active' && provider.balance > 100
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-sm text-gray-500">Active Payment Providers</p>
-              <h3 className="text-2xl font-bold mt-1">3</h3>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-sm text-gray-500">Avg Fees</p>
-              <h3 className="text-2xl font-bold mt-1">-</h3>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-sm text-gray-500">Currencies</p>
-              <h3 className="text-2xl font-bold mt-1">-</h3>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-sm text-gray-500">Payment Methods</p>
-              <h3 className="text-2xl font-bold mt-1">-</h3>
-            </CardContent>
-          </Card>
+            return (
+              <Card key={provider.name} className={`border-l-4 ${
+                isHealthy ? 'border-green-500' : 
+                provider.status === 'error' ? 'border-red-500' : 
+                'border-yellow-500'
+              }`}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(provider.status)}
+                      <div>
+                        <CardTitle className="text-lg">{provider.name}</CardTitle>
+                        <p className="text-sm text-gray-500">{provider.apiUrl}</p>
+                      </div>
+                    </div>
+                    <Badge className={statusBadge.class}>
+                      {statusBadge.label}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {provider.status === 'error' ? (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-start gap-2">
+                        <XCircle className="w-5 h-5 text-red-500 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-red-900">Erreur de connexion</p>
+                          <p className="text-sm text-red-700 mt-1">{provider.error}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Balance Warning */}
+                      {provider.balance < 100 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-yellow-600" />
+                            <p className="text-sm text-yellow-800">
+                              Balance faible - Rechargez votre compte
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-gray-600 mb-1">
+                            <DollarSign className="w-4 h-4" />
+                            <span className="text-xs font-medium">Balance</span>
+                          </div>
+                          <p className="text-lg font-bold">
+                            {provider.balance.toFixed(2)} {provider.currency}
+                          </p>
+                        </div>
+
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-gray-600 mb-1">
+                            <Activity className="w-4 h-4" />
+                            <span className="text-xs font-medium">Today</span>
+                          </div>
+                          <p className="text-lg font-bold">
+                            {provider.stats?.todayPurchases || 0} SMS
+                          </p>
+                        </div>
+
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-gray-600 mb-1">
+                            <Zap className="w-4 h-4" />
+                            <span className="text-xs font-medium">Response</span>
+                          </div>
+                          <p className="text-lg font-bold">
+                            {provider.stats?.avgResponseTime || 0}ms
+                          </p>
+                        </div>
+
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-gray-600 mb-1">
+                            <Clock className="w-4 h-4" />
+                            <span className="text-xs font-medium">Last Check</span>
+                          </div>
+                          <p className="text-sm font-medium">
+                            {new Date(provider.lastCheck).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => window.open(provider.apiUrl, '_blank')}
+                    >
+                      <Globe className="w-4 h-4 mr-2" />
+                      Visit Website
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => window.location.href = '/admin/settings'}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Configure
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
-      </div>
+      )}
+
+      {/* Info Card */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-1">Configuration des Providers</h3>
+              <p className="text-sm text-blue-800 mb-2">
+                Les providers sont configurés via les paramètres système. Assurez-vous d'avoir:
+              </p>
+              <ul className="text-sm text-blue-800 space-y-1 ml-4">
+                <li>• <strong>SMS-Activate:</strong> Clé API configurée dans SMS_ACTIVATE_API_KEY</li>
+                <li>• <strong>5sim:</strong> Clé API configurée dans FIVESIM_API_KEY</li>
+                <li>• <strong>Balance minimum:</strong> Maintenez au moins 100 RUB sur chaque provider</li>
+              </ul>
+              <Button 
+                size="sm" 
+                className="mt-3"
+                onClick={() => window.location.href = '/admin/settings'}
+              >
+                Configurer maintenant
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
