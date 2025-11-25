@@ -13,7 +13,7 @@ jobs:
       - name: Trigger sync-sms-activate Edge Function
         run: |
           response=$(curl -s -w "\n%{http_code}" -X POST \
-            'https://qepxgaozywhjbnvqkgfr.supabase.co/functions/v1/sync-sms-activate' \
+            'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-sms-activate' \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{}')
