@@ -2,8 +2,8 @@ name: Sync Service Counts
 
 on:
   schedule:
-    # Toutes les 5 minutes
-    - cron: '*/5 * * * *'
+    # Toutes les 15 minutes (réduit pour économiser les minutes GitHub Actions)
+    - cron: '*/15 * * * *'
   workflow_dispatch: # Permet déclenchement manuel
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
       - name: Trigger sync-service-counts Edge Function
         run: |
           response=$(curl -s -w "\n%{http_code}" -X POST \
-            'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-service-counts' \
+            'https://qepxgaozywhjbnvqkgfr.supabase.co/functions/v1/sync-service-counts' \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{}')
