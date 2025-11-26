@@ -111,26 +111,32 @@ function detectServiceCategory(code: string, name: string): string {
   return 'other'
 }
 
-// Service code mapping: SMS-Activate → 5sim
-const SMS_ACTIVATE_TO_SERVICE: Record<string, string> = {
-  'go': 'google',
-  'wa': 'whatsapp',
-  'tg': 'telegram',
-  'fb': 'facebook',
-  'ig': 'instagram',
-  'tw': 'twitter',
-  'ds': 'discord',
-  'mm': 'microsoft',
-  'mb': 'yahoo',
-  'am': 'amazon',
-  'nf': 'netflix',
-  'ub': 'uber',
-  'tk': 'tiktok',
-  'sn': 'snapchat',
-  'ld': 'linkedin',
-  'vi': 'viber',
-  'ts': 'paypal',
-  'st': 'steam'
+// Service code normalization: Normalize long codes to short codes (SMS-Activate API format)
+const NORMALIZE_SERVICE_CODE: Record<string, string> = {
+  // Long → Short mapping (getPrices returns long codes, getServicesList uses short codes)
+  'whatsapp': 'wa',
+  'telegram': 'tg',
+  'instagram': 'ig',
+  'facebook': 'fb',
+  'google': 'go',
+  'twitter': 'tw',
+  'discord': 'ds',
+  'microsoft': 'mm',
+  'yahoo': 'mb',
+  'amazon': 'am',
+  'netflix': 'nf',
+  'uber': 'ub',
+  'tiktok': 'tk',
+  'snapchat': 'sn',
+  'linkedin': 'ld',
+  'viber': 'vi',
+  'paypal': 'ts',
+  'steam': 'st',
+  'youtube': 'go',
+  'gmail': 'go',
+  'vkontakte': 'vk',
+  'wechat': 'wb',
+  'line': 'me'
 }
 
 // Country code mapping: SMS-Activate → 5sim (CORRECTED)
@@ -350,7 +356,8 @@ serve(async (req) => {
       const countryId = parts.length > 1 ? parseInt(parts[1]) : 0
 
       const priceInfo = value as any
-      const serviceCode = SMS_ACTIVATE_TO_SERVICE[smsActivateService] || smsActivateService
+      // Normalize service code: long codes → short codes (whatsapp → wa, telegram → tg)
+      const serviceCode = NORMALIZE_SERVICE_CODE[smsActivateService.toLowerCase()] || smsActivateService
       const countryCode = SMS_ACTIVATE_TO_COUNTRY[countryId] || 'russia'
 
       // Add new service if not seen yet
@@ -358,18 +365,20 @@ serve(async (req) => {
         servicesSeen.add(serviceCode)
         
         // Use popularity_score from master service list API (getServicesList)
-        // If not found in master list, fallback to low score (5)
-        const popularityScore = masterServiceOrder.get(smsActivateService) || 5
+        // Try both normalized code and original code
+        const popularityScore = masterServiceOrder.get(serviceCode) || 
+                               masterServiceOrder.get(smsActivateService) || 5
         
         // Use display name from API, or fallback to capitalized code
-        const displayName = serviceDisplayNames.get(smsActivateService) || 
+        const displayName = serviceDisplayNames.get(serviceCode) || 
+                           serviceDisplayNames.get(smsActivateService) || 
                            serviceCode.charAt(0).toUpperCase() + serviceCode.slice(1)
         
         // Smart icon detection based on service name/code
-        const icon = detectServiceIcon(smsActivateService, displayName)
+        const icon = detectServiceIcon(serviceCode, displayName)
         
         // Smart category detection based on service name
-        const category = detectServiceCategory(smsActivateService, displayName)
+        const category = detectServiceCategory(serviceCode, displayName)
         
         servicesToUpsert.push({
           code: serviceCode,
