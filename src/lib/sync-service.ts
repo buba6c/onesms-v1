@@ -493,27 +493,52 @@ export const getServiceStats = async () => {
   const { data: services } = await supabase
     .from('services')
     .select('popularity_score')
-    .limit(50000)
+    .limit(10000)
 
   const { data: countries } = await supabase
     .from('countries')
     .select('*')
     .limit(10000)
 
-  // Récupérer TOUTES les pricing_rules sans limite
-  const { data: pricing } = await supabase
+  // Utiliser COUNT exact pour les pricing_rules au lieu de récupérer tous les records
+  const { count: pricingRulesCount } = await supabase
     .from('pricing_rules')
-    .select('available_count')
-    .limit(50000)
+    .select('*', { count: 'exact', head: true })
+
+  // Récupérer TOUTES les pricing_rules pour le total_available avec pagination
+  let allPricing: any[] = []
+  let page = 0
+  const pageSize = 1000
+  let hasMore = true
+
+  while (hasMore) {
+    const { data: pricingPage, error } = await supabase
+      .from('pricing_rules')
+      .select('available_count')
+      .range(page * pageSize, (page + 1) * pageSize - 1)
+
+    if (error) {
+      console.error('❌ [STATS] Erreur pagination pricing_rules:', error)
+      break
+    }
+
+    if (pricingPage && pricingPage.length > 0) {
+      allPricing = allPricing.concat(pricingPage)
+      page++
+      hasMore = pricingPage.length === pageSize
+    } else {
+      hasMore = false
+    }
+  }
 
   const totalServices = totalServicesCount || 0
   const activeServices = activeServicesCount || 0
   const popularServices = services?.filter(s => s.popularity_score >= 50).length || 0
   const totalCountries = countries?.length || 0
   const activeCountries = countries?.filter(c => c.active).length || 0
-  const totalAvailable = pricing?.reduce((sum, p) => sum + (p.available_count || 0), 0) || 0
+  const totalAvailable = allPricing.reduce((sum, p) => sum + (p.available_count || 0), 0)
 
-  console.log('📊 [STATS] Services:', totalServices, 'Active:', activeServices, 'Popular:', popularServices, 'Pricing rules:', pricing?.length, 'Total available:', totalAvailable)
+  console.log('📊 [STATS] Services:', totalServices, 'Active:', activeServices, 'Popular:', popularServices, 'Pricing rules:', pricingRulesCount, 'Total available:', totalAvailable, `(from ${allPricing.length} records)`)
 
   return {
     totalServices,
@@ -521,6 +546,7 @@ export const getServiceStats = async () => {
     popularServices,
     totalCountries,
     activeCountries,
-    totalAvailable
+    totalAvailable,
+    pricingRulesCount
   }
 }
