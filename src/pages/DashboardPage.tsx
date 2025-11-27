@@ -958,6 +958,8 @@ export default function DashboardPage() {
       setSelectedService(null);
       setSelectedCountry(null);
       setCurrentStep('service');
+      // Fermer le panneau mobile après l'achat
+      setMobileOrderPanelOpen(false);
 
     } catch (error: any) {
       console.error(`❌ [${mode === 'rent' ? 'RENT' : 'ACTIVATE'}] Exception:`, error);
@@ -1073,11 +1075,46 @@ export default function DashboardPage() {
     return elapsed >= 300; // 5 minutes = 300 secondes
   };
 
+  // État pour le panneau mobile
+  const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
+
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20">
+      {/* Mobile: Bouton flottant pour ouvrir le panneau de commande */}
+      <button
+        onClick={() => setMobileOrderPanelOpen(true)}
+        className="lg:hidden fixed bottom-6 right-6 z-40 w-16 h-16 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full shadow-2xl shadow-blue-500/40 flex items-center justify-center text-white hover:scale-110 transition-transform"
+      >
+        <Phone className="w-7 h-7" />
+      </button>
+
+      {/* Mobile: Overlay pour fermer */}
+      {mobileOrderPanelOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+          onClick={() => setMobileOrderPanelOpen(false)}
+        />
+      )}
+
       {/* Sidebar - Order Number */}
-      <aside className="w-full lg:w-[400px] bg-white/80 backdrop-blur-xl border-b lg:border-b-0 lg:border-r border-gray-200/50 overflow-y-auto shadow-xl shadow-gray-200/50 max-h-[50vh] lg:max-h-none">
-        <div className="p-4 lg:p-6">
+      <aside className={`
+        ${mobileOrderPanelOpen ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
+        fixed lg:relative bottom-0 left-0 right-0 lg:bottom-auto
+        w-full lg:w-[400px] 
+        bg-white/95 backdrop-blur-xl 
+        border-t lg:border-t-0 lg:border-r border-gray-200/50 
+        overflow-y-auto shadow-xl shadow-gray-200/50 
+        max-h-[85vh] lg:max-h-none
+        z-50 lg:z-auto
+        transition-transform duration-300 ease-out
+        rounded-t-3xl lg:rounded-none
+      `}>
+        {/* Mobile: Handle bar */}
+        <div className="lg:hidden flex justify-center py-3">
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full" onClick={() => setMobileOrderPanelOpen(false)}></div>
+        </div>
+        
+        <div className="p-4 lg:p-6 pt-0 lg:pt-6">
           {/* Header */}
           <div className="mb-4 lg:mb-6">
             <h1 className="text-lg lg:text-xl font-bold text-gray-900">{t('dashboard.orderNumber')}</h1>
@@ -1596,12 +1633,21 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Call to Action */}
+              {/* Call to Action - Different for mobile and desktop */}
               <div className="flex items-center justify-center py-6">
-                <div className="flex items-center gap-3 text-blue-600 bg-blue-50 px-6 py-3 rounded-2xl">
+                {/* Desktop CTA */}
+                <div className="hidden lg:flex items-center gap-3 text-blue-600 bg-blue-50 px-6 py-3 rounded-2xl">
                   <span className="animate-bounce text-xl">←</span>
                   <span className="font-medium">{t('dashboard.emptyState.getItNow')} - {t('dashboard.selectFromSidebar')}</span>
                 </div>
+                {/* Mobile CTA - Button to open panel */}
+                <button
+                  onClick={() => setMobileOrderPanelOpen(true)}
+                  className="lg:hidden flex items-center gap-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-8 py-4 rounded-2xl shadow-lg shadow-blue-500/30 hover:shadow-xl hover:scale-105 transition-all"
+                >
+                  <Phone className="w-6 h-6" />
+                  <span className="font-bold text-lg">{t('dashboard.orderNumber', 'Commander un numéro')}</span>
+                </button>
               </div>
             </div>
           ) : (
