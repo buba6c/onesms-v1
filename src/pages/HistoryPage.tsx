@@ -259,14 +259,14 @@ export default function HistoryPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <h1 className="text-4xl font-bold text-gray-900 text-center mb-6">{t('history.title')}</h1>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 text-center mb-4 sm:mb-6">{t('history.title')}</h1>
           
-          {/* Tabs */}
-          <div className="flex justify-center gap-2">
+          {/* Tabs - Full width on mobile */}
+          <div className="flex justify-center gap-1 sm:gap-2">
             <button
               onClick={() => setActiveTab('orders')}
-              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                 activeTab === 'orders'
                   ? 'bg-gray-100 text-gray-900'
                   : 'bg-transparent text-gray-500 hover:text-gray-900'
@@ -276,7 +276,7 @@ export default function HistoryPage() {
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                 activeTab === 'payments'
                   ? 'bg-gray-100 text-gray-900'
                   : 'bg-transparent text-gray-500 hover:text-gray-900'
@@ -289,7 +289,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {activeTab === 'orders' ? (
           <>
             {/* Orders List */}
@@ -315,9 +315,127 @@ export default function HistoryPage() {
                   return (
                   <div
                     key={order.id}
-                    className="bg-white border border-gray-200 rounded-2xl px-5 py-4 hover:shadow-md transition-all"
+                    className="bg-white border border-gray-200 rounded-2xl p-3 sm:px-5 sm:py-4 hover:shadow-md transition-all"
                   >
-                    <div className="flex items-center gap-4">
+                    {/* Mobile Layout */}
+                    <div className="flex flex-col sm:hidden gap-3">
+                      {/* Top row: Logo + Service + Price */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {/* Logo + Flag */}
+                          <div className="relative flex-shrink-0">
+                            <div className="w-11 h-11 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm">
+                              <img 
+                                src={getServiceLogo(order.service_code)}
+                                alt={order.service_code}
+                                className="w-6 h-6 object-contain"
+                                onError={(e) => handleImageError(e, order.service_code)}
+                              />
+                              <span className="text-base hidden items-center justify-center">{getServiceIcon(order.service_code)}</span>
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white overflow-hidden bg-white shadow-md">
+                              <img 
+                                src={getCountryFlag(order.country_code)}
+                                alt={order.country_code}
+                                className="w-full h-full object-cover"
+                                onError={(e) => handleImageError(e)}
+                              />
+                            </div>
+                          </div>
+                          {/* Service Name */}
+                          <div>
+                            <p className="font-semibold text-sm text-gray-900 leading-tight">
+                              {getServiceName(order.service_code)}
+                            </p>
+                            <p className="text-xs text-gray-500">{getCountryName(order.country_code)}</p>
+                          </div>
+                        </div>
+                        {/* Price + Menu */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-full">
+                            <span className="text-xs font-semibold">{Math.floor(order.price)}</span>
+                            <span className="text-[10px] ml-0.5">Ⓐ</span>
+                          </div>
+                          {actualStatus !== 'received' && actualStatus !== 'cancelled' && actualStatus !== 'timeout' && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                                  <MoreVertical className="h-4 w-4 text-gray-400" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  onClick={() => cancelActivation(order.id, order.order_id)}
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                >
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Annuler
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Phone number row */}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-gray-900 bg-gray-100 px-2.5 py-1 rounded flex-1">
+                          {formatPhoneNumber(order.phone)}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(order.phone)}
+                          className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Copy className="h-4 w-4 text-blue-500" />
+                        </button>
+                      </div>
+                      
+                      {/* Status / SMS Code row */}
+                      <div className="flex items-center justify-between">
+                        {actualStatus === 'received' && order.sms_code ? (
+                          <div className="bg-[#007AFF] text-white rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 mr-2">
+                            <span className="font-medium text-xs leading-relaxed block">
+                              {(() => {
+                                const cleanCode = order.sms_code.includes('STATUS_OK:') 
+                                  ? order.sms_code.split(':')[1] 
+                                  : order.sms_code;
+                                return order.sms_text && !order.sms_text.includes('STATUS_OK:') 
+                                  ? order.sms_text 
+                                  : `Code: ${cleanCode}`;
+                              })()}
+                            </span>
+                          </div>
+                        ) : actualStatus === 'waiting' ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                            <span className="text-xs text-gray-400">En attente du SMS...</span>
+                          </div>
+                        ) : actualStatus === 'timeout' ? (
+                          <div className="flex items-center gap-1.5 text-orange-600">
+                            <span className="text-xs">⏰</span>
+                            <span className="text-xs font-semibold">Expiré</span>
+                          </div>
+                        ) : actualStatus === 'cancelled' ? (
+                          <div className="flex items-center gap-1.5 text-red-600">
+                            <span className="text-xs">✕</span>
+                            <span className="text-xs font-semibold">Annulé</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Pas de SMS</span>
+                        )}
+                        
+                        {/* Timer - only when waiting */}
+                        {actualStatus === 'waiting' && (
+                          <div className="flex items-center gap-1.5 text-gray-500">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span className="text-xs font-semibold">{formatTime(timeRemaining)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden sm:flex items-center gap-4">
                       {/* Logo + Flag (52px zone) */}
                       <div className="relative flex-shrink-0">
                         <div className="w-[52px] h-[52px] bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm">
@@ -515,9 +633,42 @@ export default function HistoryPage() {
                 {paginatedPayments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-all"
+                    className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 hover:shadow-sm transition-all"
                   >
-                    <div className="flex items-center justify-between">
+                    {/* Mobile Layout */}
+                    <div className="flex flex-col sm:hidden gap-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 truncate">{payment.type}</p>
+                          <p className="text-xs text-gray-500 truncate">{payment.description}</p>
+                        </div>
+                        <div className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold ml-2 ${
+                          payment.amount > 0
+                            ? 'bg-green-50 text-green-600'
+                            : 'bg-red-50 text-red-600'
+                        }`}>
+                          <span>{payment.amount > 0 ? '+' : ''}{Math.floor(Math.abs(payment.amount))}</span>
+                          <span className="text-xs">Ⓐ</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          payment.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : payment.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {payment.status}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(payment.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Desktop Layout */}
+                    <div className="hidden sm:flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-sm text-gray-900">{payment.type}</p>
                         <p className="text-xs text-gray-500">{payment.description}</p>
