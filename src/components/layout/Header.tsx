@@ -161,13 +161,13 @@ export default function Header() {
             <img 
               src="/mobile.png" 
               alt="One SMS" 
-              className="md:hidden h-10 w-auto object-contain transition-transform group-hover:scale-105"
+              className="md:hidden h-12 w-auto object-contain transition-transform group-hover:scale-105"
             />
             {/* Desktop Logo - Logo complet */}
             <img 
               src="/web.png" 
               alt="One SMS" 
-              className="hidden md:block h-11 lg:h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              className="hidden md:block h-14 lg:h-16 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </Link>
 
