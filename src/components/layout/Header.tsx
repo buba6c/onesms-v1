@@ -158,9 +158,9 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 md:h-20">
           <Link to={logoDestination} className="flex items-center space-x-2 group">
             <img 
-              src="/logo.png" 
+              src="/logo.svg" 
               alt="One SMS" 
-              className="h-9 md:h-10 w-auto transition-transform group-hover:scale-105"
+              className="h-8 md:h-9 w-auto transition-transform group-hover:scale-105"
             />
           </Link>
 
