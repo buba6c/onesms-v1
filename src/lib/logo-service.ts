@@ -7,6 +7,68 @@ const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
 
 // Mapping services vers domaines (prioritaire)
 const SERVICE_DOMAINS: Record<string, string> = {
+  // Codes SMS-Activate TOP services
+  'wa': 'whatsapp.com',
+  'tg': 'telegram.org',
+  'vi': 'viber.com',
+  'ig': 'instagram.com',
+  'fb': 'facebook.com',
+  'tw': 'x.com',
+  'ds': 'discord.com',
+  'vk': 'vk.com',
+  'am': 'amazon.com',
+  'nf': 'netflix.com',
+  'ub': 'uber.com',
+  'ts': 'paypal.com',
+  'mb': 'mamba.ru',
+  'ms': 'microsoft.com',
+  'om': 'microsoft.com',
+  'go': 'google.com',
+  'ym': 'yandex.com',
+  'ok': 'ok.ru',
+  'ma': 'mail.ru',
+  'av': 'avito.ru',
+  'yz': 'youla.ru',
+  'wb': 'wildberries.ru',
+  'me': 'line.me',
+  'we': 'wechat.com',
+  'sn': 'snapchat.com',
+  'tt': 'tiktok.com',
+  'lf': 'aliexpress.com',
+  'gm': 'gmail.com',
+  'mm': 'mamba.ru',
+  'uk': 'ukr.net',
+  'kp': 'kp.ru',
+  'mr': 'mail.ru',
+  'oi': 'tinder.com',
+  'qv': 'badoo.com',
+  'bd': 'baddoo.com',
+  'zn': 'dzen.ru',
+  'tn': 'tinder.com',
+  'ka': 'kakao.com',
+  'kt': 'kakaotalk.com',
+  'wx': 'wechat.com',
+  'qq': 'qq.com',
+  'li': 'linkedin.com',
+  'gp': 'play.google.com',
+  'mc': 'mastercard.com',
+  'bl': 'blizzard.com',
+  'dr': 'dribbble.com',
+  'zr': 'zara.com',
+  'im': 'imo.im',
+  'tx': 'tencent.com',
+  'mt': 'mercadolibre.com',
+  'pm': 'payeer.com',
+  'pf': 'postfinance.ch',
+  
+  // Services manquants ajoutés
+  'fu': 'snapchat.com',      // Snapchat
+  'bnl': 'reddit.com',       // Reddit
+  'aon': 'binance.com',      // Binance
+  'ij': 'revolut.com',       // Revolut
+  'alj': 'spotify.com',      // Spotify
+  
+  // Noms complets
   'whatsapp': 'whatsapp.com',
   'instagram': 'instagram.com',
   'facebook': 'facebook.com',
@@ -51,15 +113,11 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'stripe': 'stripe.com',
   'coinbase': 'coinbase.com',
   'binance': 'binance.com',
-  'bn': 'binance.com',    // Binance (code SMS-Activate)
+  'bn': 'binance.com',
   'revolut': 'revolut.com',
-  // Dating apps - codes SMS-Activate
-  'oi': 'tinder.com',     // Tinder
-  'qv': 'badoo.com',      // Badoo
   'tinder': 'tinder.com',
   'badoo': 'badoo.com',
-  // Special SMS-Activate services
-  'full': 'sms-activate.org', // Full rent (universal service)
+  'full': 'sms-activate.org',
 }
 
 /**
@@ -104,27 +162,143 @@ export const getServiceLogoFallback = (serviceCode: string): string => {
  */
 export const getServiceIcon = (serviceCode: string): string => {
   const iconMap: Record<string, string> = {
+    // Messaging & Social
     'whatsapp': '💬',
+    'wa': '💬',
     'telegram': '✈️',
+    'tg': '✈️',
     'instagram': '📸',
+    'ig': '📸',
     'facebook': '👥',
+    'fb': '👥',
     'twitter': '🐦',
-    'google': '🔍',
-    'microsoft': '🪟',
-    'apple': '🍎',
+    'tw': '🐦',
+    'x': '🐦',
     'discord': '💬',
-    'netflix': '🎬',
-    'spotify': '🎵',
-    'uber': '🚗',
-    'airbnb': '🏠',
+    'ds': '💬',
+    'snapchat': '👻',
+    'fu': '👻',
+    'sn': '👻',
+    'viber': '📞',
+    'vi': '📞',
+    'line': '💬',
+    'me': '💬',
+    'wechat': '💬',
+    'we': '💬',
+    'wx': '💬',
+    'kakao': '📱',
+    'kt': '📱',
+    'ka': '📱',
+    'imo': '📱',
+    'im': '📱',
+    
+    // Tech Giants
+    'google': '🔍',
+    'go': '🔍',
+    'microsoft': '🪟',
+    'ms': '🪟',
+    'om': '🪟',
+    'apple': '🍎',
     'amazon': '📦',
+    'am': '📦',
+    
+    // Entertainment
+    'netflix': '🎬',
+    'nf': '🎬',
+    'spotify': '🎵',
+    'alj': '🎵',
+    'tiktok': '🎵',
+    'tt': '🎵',
+    'lf': '🎵',
+    'twitch': '🎮',
+    'youtube': '📺',
+    
+    // Finance & Crypto
     'paypal': '💳',
+    'ts': '💳',
+    'revolut': '💳',
+    'ij': '💳',
+    'coinbase': '🪙',
+    're': '🪙',
+    'binance': '🔶',
+    'aon': '🔶',
+    'bn': '🔶',
+    'stripe': '💳',
+    'payeer': '💰',
+    'pm': '💰',
+    
+    // E-commerce
+    'uber': '🚗',
+    'ub': '🚗',
+    'airbnb': '🏠',
+    'shopee': '🛒',
+    'alibaba': '🛍️',
+    'mercadolibre': '🛍️',
+    'mg': '🛍️',
+    'mt': '🛍️',
+    'avito': '🏪',
+    'av': '🏪',
+    'wildberries': '🛍️',
+    'wb': '🛍️',
+    'youla': '🛒',
+    'yz': '🛒',
+    'zara': '👗',
+    'zr': '👗',
+    
     // Dating apps
-    'oi': '❤️',        // Tinder
     'tinder': '❤️',
-    'qv': '💙',        // Badoo
+    'oi': '❤️',
+    'tn': '💼',        // LinkedIn (corrigé)
     'badoo': '💙',
-    // Special services
+    'qv': '💙',
+    'bumble': '💛',
+    'bd': '💛',
+    'mamba': '💘',
+    'mb': '💘',
+    'mm': '💘',
+    
+    // Social Networks
+    'reddit': '🤖',
+    'bnl': '🤖',
+    'linkedin': '💼',
+    'li': '💼',
+    'vkontakte': '🎵',
+    'vk': '🎵',
+    'odnoklassniki': '👥',
+    'ok': '👥',
+    'pinterest': '📌',
+    'dribbble': '🎨',
+    'dr': '🎨',
+    
+    // Email & Communication
+    'gmail': '📧',
+    'gm': '📧',
+    'outlook': '📧',
+    'yahoo': '📧',
+    'yandex': '🔍',
+    'ym': '🔍',
+    'mail.ru': '📧',
+    'ma': '📧',
+    'mr': '📧',
+    'ukr.net': '📧',
+    'uk': '📧',
+    
+    // Gaming
+    'steam': '🎮',
+    'blizzard': '🎮',
+    'bl': '🎮',
+    
+    // News & Media
+    'dzen': '📰',
+    'zn': '📰',
+    'kp.ru': '📰',
+    'kp': '📰',
+    
+    // Other
+    'tencent': '🐧',
+    'tx': '🐧',
+    'postfinance': '🏦',
+    'pf': '🏦',
     'full': '🏠',      // Full rent
   }
   return iconMap[serviceCode.toLowerCase()] || '📱'

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,7 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode
 }
 
 export default function AdminServices() {
+  const { t } = useTranslation()
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -128,10 +130,10 @@ export default function AdminServices() {
   }
 
   const statCards = [
-    { label: 'Total Services', value: stats?.totalServices || 0, color: 'text-gray-500' },
-    { label: 'Active', value: stats?.activeServices || 0, color: 'text-green-500' },
-    { label: 'Popular', value: stats?.popularServices || 0, color: 'text-orange-500' },
-    { label: 'Total Numbers', value: stats?.totalAvailable?.toLocaleString() || '0', color: 'text-blue-500' },
+    { label: t('admin.totalServices'), value: stats?.totalServices || 0, color: 'text-gray-500' },
+    { label: t('admin.activeServices'), value: stats?.activeServices || 0, color: 'text-green-500' },
+    { label: t('admin.popularServices'), value: stats?.popularServices || 0, color: 'text-orange-500' },
+    { label: t('admin.totalNumbers'), value: stats?.totalAvailable?.toLocaleString() || '0', color: 'text-blue-500' },
   ]
 
   return (
@@ -139,7 +141,7 @@ export default function AdminServices() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Services Management</h1>
+          <h1 className="text-3xl font-bold">{t('admin.servicesManagement')}</h1>
           <p className="text-gray-500">
             {stats?.activeServices || 0} active / {stats?.totalServices || 0} services
           </p>
@@ -160,7 +162,7 @@ export default function AdminServices() {
           ) : (
             <RefreshCw className="w-4 h-4 mr-2" />
           )}
-          Synchroniser avec SMS-Activate
+          {t('admin.syncWithSMSActivate')}
         </Button>
       </div>
 
@@ -171,7 +173,7 @@ export default function AdminServices() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
-                placeholder="Search services..."
+                placeholder={t('admin.searchServices')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -182,19 +184,19 @@ export default function AdminServices() {
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="px-4 py-2 border rounded-lg"
             >
-              <option value="all">All Categories</option>
-              <option value="social">Social</option>
-              <option value="tech">Tech</option>
-              <option value="other">Other</option>
+              <option value="all">{t('admin.allCategories')}</option>
+              <option value="social">{t('admin.social')}</option>
+              <option value="tech">{t('admin.tech')}</option>
+              <option value="other">{t('admin.other')}</option>
             </select>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2 border rounded-lg"
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="all">{t('admin.allStatus')}</option>
+              <option value="active">{t('admin.active')}</option>
+              <option value="inactive">{t('admin.inactive')}</option>
             </select>
           </div>
         </CardContent>
@@ -217,11 +219,11 @@ export default function AdminServices() {
         {isLoading ? (
           <div className="p-12 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-500">Loading services...</p>
+            <p className="text-gray-500">{t('admin.loadingServices')}</p>
           </div>
         ) : services.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-gray-500 mb-4">No services found</p>
+            <p className="text-gray-500 mb-4">{t('admin.noServicesFound')}</p>
             <Button onClick={() => syncMutation.mutate()} className="bg-purple-600">
               <RefreshCw className="w-4 h-4 mr-2" />
               Synchroniser avec SMS-Activate
@@ -255,8 +257,11 @@ export default function AdminServices() {
                           <span className="text-2xl hidden">{getServiceIcon(service.code)}</span>
                         </div>
                         <div>
-                          <div className="font-medium">{service.display_name || service.name}</div>
-                          <div className="text-xs text-gray-500">{service.code}</div>
+                          <div className="font-medium">
+                            {service.display_name || service.name}
+                            <span className="text-gray-400 font-normal ml-1">({service.code})</span>
+                          </div>
+                          <div className="text-xs text-gray-500">Code: {service.code}</div>
                         </div>
                       </div>
                     </td>

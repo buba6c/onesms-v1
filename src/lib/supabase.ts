@@ -46,12 +46,21 @@ export const signInWithGoogle = async () => {
   return { data, error }
 }
 
-export const signInWithApple = async () => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'apple',
+export const signInWithPhone = async (phone: string) => {
+  const { data, error } = await supabase.auth.signInWithOtp({
+    phone,
     options: {
-      redirectTo: `${window.location.origin}/dashboard`,
+      channel: 'sms',
     },
+  })
+  return { data, error }
+}
+
+export const verifyOtp = async (phone: string, token: string) => {
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone,
+    token,
+    type: 'sms',
   })
   return { data, error }
 }

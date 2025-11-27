@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
@@ -7,6 +8,7 @@ import { Users, DollarSign, Phone, MessageSquare, TrendingUp, TrendingDown, Refr
 import { Link } from 'react-router-dom'
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   // Auto-refresh every 30s
   const { data: stats = {
     totalUsers: 0,

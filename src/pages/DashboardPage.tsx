@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -16,7 +17,9 @@ import {
   Copy,
   Clock,
   MoreVertical,
-  XCircle
+  XCircle,
+  Home,
+  Phone
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -118,6 +121,7 @@ interface ActiveNumber {
 type Step = 'service' | 'country' | 'confirm' | 'active';
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -126,10 +130,21 @@ export default function DashboardPage() {
   const [currentStep, setCurrentStep] = useState<Step>('service');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all'); // Afficher tous les services (triés par popularity_score comme SMS-Activate)
   const [searchService, setSearchService] = useState('');
   const [searchCountry, setSearchCountry] = useState('');
   const [activeNumbers, setActiveNumbers] = useState<ActiveNumber[]>([]);
+  
+  // Timer state to force re-render every second for real-time countdown
+  const [, setTimerTick] = useState(0);
+  
+  // Update timer every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimerTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch services - OPTIMISÉ: Lecture directe depuis DB avec total_available mis à jour par Cron
   const { data: services = [] } = useQuery<Service[]>({
@@ -138,13 +153,15 @@ export default function DashboardPage() {
       console.log('⚡ [SERVICES] Chargement depuis DB (optimisé)...');
       
       // Récupérer les services depuis la DB avec total_available à jour
+      // Utiliser .range() au lieu de .limit() pour contourner la limite PostgREST de 1000
       const { data: dbServices, error } = await supabase
         .from('services')
         .select('code, name, display_name, icon, total_available, category, popularity_score')
         .eq('active', true)
         .gt('total_available', 0) // Seulement services disponibles
         .order('popularity_score', { ascending: false })
-        .order('total_available', { ascending: false });
+        .order('total_available', { ascending: false })
+        .range(0, 9999); // Range permet de dépasser la limite PostgREST par défaut
       
       if (error) {
         console.error('❌ [SERVICES] Erreur DB:', error);
@@ -184,6 +201,9 @@ export default function DashboardPage() {
         : dbServices.filter(s => s.category === selectedCategory);
       
       console.log('✅ [SERVICES] Chargés depuis DB:', filtered.length, 'services');
+      console.log('   Catégorie sélectionnée:', selectedCategory);
+      console.log('   Total DB:', dbServices.length);
+      console.log('   Après filtre:', filtered.length);
       
       return filtered.map(s => ({
         id: s.code,
@@ -197,18 +217,28 @@ export default function DashboardPage() {
   });
 
   // Charger les activations en cours depuis la DB
-  const { data: dbActivations = [], refetch: refetchActivations } = useQuery<ActiveNumber[]>({
+  const { 
+    data: dbActivations = [], 
+    refetch: refetchActivations, 
+    isLoading: loadingActivations,
+    isFetching: fetchingActivations,
+    isPending: pendingActivations
+  } = useQuery<ActiveNumber[]>({
     queryKey: ['active-numbers', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
       console.log('🔄 [LOAD] Chargement activations DB...');
       
+      // Récupérer le timestamp actuel pour filtrer les expirés
+      const now = new Date().toISOString();
+      
       const { data, error } = await supabase
         .from('activations')
         .select('*')
         .eq('user_id', user.id)
         .in('status', ['pending', 'waiting', 'received'])
+        .or(`expires_at.gt.${now},sms_code.not.is.null`) // Soit pas expiré, soit a reçu un SMS
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -216,10 +246,27 @@ export default function DashboardPage() {
         return [];
       }
 
-      console.log('✅ [LOAD] Activations chargées:', data?.length || 0);
+      console.log('✅ [LOAD] Activations brutes chargées:', data?.length || 0);
+      
+      // FILTRE SUPPLÉMENTAIRE: Éliminer les numéros expirés côté client immédiatement
+      const nowTime = Date.now();
+      const filteredData = data?.filter(act => {
+        const expiresAtTime = new Date(act.expires_at).getTime();
+        const isExpired = expiresAtTime < nowTime;
+        const hasCode = !!act.sms_code;
+        
+        // Garder seulement si: pas expiré OU a reçu un SMS
+        if (isExpired && !hasCode) {
+          console.log('🚫 [FILTER-QUERY] Exclu car expiré sans SMS:', act.id, act.phone);
+          return false;
+        }
+        return true;
+      }) || [];
+      
+      console.log('✅ [LOAD] Activations après filtre client:', filteredData.length);
 
       // Mapper les activations DB vers le format ActiveNumber
-      return data?.map(act => {
+      return filteredData.map(act => {
         const expiresAt = new Date(act.expires_at).getTime();
         const now = Date.now();
         const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
@@ -239,14 +286,23 @@ export default function DashboardPage() {
           price: act.price,
           charged: act.charged || false
         } as ActiveNumber;
-      }) || [];
+      });
     },
     enabled: !!user?.id,
+    staleTime: 0, // Pas de cache pour éviter le flash des données périmées
+    gcTime: 0, // Supprimer le cache immédiatement après unmount
+    refetchOnMount: 'always', // Toujours refetch au mount
     refetchInterval: 10000 // Recharger toutes les 10 secondes
   });
 
   // Charger les rentals actifs depuis la DB
-  const { data: dbRentals = [], refetch: refetchRentals } = useQuery<ActiveNumber[]>({
+  const { 
+    data: dbRentals = [], 
+    refetch: refetchRentals, 
+    isLoading: loadingRentals,
+    isFetching: fetchingRentals,
+    isPending: pendingRentals
+  } = useQuery<ActiveNumber[]>({
     queryKey: ['active-rentals', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -283,39 +339,88 @@ export default function DashboardPage() {
       // Mapper les rentals DB vers le format ActiveNumber
       return data?.map(rent => {
         // Support both column naming conventions
+        // order_id is the SMS-Activate rental ID
         const expiresAt = new Date(rent.expires_at || rent.end_date).getTime();
         const now = Date.now();
         const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+        
+        // order_id = SMS-Activate rental ID (number)
+        const smsActivateRentId = rent.order_id || rent.rental_id || rent.rent_id;
+        console.log('📋 [MAP] Rental mapping:', { 
+          dbId: rent.id, 
+          orderId: rent.order_id,
+          rentalId: rent.rental_id,
+          rentId: rent.rent_id,
+          smsActivateRentId
+        });
 
         return {
           id: rent.id,
-          orderId: rent.rental_id || rent.rent_id,
+          orderId: String(smsActivateRentId),
           activationId: rent.id,
-          rentalId: rent.rental_id || rent.rent_id,
+          rentalId: String(smsActivateRentId), // SMS-Activate rent ID for polling
           phone: rent.phone,
           service: rent.service_code,
           country: rent.country_code,
           timeRemaining,
           expiresAt: rent.expires_at || rent.end_date,
           status: timeRemaining > 0 ? 'active' : 'timeout',
-          price: rent.total_cost || rent.hourly_rate * (rent.rent_hours || rent.duration_hours),
+          price: rent.total_cost || rent.price || (rent.hourly_rate ? rent.hourly_rate * (rent.rent_hours || rent.duration_hours) : 0),
           charged: true,
           type: 'rental' as const,
           durationHours: rent.duration_hours || rent.rent_hours,
-          messageCount: rent.message_count || 0
+          messageCount: rent.message_count || rent.sms_count || 0
         } as ActiveNumber;
-      }) || [];
+      });
     },
     enabled: !!user?.id,
+    staleTime: 0, // Pas de cache pour éviter le flash des données périmées
+    gcTime: 0, // Supprimer le cache immédiatement après unmount
+    refetchOnMount: 'always', // Toujours refetch au mount
     refetchInterval: 10000 // Recharger toutes les 10 secondes
   });
 
   // Synchroniser activeNumbers avec la DB (fusionner activations + rentals)
+  // Auto-masquer les numéros qui ont reçu un SMS après 20 secondes
+  const [hiddenNumbers, setHiddenNumbers] = useState<Set<string>>(new Set());
+  const [smsReceivedTimestamps, setSmsReceivedTimestamps] = useState<Map<string, number>>(new Map());
+  
+  // Flag pour savoir si le chargement initial est terminé
+  // isPending = true seulement au TOUT PREMIER fetch (pas de données en cache)
+  // isFetching = true pendant tout fetch (initial ou refetch)
+  const isInitialLoading = pendingActivations || pendingRentals || fetchingActivations || fetchingRentals;
+  
+  // Track si on a déjà fait le premier chargement réussi
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  
   useEffect(() => {
+    // Marquer comme chargé une fois que le premier fetch est terminé
+    if (!pendingActivations && !pendingRentals && !hasInitiallyLoaded) {
+      console.log('✅ [INIT] Premier chargement terminé');
+      setHasInitiallyLoaded(true);
+    }
+  }, [pendingActivations, pendingRentals, hasInitiallyLoaded]);
+
+  useEffect(() => {
+    // NE PAS mettre à jour si on n'a pas encore fait le premier chargement
+    // Cela évite le flash des données en cache
+    if (!hasInitiallyLoaded) {
+      console.log('⏳ [SYNC] En attente du premier chargement...');
+      return;
+    }
+    
     const combined = [
       ...dbActivations.map(a => ({ ...a, type: 'activation' as const })),
       ...dbRentals
     ];
+    
+    // Détecter les nouveaux SMS reçus et enregistrer le timestamp
+    combined.forEach(num => {
+      if (num.type === 'activation' && num.smsCode && !smsReceivedTimestamps.has(num.id)) {
+        setSmsReceivedTimestamps(prev => new Map(prev).set(num.id, Date.now()));
+      }
+    });
+
     console.log('🔄 [SYNC] Synchronisation activeNumbers:', {
       activations: dbActivations.length,
       rentals: dbRentals.length,
@@ -324,8 +429,67 @@ export default function DashboardPage() {
     if (dbRentals.length > 0) {
       console.log('📋 [SYNC] Premier rental dans combined:', combined.find(n => n.type === 'rental'));
     }
-    setActiveNumbers(combined);
-  }, [dbActivations, dbRentals]);
+    
+    // Filtrer les numéros masqués ET les numéros expirés/timeout (sauf s'ils ont reçu un SMS)
+    const now = Date.now();
+    const visibleNumbers = combined.filter(num => {
+      // Si masqué manuellement, ne pas afficher
+      if (hiddenNumbers.has(num.id)) return false;
+      
+      // Si timeout et pas de SMS reçu, ne pas afficher sur le dashboard
+      if (num.status === 'timeout' && !num.smsCode) return false;
+      
+      // Vérifier si le numéro est expiré (temps écoulé)
+      if (num.expiresAt) {
+        const expiresAtTime = new Date(num.expiresAt).getTime();
+        const isExpired = expiresAtTime < now;
+        
+        // Si expiré et pas de SMS reçu, ne pas afficher
+        if (isExpired && !num.smsCode) {
+          console.log('🚫 [FILTER] Numéro expiré masqué:', num.id, num.phone);
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    console.log('📊 [FILTER] Résultat filtrage:', {
+      avant: combined.length,
+      après: visibleNumbers.length,
+      masqués: combined.length - visibleNumbers.length
+    });
+    setActiveNumbers(visibleNumbers);
+  }, [dbActivations, dbRentals, hiddenNumbers, hasInitiallyLoaded]);
+
+  // Auto-masquer les numéros 20 secondes après réception du SMS
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const toHide: string[] = [];
+      
+      smsReceivedTimestamps.forEach((timestamp, id) => {
+        if (now - timestamp >= 20000) { // 20 secondes
+          toHide.push(id);
+        }
+      });
+      
+      if (toHide.length > 0) {
+        setHiddenNumbers(prev => {
+          const newSet = new Set(prev);
+          toHide.forEach(id => newSet.add(id));
+          return newSet;
+        });
+        setSmsReceivedTimestamps(prev => {
+          const newMap = new Map(prev);
+          toHide.forEach(id => newMap.delete(id));
+          return newMap;
+        });
+      }
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [smsReceivedTimestamps]);
 
   // Polling automatique pour les rentals actifs
   const activeRentalIds = dbRentals.map(r => r.rentalId).filter(Boolean) as string[];
@@ -650,6 +814,7 @@ export default function DashboardPage() {
     }
   });
 
+  // Filtrer par recherche seulement (la catégorie est déjà filtrée dans la query)
   const filteredServices = services.filter(s =>
     s.name.toLowerCase().includes(searchService.toLowerCase())
   );
@@ -714,11 +879,13 @@ export default function DashboardPage() {
       console.log(`🔍 [${isRent ? 'RENT' : 'ACTIVATE'}] SMS-Activate sélectionnera automatiquement le meilleur opérateur`);
       
       // Préparer le body selon le mode
+      // ✅ Envoyer le prix affiché au frontend pour garantir la cohérence
       const requestBody = {
         country: selectedCountry.code,
         operator: 'any', // SMS-Activate choisit automatiquement le meilleur
         product: selectedService.code || selectedService.name.toLowerCase(),
         userId: user.id,
+        expectedPrice: finalPrice, // Prix affiché au frontend, à utiliser dans la DB
         ...(isRent && { duration: rentDuration })
       };
       
@@ -808,21 +975,33 @@ export default function DashboardPage() {
     setCurrentStep('service');
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, type: 'phone' | 'code' = 'phone') => {
     navigator.clipboard.writeText(text);
     toast({
-      title: 'Copied!',
-      description: 'Phone number copied to clipboard'
+      title: t('dashboard.copied'),
+      description: type === 'code' ? t('dashboard.codeCopied') : t('dashboard.numberCopied')
     });
+  };
+
+  // Helper: Get full service name from code (wa -> WhatsApp)
+  const getServiceName = (code: string): string => {
+    const allServices = getAllServices();
+    const found = allServices.find(s => s.code.toLowerCase() === code.toLowerCase());
+    return found?.name || code.toUpperCase();
   };
 
   const cancelActivation = async (activationId: string, orderId: string) => {
     try {
       console.log('🚫 [CANCEL] Starting cancellation for:', { activationId, orderId });
 
-      // 1. Cancel via Edge Function (plus sécurisé)
+      // 1. Cancel via Edge Function - Envoyer TOUJOURS orderId (ID SMS-Activate)
+      // L'activationId est l'UUID Supabase, orderId est l'ID de SMS-Activate
       const { data, error } = await supabase.functions.invoke('cancel-sms-activate-order', {
-        body: { activationId, userId: user?.id }
+        body: { 
+          orderId: orderId, // ID SMS-Activate (numérique)
+          activationId: activationId, // UUID Supabase (pour mise à jour DB)
+          userId: user?.id 
+        }
       });
 
       if (error || !data?.success) {
@@ -879,31 +1058,50 @@ export default function DashboardPage() {
     return Math.max(0, Math.floor((expiresAtMs - now) / 1000));
   };
 
-  return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-50">
-      {/* Sidebar - Order Number */}
-      <aside className="w-[380px] bg-white border-r border-gray-200 overflow-y-auto">
-        <div className="p-5">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">Order number</h1>
+  // Calculer le temps écoulé depuis la création (pour savoir si annulation est autorisée après 5 min)
+  const getTimeElapsedSinceCreation = (expiresAt: string): number => {
+    // expiresAt = création + 20 minutes, donc création = expiresAt - 20 min
+    const expiresAtMs = new Date(expiresAt).getTime();
+    const createdAtMs = expiresAtMs - (20 * 60 * 1000); // 20 min before expiry
+    const now = Date.now();
+    return Math.floor((now - createdAtMs) / 1000); // Temps écoulé en secondes
+  };
 
-          {/* Mode Toggle */}
-          <div className="flex bg-gray-100 rounded-full p-1 mb-4">
+  // Vérifier si l'annulation est autorisée (après 5 minutes = 300 secondes)
+  const canCancelActivation = (expiresAt: string): boolean => {
+    const elapsed = getTimeElapsedSinceCreation(expiresAt);
+    return elapsed >= 300; // 5 minutes = 300 secondes
+  };
+
+  return (
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20">
+      {/* Sidebar - Order Number */}
+      <aside className="w-full lg:w-[400px] bg-white/80 backdrop-blur-xl border-b lg:border-b-0 lg:border-r border-gray-200/50 overflow-y-auto shadow-xl shadow-gray-200/50 max-h-[50vh] lg:max-h-none">
+        <div className="p-4 lg:p-6">
+          {/* Header */}
+          <div className="mb-4 lg:mb-6">
+            <h1 className="text-lg lg:text-xl font-bold text-gray-900">{t('dashboard.orderNumber')}</h1>
+            <p className="text-xs text-gray-500">{t('dashboard.selectService')}</p>
+          </div>
+
+          {/* Mode Toggle - Modernisé */}
+          <div className="flex bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-1.5 mb-4 lg:mb-5 shadow-inner">
             <button
               onClick={() => setMode('activation')}
-              className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
+              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${
                 mode === 'activation'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
               }`}
             >
               Activation
             </button>
             <button
               onClick={() => setMode('rent')}
-              className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
+              className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${
                 mode === 'rent'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
               }`}
             >
               Rent
@@ -913,53 +1111,63 @@ export default function DashboardPage() {
           {/* STEP 1: Service Selection */}
           {currentStep === 'service' && (
             <>
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="relative mb-5">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-400" />
                 <Input
                   type="text"
-                  placeholder="Enter service name..."
+                  placeholder={t('dashboard.enterServiceName')}
                   value={searchService}
                   onChange={(e) => setSearchService(e.target.value)}
-                  className="pl-10 h-11 text-sm bg-gray-50 border-gray-200"
+                  className="pl-12 h-12 text-sm bg-white border-2 border-gray-100 rounded-xl focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all shadow-sm hover:shadow-md"
                 />
               </div>
 
               {/* Special Service for Rent Mode */}
               {mode === 'rent' && (
-                <div className="mb-4">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">
-                    IF THE REQUIRED SERVICE IS NOT IN THE LIST
+                <div className="mb-5">
+                  <p className="text-[10px] text-purple-500 uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                    <span className="w-5 h-0.5 bg-purple-400 rounded-full"></span>
+                    {t('dashboard.universalService')}
                   </p>
                   <div className="space-y-2 mb-4">
                     {/* Full rent - Universal service */}
                     <div
-                      onClick={() => handleServiceSelect({ id: 'full', name: 'Full rent', code: 'full', count: 597, icon: '🏠', category: 'other', active: true })}
-                      className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-blue-500 hover:shadow-sm transition-all"
+                      onClick={() => handleServiceSelect({ id: 'full', name: 'Full rent', code: 'full', count: 597, icon: 'home', category: 'other', active: true })}
+                      className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-purple-400 hover:shadow-lg hover:shadow-purple-100 transition-all duration-300 group"
                     >
-                      <div className="w-11 h-11 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-2xl">🏠</span>
+                      <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
+                        <Home className="w-7 h-7 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm text-gray-900">Full rent</p>
-                        <p className="text-xs text-gray-500">Receive SMS from any service</p>
+                        <p className="font-bold text-base text-gray-900">Full rent</p>
+                        <p className="text-xs text-purple-600">{t('dashboard.receiveFromAny')}</p>
+                      </div>
+                      <div className="text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        →
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">
-                POPULAR ({filteredServices.length} services)
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[11px] text-gray-500 uppercase tracking-widest font-bold flex items-center gap-2">
+                  <span className="w-5 h-0.5 bg-blue-400 rounded-full"></span>
+                  {selectedCategory === 'all' ? t('dashboard.allServices') : selectedCategory.toUpperCase()}
+                </p>
+                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                  {filteredServices.length} {t('dashboard.services')}
+                </span>
+              </div>
 
-              <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
+              <div className="space-y-2.5 max-h-[calc(100vh-320px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {filteredServices.map((service) => (
                   <div
                     key={service.id}
                     onClick={() => handleServiceSelect(service)}
-                    className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-blue-500 hover:shadow-sm transition-all"
+                    className="group bg-white border-2 border-gray-100 rounded-xl p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-blue-400 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300 hover:scale-[1.01]"
                   >
-                    <div className="w-11 h-11 bg-white border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <div className="w-12 h-12 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm group-hover:shadow-md group-hover:border-blue-200 transition-all">
                       <img 
                         src={getServiceLogo(service.code || service.name)} 
                         alt={service.name}
@@ -969,8 +1177,14 @@ export default function DashboardPage() {
                       <span className="text-xl hidden items-center justify-center">{getServiceIcon(service.code || service.name)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-gray-900 truncate">{service.name}</p>
-                      <p className="text-xs text-gray-500">{service.count.toLocaleString()} numbers</p>
+                      <p className="font-bold text-sm text-gray-900 truncate group-hover:text-blue-600 transition-colors">{service.name}</p>
+                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                        {service.count.toLocaleString()} {t('dashboard.numbersAvailable')}
+                      </p>
+                    </div>
+                    <div className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all">
+                      →
                     </div>
                   </div>
                 ))}
@@ -981,78 +1195,93 @@ export default function DashboardPage() {
           {/* STEP 2: Country Selection */}
           {(currentStep === 'country' || currentStep === 'confirm') && selectedService && (
             <>
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="relative mb-4 opacity-50">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300" />
                 <Input
                   type="text"
                   placeholder="Enter service name..."
                   value={searchService}
                   disabled
-                  className="pl-10 h-11 text-sm bg-gray-50 border-gray-200"
+                  className="pl-12 h-12 text-sm bg-gray-50 border-2 border-gray-100 rounded-xl cursor-not-allowed"
                 />
               </div>
 
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">SELECTED SERVICE</p>
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 flex items-center gap-3">
-                <div className="w-11 h-11 bg-white border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+              <p className="text-[11px] text-blue-500 uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                <span className="w-5 h-0.5 bg-blue-400 rounded-full"></span>
+                {t('dashboard.selectedService')}
+              </p>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4 mb-5 flex items-center gap-4 shadow-sm">
+                <div className="w-14 h-14 bg-white border-2 border-blue-100 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-md">
                   <img 
                     src={getServiceLogo(selectedService.code || selectedService.name)} 
                     alt={selectedService.name}
-                    className="w-8 h-8 object-contain"
+                    className="w-9 h-9 object-contain"
                     onError={(e) => handleLogoError(e, selectedService.code || selectedService.name)}
                   />
                   <span className="text-xl hidden items-center justify-center">{getServiceIcon(selectedService.code || selectedService.name)}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-gray-900 truncate">{selectedService.name}</p>
-                  <p className="text-xs text-gray-500">{selectedService.count.toLocaleString()} numbers</p>
+                  <p className="font-bold text-base text-gray-900 truncate">{selectedService.name}</p>
+                  <p className="text-sm text-blue-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                    {selectedService.count.toLocaleString()} {t('dashboard.numbersAvailable')}
+                  </p>
                 </div>
-                <button onClick={handleReset} className="p-1.5 hover:bg-gray-200 rounded-full transition-all flex-shrink-0">
-                  <X className="h-4 w-4 text-gray-400" />
+                <button onClick={handleReset} className="p-2 hover:bg-blue-100 rounded-xl transition-all flex-shrink-0 group">
+                  <X className="h-5 w-5 text-blue-400 group-hover:text-blue-600 transition-colors" />
                 </button>
               </div>
 
               {currentStep === 'country' && (
                 <>
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-2">COUNTRY SELECTION</p>
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <p className="text-[11px] text-green-600 uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                    <span className="w-5 h-0.5 bg-green-400 rounded-full"></span>
+                    {t('dashboard.countrySelection')}
+                  </p>
+                  <div className="relative mb-4">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-green-400" />
                     <Input
                       type="text"
-                      placeholder="Enter country name..."
+                      placeholder={t('dashboard.enterCountryName')}
                       value={searchCountry}
                       onChange={(e) => setSearchCountry(e.target.value)}
-                      className="pl-10 h-11 text-sm bg-gray-50 border-gray-200"
+                      className="pl-12 h-12 text-sm bg-white border-2 border-gray-100 rounded-xl focus:border-green-400 focus:ring-4 focus:ring-green-100 transition-all shadow-sm hover:shadow-md"
                       disabled={loadingCountries}
                     />
                   </div>
 
                   {loadingCountries ? (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-3">
-                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-                      <p className="text-sm text-gray-500 animate-pulse">🌐 Chargement des taux en temps réel depuis 5sim...</p>
+                    <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                      <div className="relative">
+                        <div className="w-16 h-16 border-4 border-blue-100 rounded-full"></div>
+                        <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <p className="text-sm text-gray-500 animate-pulse">🌐 {t('dashboard.loadingRates')}</p>
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center justify-between mb-2 text-[10px] text-gray-500 px-1">
-                        <span>Country, success rate</span>
-                        <span>Price</span>
+                      <div className="flex items-center justify-between mb-3 text-[11px] text-gray-500 px-2 font-medium">
+                        <span>{t('dashboard.countrySuccessRate')}</span>
+                        <span>{t('dashboard.price')}</span>
                       </div>
 
                       {filteredCountries.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
-                          <p className="text-sm">Aucun pays disponible pour ce service</p>
+                        <div className="text-center py-12">
+                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                            <span className="text-2xl">🌍</span>
+                          </div>
+                          <p className="text-sm text-gray-500">{t('dashboard.noCountryAvailable')}</p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-2.5 max-h-[calc(100vh-500px)] overflow-y-auto pr-1">
                           {filteredCountries.map((country) => (
                       <div
                         key={country.id}
                         onClick={() => handleCountrySelect(country)}
-                        className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:border-blue-500 hover:shadow-sm transition-all"
+                        className="group bg-white border-2 border-gray-100 rounded-xl p-3.5 flex items-center justify-between cursor-pointer hover:border-green-400 hover:shadow-lg hover:shadow-green-100/50 transition-all duration-300 hover:scale-[1.01]"
                       >
-                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                          <div className="w-12 h-9 rounded border border-gray-200 overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-12 h-9 rounded-lg border border-gray-200 overflow-hidden bg-white flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
                             <img 
                               src={getCountryFlag(country.name)} 
                               alt={country.name}
@@ -1067,16 +1296,16 @@ export default function DashboardPage() {
                             <span className="text-2xl hidden items-center justify-center">{getFlagEmoji(country.name)}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-sm text-gray-900 truncate">{country.name}</p>
+                            <p className="font-bold text-sm text-gray-900 truncate group-hover:text-green-600 transition-colors">{country.name}</p>
                             <p className="text-xs text-green-600 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                              {country.count.toLocaleString()} numbers
+                              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                              {country.count.toLocaleString()} {t('dashboard.numbersAvailable')}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-base flex-shrink-0">
+                        <div className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-xl font-bold text-base flex-shrink-0 shadow-lg shadow-blue-500/30 group-hover:shadow-xl group-hover:shadow-blue-500/40 transition-shadow">
                           <span>{Math.floor(country.price)}</span>
-                          <span className="text-xs">Ⓐ</span>
+                          <span className="text-xs opacity-80">Ⓐ</span>
                         </div>
                       </div>
                           ))}
@@ -1090,9 +1319,12 @@ export default function DashboardPage() {
               {/* STEP 3: Confirmation */}
               {currentStep === 'confirm' && selectedCountry && (
                 <>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">SELECTED COUNTRY</p>
-                  <div className="bg-gray-50 rounded-xl p-4 mb-6 flex items-center gap-3">
-                    <div className="w-16 h-12 rounded border border-gray-200 overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+                  <p className="text-[11px] text-green-600 uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                    <span className="w-5 h-0.5 bg-green-400 rounded-full"></span>
+                    {t('dashboard.selectedCountry')}
+                  </p>
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4 mb-5 flex items-center gap-4 shadow-sm">
+                    <div className="w-16 h-12 rounded-lg border-2 border-green-100 overflow-hidden bg-white flex items-center justify-center flex-shrink-0 shadow-md">
                       <img 
                         src={getCountryFlag(selectedCountry.name)} 
                         alt={selectedCountry.name}
@@ -1109,50 +1341,64 @@ export default function DashboardPage() {
                     <div className="flex-1">
                       <p className="font-bold text-base text-gray-900">{selectedCountry.name}</p>
                       <p className="text-sm text-green-600 flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        {selectedCountry.count.toLocaleString()} numbers
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        {selectedCountry.count.toLocaleString()} {t('dashboard.numbersAvailable')}
                       </p>
                     </div>
-                    <button onClick={() => setCurrentStep('country')} className="p-2 hover:bg-gray-200 rounded-full transition-all">
-                      <X className="h-5 w-5 text-gray-400" />
+                    <button onClick={() => setCurrentStep('country')} className="p-2 hover:bg-green-100 rounded-xl transition-all group">
+                      <X className="h-5 w-5 text-green-400 group-hover:text-green-600 transition-colors" />
                     </button>
                   </div>
 
-                  {/* Rent Duration Selector */}
+                  {/* Rent Duration Selector - Modernisé */}
                   {mode === 'rent' && (
                     <div className="mb-6">
-                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">DURATION</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <p className="text-[11px] text-purple-500 uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
+                        <span className="w-5 h-0.5 bg-purple-400 rounded-full"></span>
+                        {t('dashboard.duration')}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
                         {[
-                          { value: '4hours' as const, label: '4 Hours', price: selectedCountry.price * 1 },
-                          { value: '1day' as const, label: '1 Day', price: selectedCountry.price * 3 },
-                          { value: '1week' as const, label: '1 Week', price: selectedCountry.price * 15 },
-                          { value: '1month' as const, label: '1 Month', price: selectedCountry.price * 50 }
+                          { value: '4hours' as const, label: '4 Hours', icon: '⏰', price: selectedCountry.price * 1 },
+                          { value: '1day' as const, label: '1 Day', icon: '🌅', price: selectedCountry.price * 3 },
+                          { value: '1week' as const, label: '1 Week', icon: '📅', price: selectedCountry.price * 15 },
+                          { value: '1month' as const, label: '1 Month', icon: '🗓️', price: selectedCountry.price * 50 }
                         ].map(option => (
                           <button
                             key={option.value}
                             onClick={() => setRentDuration(option.value)}
-                            className={`p-3 rounded-lg border-2 transition-all ${
+                            className={`p-4 rounded-xl border-2 transition-all duration-300 ${
                               rentDuration === option.value
-                                ? 'border-blue-600 bg-blue-50'
-                                : 'border-gray-200 hover:border-gray-300'
+                                ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 shadow-lg shadow-purple-100 scale-[1.02]'
+                                : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-md'
                             }`}
                           >
-                            <div className="text-sm font-semibold text-gray-900">{option.label}</div>
-                            <div className="text-lg font-bold text-blue-600">{Math.ceil(option.price)} Ⓐ</div>
+                            <div className="text-2xl mb-1">{option.icon}</div>
+                            <div className="text-sm font-bold text-gray-900">{option.label}</div>
+                            <div className={`text-lg font-black ${
+                              rentDuration === option.value ? 'text-purple-600' : 'text-blue-600'
+                            }`}>{Math.ceil(option.price)} Ⓐ</div>
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
 
+                  {/* Bouton Activate/Rent modernisé */}
                   <Button 
                     onClick={handleActivate}
-                    className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-2xl flex items-center justify-between px-6"
+                    className={`w-full h-16 text-white text-lg font-bold rounded-2xl flex items-center justify-between px-6 shadow-xl transition-all duration-300 hover:scale-[1.02] ${
+                      mode === 'rent' 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-purple-500/30'
+                        : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/30'
+                    }`}
                   >
-                    <span>{mode === 'rent' ? 'Rent' : 'Activate'}</span>
-                    <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-lg">
-                      <span className="text-2xl">
+                    <span className="flex items-center gap-2">
+                      {mode === 'rent' ? '🏠' : '⚡'}
+                      {mode === 'rent' ? t('dashboard.rent') : t('dashboard.activate')}
+                    </span>
+                    <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-xl backdrop-blur-sm">
+                      <span className="text-2xl font-black">
                         {mode === 'rent' 
                           ? Math.ceil(selectedCountry.price * (
                               rentDuration === '4hours' ? 1 :
@@ -1162,14 +1408,14 @@ export default function DashboardPage() {
                           : Math.floor(selectedCountry.price)
                         }
                       </span>
-                      <span className="text-sm">Ⓐ</span>
+                      <span className="text-sm font-semibold opacity-80">Ⓐ</span>
                     </div>
                   </Button>
 
-                  <p className="text-center text-sm text-gray-500 mt-4 mb-0">
+                  <p className="text-center text-sm text-gray-500 mt-4 mb-0 px-2">
                     {mode === 'rent' 
-                      ? 'The number will be available for the selected duration and can receive multiple SMS'
-                      : 'If the number does not receive an SMS, the funds will be returned to the balance'
+                      ? t('dashboard.rentInfo')
+                      : t('dashboard.refundInfo')
                     }
                   </p>
                 </>
@@ -1180,83 +1426,256 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main Content - Active Numbers */}
-      <main className="flex-1 overflow-y-auto bg-white">
-        <div className="p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Active numbers</h2>
+      <main className="flex-1 overflow-y-auto bg-gradient-to-br from-white via-gray-50/50 to-blue-50/30">
+        <div className="p-4 lg:p-8">
+          {/* Header avec titre et compteur - Seulement si des numéros actifs */}
+          {activeNumbers.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
+              <div>
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-900">{t('dashboard.activeNumbers')}</h2>
+                <p className="text-sm text-gray-500">{t('dashboard.manageNumbers')}</p>
+              </div>
+              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                {activeNumbers.length} {t('dashboard.active')}
+              </div>
+            </div>
+          )}
 
           {activeNumbers.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                <span className="text-4xl">📱</span>
+            <div className="space-y-6">
+              {/* Two main cards: Activation & Rent */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                {/* Activation Card */}
+                <div className="bg-white rounded-2xl border-2 border-gray-100 p-5 lg:p-6 hover:border-blue-200 hover:shadow-lg transition-all duration-300">
+                  <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">{t('dashboard.emptyState.activationTitle')}</h3>
+                  <p className="text-sm text-gray-500 mb-5">{t('dashboard.emptyState.activationDesc')}</p>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.activationFeature1')}</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.activationFeature2')}</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.activationFeature3')}</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.activationFeature4')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rent Card */}
+                <div className="bg-white rounded-2xl border-2 border-gray-100 p-5 lg:p-6 hover:border-purple-200 hover:shadow-lg transition-all duration-300">
+                  <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">{t('dashboard.emptyState.rentTitle')}</h3>
+                  <p className="text-sm text-gray-500 mb-5">{t('dashboard.emptyState.rentDesc')}</p>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.rentFeature1')}</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.rentFeature2')}</span>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"/></svg>
+                      </div>
+                      <span className="text-sm text-gray-700">{t('dashboard.emptyState.rentFeature3')}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-gray-500 mb-2">No active numbers</p>
-              <p className="text-sm text-gray-400">Select a service and country to get started</p>
+
+              {/* Steps Section */}
+              <div className="bg-white rounded-2xl border-2 border-gray-100 p-5 lg:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Step 1 */}
+                  <div className="flex flex-col items-start relative">
+                    <h4 className="text-lg font-bold text-gray-900 mb-2">{t('dashboard.emptyState.step1Title')}</h4>
+                    <p className="text-sm text-gray-500">{t('dashboard.emptyState.step1Desc')}</p>
+                    <div className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 text-gray-300">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+                    </div>
+                  </div>
+                  {/* Step 2 */}
+                  <div className="flex flex-col items-start relative">
+                    <h4 className="text-lg font-bold text-gray-900 mb-2">{t('dashboard.emptyState.step2Title')}</h4>
+                    <p className="text-sm text-gray-500">{t('dashboard.emptyState.step2Desc')}</p>
+                    <div className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 text-gray-300">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+                    </div>
+                  </div>
+                  {/* Step 3 */}
+                  <div className="flex flex-col items-start">
+                    <h4 className="text-lg font-bold text-gray-900 mb-2">{t('dashboard.emptyState.step3Title')}</h4>
+                    <p className="text-sm text-gray-500">{t('dashboard.emptyState.step3Desc')}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features Grid - Activation */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl p-4 lg:p-5 border border-blue-100">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.wideChoice')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.wideChoiceDesc')}</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl p-4 lg:p-5 border border-green-100">
+                  <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.bigVolumes')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.bigVolumesDesc')}</p>
+                </div>
+                <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-2xl p-4 lg:p-5 border border-amber-100">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.affordablePrice')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.affordablePriceDesc')}</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-2xl p-4 lg:p-5 border border-purple-100">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.suitableTasks')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.suitableTasksDesc')}</p>
+                </div>
+              </div>
+
+              {/* Features Grid - Rent */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-pink-50 to-pink-100/50 rounded-2xl p-4 lg:p-5 border border-pink-100">
+                  <div className="w-10 h-10 rounded-xl bg-pink-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.accountInsurance')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.accountInsuranceDesc')}</p>
+                </div>
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 rounded-2xl p-4 lg:p-5 border border-indigo-100">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.flexibleSettings')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.flexibleSettingsDesc')}</p>
+                </div>
+                <div className="bg-gradient-to-br from-cyan-50 to-cyan-100/50 rounded-2xl p-4 lg:p-5 border border-cyan-100">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.reliableSuppliers')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.reliableSuppliersDesc')}</p>
+                </div>
+                <div className="bg-gradient-to-br from-rose-50 to-rose-100/50 rounded-2xl p-4 lg:p-5 border border-rose-100">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                  </div>
+                  <h4 className="font-bold text-gray-900 mb-1">{t('dashboard.emptyState.anyPurpose')}</h4>
+                  <p className="text-xs text-gray-500">{t('dashboard.emptyState.anyPurposeDesc')}</p>
+                </div>
+              </div>
+
+              {/* Call to Action */}
+              <div className="flex items-center justify-center py-6">
+                <div className="flex items-center gap-3 text-blue-600 bg-blue-50 px-6 py-3 rounded-2xl">
+                  <span className="animate-bounce text-xl">←</span>
+                  <span className="font-medium">{t('dashboard.emptyState.getItNow')} - {t('dashboard.selectFromSidebar')}</span>
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 lg:space-y-4">
               {activeNumbers.map((num) => (
-                <div key={num.id} className="bg-white border border-gray-200 rounded-2xl px-5 py-4 hover:shadow-md transition-all">
-                  <div className="flex items-center gap-4">
-                    {/* Logo + Flag (52px zone) */}
-                    <div className="relative flex-shrink-0">
-                      <div className="w-[52px] h-[52px] bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm">
-                        <img 
-                          src={getServiceLogo(num.service.toLowerCase())}
-                          alt={num.service}
-                          className="w-7 h-7 object-contain"
-                          onError={(e) => handleLogoError(e, num.service.toLowerCase())}
-                        />
+                <div key={num.id} className="group bg-white border-2 border-gray-100 rounded-2xl px-4 lg:px-6 py-4 lg:py-5 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-100/50 transition-all duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+                    {/* Row 1: Logo + Service + Phone */}
+                    <div className="flex items-center gap-3 sm:gap-5">
+                      {/* Logo + Flag */}
+                      <div className="relative flex-shrink-0">
+                        <div className="w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-white to-gray-50 border-2 border-gray-100 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:border-blue-200 transition-all">
+                          <img 
+                            src={getServiceLogo(num.service.toLowerCase())}
+                            alt={num.service}
+                            className="w-6 h-6 lg:w-8 lg:h-8 object-contain"
+                            onError={(e) => handleLogoError(e, num.service.toLowerCase())}
+                          />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 lg:-bottom-1.5 lg:-right-1.5 w-6 h-6 lg:w-7 lg:h-7 rounded-full border-2 lg:border-[3px] border-white overflow-hidden bg-white shadow-lg">
+                          <img 
+                            src={getCountryFlag(num.country)}
+                            alt={num.country}
+                            className="w-full h-full object-cover"
+                            onError={(e) => handleLogoError(e, num.country)}
+                          />
+                        </div>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-[3px] border-white overflow-hidden bg-white shadow-md">
-                        <img 
-                          src={getCountryFlag(num.country)}
-                          alt={num.country}
-                          className="w-full h-full object-cover"
-                          onError={(e) => handleLogoError(e, num.country)}
-                        />
-                      </div>
-                    </div>
 
-                    {/* Service + Country (140px) */}
-                    <div className="w-[140px] flex-shrink-0">
-                      <div className="flex items-center gap-1">
-                        <p className="font-semibold text-[15px] text-gray-900 leading-tight truncate">{num.service} + ...</p>
-                        {num.type === 'rental' && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700">
-                            RENT
+                      {/* Service + Country + Phone - Responsive layout */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                        <div className="min-w-0 sm:min-w-[100px]">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-bold text-sm text-gray-900 leading-tight truncate">{getServiceName(num.service)}</p>
+                            {num.type === 'rental' && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700">
+                                RENT
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 leading-tight flex items-center gap-1">
+                            <span className="w-1 h-1 bg-green-500 rounded-full"></span>
+                            {num.country}
+                          </p>
+                        </div>
+                        {/* Phone Number */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs sm:text-sm font-bold text-gray-900 bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-gray-200">
+                            {formatPhoneNumber(num.phone)}
                           </span>
-                        )}
+                          <button
+                            onClick={() => copyToClipboard(num.phone, 'phone')}
+                            className="p-1.5 sm:p-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200 group/btn"
+                            title={t('dashboard.copyNumber')}
+                          >
+                            <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-500 group-hover/btn:scale-110 transition-transform" />
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-[13px] text-gray-500 leading-tight">{num.country}</p>
-                    </div>
-
-                    {/* Phone (240px pour le format complet) */}
-                    <div className="flex items-center gap-2 w-[240px] flex-shrink-0">
-                      <span className="font-mono text-[14px] font-semibold text-gray-900 bg-gray-100 px-2.5 py-1 rounded whitespace-nowrap">
-                        {formatPhoneNumber(num.phone)}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(num.phone)}
-                        className="p-1 hover:bg-blue-50 rounded-md transition-colors"
-                        title="Copier le numéro"
-                      >
-                        <Copy className="h-4 w-4 text-blue-500" />
-                      </button>
                     </div>
 
                     {/* Flexible right section */}
-                    <div className="flex items-center gap-4 flex-1 justify-end">
+                    <div className="flex flex-wrap items-center gap-2 lg:gap-4 flex-1 justify-start lg:justify-end w-full lg:w-auto mt-3 lg:mt-0">
                       {/* Pour RENTAL: afficher le compteur de messages */}
                       {num.type === 'rental' ? (
                         <div className="flex items-center gap-2">
-                          <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[14px] text-purple-700 font-medium">
-                                📨 {num.messageCount || 0} message{(num.messageCount || 0) !== 1 ? 's' : ''}
+                          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl px-3 lg:px-4 py-2 lg:py-2.5">
+                            <div className="flex items-center gap-2 lg:gap-3">
+                              <span className="text-xs lg:text-sm text-purple-700 font-bold">
+                                📨 {num.messageCount || 0} {(num.messageCount || 0) === 1 ? t('dashboard.messages') : t('dashboard.messagesPlural')}
                               </span>
                               {num.durationHours && (
-                                <span className="text-[12px] text-purple-600">
-                                  • {num.durationHours}h rental
+                                <span className="text-xs text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full font-medium">
+                                  {num.durationHours}h
                                 </span>
                               )}
                             </div>
@@ -1266,51 +1685,63 @@ export default function DashboardPage() {
                         <>
                           {/* Code bleu OU Waiting spinner (pour activation) */}
                           {num.smsCode ? (
-                            <div className="bg-[#007AFF] text-white rounded-2xl rounded-tr-md px-4 py-2.5 shadow-md max-w-md">
-                              <span className="font-medium text-[14px] leading-relaxed">
+                            <div 
+                              onClick={() => {
+                                const cleanCode = num.smsCode?.includes('STATUS_OK:') 
+                                  ? num.smsCode.split(':')[1] 
+                                  : num.smsCode || '';
+                                copyToClipboard(cleanCode, 'code');
+                              }}
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl rounded-tr-md px-3 lg:px-4 py-2 lg:py-2.5 shadow-lg shadow-blue-500/30 max-w-full lg:max-w-md cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all flex-1 lg:flex-initial"
+                              title={t('dashboard.clickToCopy')}
+                            >
+                              <span className="font-medium text-sm leading-relaxed">
                                 {(() => {
                                   // Extraire le code SMS si le format est STATUS_OK:code
                                   const cleanCode = num.smsCode.includes('STATUS_OK:') 
                                     ? num.smsCode.split(':')[1] 
                                     : num.smsCode;
                                   
-                                  // Récupérer le nom du service
-                                  const serviceName = services.find(s => s.code === num.service)?.name || num.service;
+                                  // Récupérer le nom du service avec helper
+                                  const serviceName = getServiceName(num.service);
                                   
                                   return num.smsText && !num.smsText.includes('STATUS_OK:') 
                                     ? num.smsText 
-                                    : `Votre code de validation ${serviceName} est ${cleanCode}`;
+                                    : `${t('dashboard.validationCode')} ${serviceName}: ${cleanCode}`;
                                 })()}
                               </span>
                             </div>
                           ) : (num.status === 'waiting' || num.status === 'pending') ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-4 h-4 border-[2.5px] border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
-                              <span className="text-[14px] text-gray-400">Waiting for SMS...</span>
+                            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                              <div className="relative">
+                                <div className="w-4 h-4 border-[2px] border-amber-200 rounded-full"></div>
+                                <div className="absolute top-0 left-0 w-4 h-4 border-[2px] border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                              </div>
+                              <span className="text-xs text-amber-700 font-medium">{t('dashboard.waitingForSMS')}</span>
                             </div>
                           ) : num.status === 'timeout' ? (
-                            <span className="text-[14px] text-gray-400">No SMS</span>
+                            <div className="bg-gray-100 text-gray-500 px-4 py-2 rounded-xl text-sm font-medium">
+                              ⏰ {t('dashboard.noSMS')}
+                            </div>
                           ) : null}
                         </>
                       )}
 
-                      {/* Badge (40px fixe) */}
-                      <div className="flex items-center justify-center w-[40px] h-[40px] bg-[#E5E5E5] text-gray-600 rounded-full flex-shrink-0">
-                        <span className="text-[13px] font-semibold">{Math.floor(num.price)}</span>
-                        <span className="text-[11px] ml-0.5">Ⓐ</span>
+                      {/* Badge Prix */}
+                      <div className="flex items-center justify-center min-w-[40px] lg:min-w-[45px] h-[36px] lg:h-[40px] bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200 text-gray-700 rounded-lg flex-shrink-0">
+                        <span className="text-xs lg:text-sm font-bold">{num.price > 0 ? (num.price < 1 ? num.price.toFixed(2) : Math.floor(num.price)) : 0}</span>
+                        <span className="text-xs ml-0.5 opacity-70">Ⓐ</span>
                       </div>
 
                       {/* Timer */}
                       {(num.status === 'waiting' || num.status === 'pending' || num.status === 'active') && (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <div className="text-[13px]">
-                            <span className="text-gray-400">Remaining:</span>
-                            <br/>
-                            <span className="font-semibold text-gray-900">
+                        <div className="flex items-center gap-1.5 lg:gap-2 bg-blue-50 border border-blue-200 px-2 lg:px-3 py-1.5 lg:py-2 rounded-xl flex-shrink-0">
+                          <Clock className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-blue-500" />
+                          <div className="text-xs lg:text-sm">
+                            <span className="text-blue-600 font-bold">
                               {num.type === 'rental' && num.durationHours && num.durationHours >= 24
                                 ? `${Math.floor(getRealTimeRemaining(num.expiresAt) / 3600)}h`
-                                : `${Math.floor(getRealTimeRemaining(num.expiresAt) / 60)} min.`
+                                : `${Math.floor(getRealTimeRemaining(num.expiresAt) / 60)} min`
                               }
                             </span>
                           </div>
@@ -1322,11 +1753,11 @@ export default function DashboardPage() {
                         /* Menu pour RENTAL */
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-                              <MoreVertical className="h-5 w-5 text-gray-400" />
+                            <button className="p-2 lg:p-2.5 hover:bg-gray-100 rounded-xl transition-all flex-shrink-0 group/menu">
+                              <MoreVertical className="h-4 w-4 lg:h-5 lg:w-5 text-gray-400 group-hover/menu:text-gray-600 transition-colors" />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuContent align="end" className="w-48 lg:w-56 rounded-xl border-2 border-gray-100 shadow-xl">
                             <DropdownMenuItem
                               onClick={async () => {
                                 try {
@@ -1344,9 +1775,9 @@ export default function DashboardPage() {
                                   toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                 }
                               }}
-                              className="cursor-pointer"
+                              className="cursor-pointer rounded-lg"
                             >
-                              <span className="text-blue-600">📨 Refresh messages</span>
+                              <span className="text-blue-600 font-medium">📨 Refresh messages</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={async () => {
@@ -1361,9 +1792,9 @@ export default function DashboardPage() {
                                   toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                 }
                               }}
-                              className="cursor-pointer"
+                              className="cursor-pointer rounded-lg"
                             >
-                              <span className="text-green-600">➕ Extend rental (+4h)</span>
+                              <span className="text-green-600 font-medium">➕ Extend rental (+4h)</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={async () => {
@@ -1393,7 +1824,7 @@ export default function DashboardPage() {
                                 <MoreVertical className="h-5 w-5 text-gray-400" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuContent align="end" className="w-56">
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
@@ -1410,64 +1841,47 @@ export default function DashboardPage() {
                               className="text-blue-600 focus:text-blue-600 focus:bg-blue-50 cursor-pointer"
                             >
                               <Clock className="h-4 w-4 mr-2" />
-                              Demander un autre SMS
+                              {t('dashboard.requestAnotherSMS')}
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={async () => {
-                                try {
-                                  const { data, error } = await supabase.functions.invoke('cancel-sms-activate', {
-                                    body: { orderId: num.orderId }
-                                  });
-                                  if (error || !data?.success) throw new Error(data?.error || error?.message);
-                                  toast({ title: 'Annulation effectuée', description: 'Le numéro a été annulé.' });
-                                  refetchActivations();
-                                } catch (e: any) {
-                                  toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
-                                }
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <span className="text-red-600">❌ Cancel</span>
-                            </DropdownMenuItem>
+                            
+                            {/* Cancel button - only show after 5 minutes */}
+                            {canCancelActivation(num.expiresAt) ? (
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  try {
+                                    const { data, error } = await supabase.functions.invoke('cancel-sms-activate-order', {
+                                      body: { orderId: num.orderId }
+                                    });
+                                    if (error || !data?.success) throw new Error(data?.error || error?.message);
+                                    toast({ 
+                                      title: t('dashboard.cancelSuccess'), 
+                                      description: `${t('dashboard.refunded')}: ${data.refunded || num.price}Ⓐ` 
+                                    });
+                                    refetchActivations();
+                                    // Refresh user balance
+                                    queryClient.invalidateQueries({ queryKey: ['user-balance'] });
+                                  } catch (e: any) {
+                                    toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                  }
+                                }}
+                                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                {t('dashboard.cancelAndRefund')}
+                              </DropdownMenuItem>
+                            ) : (
+                              <div className="px-2 py-1.5 text-xs text-gray-400">
+                                {t('dashboard.cancelAvailableIn')} {Math.ceil((300 - getTimeElapsedSinceCreation(num.expiresAt)) / 60)} min
+                              </div>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                         )
                       )}
                       
-                      {/* Menu dropdown for completed activation with SMS code */}
-                      {num.type !== 'rental' && num.smsCode && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0">
-                              <MoreVertical className="h-5 w-5 text-gray-400" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem
-                              onClick={async () => {
-                                try {
-                                  const { data, error } = await supabase.functions.invoke('finish-sms-activate', {
-                                    body: { orderId: num.orderId }
-                                  });
-                                  if (error || !data?.success) throw new Error(data?.error || error?.message);
-                                  toast({ title: 'Activation terminée', description: 'Le numéro a été marqué comme réussi' });
-                                  refetchActivations();
-                                } catch (e: any) {
-                                  toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
-                                }
-                              }}
-                              className="text-green-600 focus:text-green-600 focus:bg-green-50 cursor-pointer"
-                            >
-                                <span className="text-green-600">✅ Marquer comme terminé</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                      
-                      {/* Empty space if no menu */}
+                      {/* Empty space if no menu (for completed activations with SMS, no dropdown needed) */}
                       {!((num.type === 'rental') || 
-                          (num.type !== 'rental' && !num.smsCode && (num.status === 'waiting' || num.status === 'pending')) ||
-                          (num.type !== 'rental' && num.smsCode)) && (
+                          (num.type !== 'rental' && !num.smsCode && (num.status === 'waiting' || num.status === 'pending'))) && (
                         <div className="w-9 h-9 flex-shrink-0"></div>
                       )}
                     </div>

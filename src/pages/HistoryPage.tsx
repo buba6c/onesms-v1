@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -79,6 +80,7 @@ interface Payment {
 type Tab = 'orders' | 'payments';
 
 export default function HistoryPage() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -134,8 +136,8 @@ export default function HistoryPage() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
-      title: 'Copied!',
-      description: 'Text copied to clipboard'
+      title: t('common.copied'),
+      description: t('common.success')
     });
   };
 
@@ -258,7 +260,7 @@ export default function HistoryPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <h1 className="text-4xl font-bold text-gray-900 text-center mb-6">History</h1>
+          <h1 className="text-4xl font-bold text-gray-900 text-center mb-6">{t('history.title')}</h1>
           
           {/* Tabs */}
           <div className="flex justify-center gap-2">
@@ -270,7 +272,7 @@ export default function HistoryPage() {
                   : 'bg-transparent text-gray-500 hover:text-gray-900'
               }`}
             >
-              Orders
+              {t('history.orders')}
             </button>
             <button
               onClick={() => setActiveTab('payments')}
@@ -280,7 +282,7 @@ export default function HistoryPage() {
                   : 'bg-transparent text-gray-500 hover:text-gray-900'
               }`}
             >
-              Payments
+              {t('history.payments')}
             </button>
           </div>
         </div>
@@ -294,15 +296,15 @@ export default function HistoryPage() {
             {ordersLoading ? (
               <div className="text-center py-12">
                 <div className="animate-spin w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full mx-auto"></div>
-                <p className="text-gray-500 mt-4">Loading orders...</p>
+                <p className="text-gray-500 mt-4">{t('common.loading')}</p>
               </div>
             ) : paginatedOrders.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
                   <span className="text-4xl">📋</span>
                 </div>
-                <p className="text-gray-500 mb-2">No orders yet</p>
-                <p className="text-sm text-gray-400">Your order history will appear here</p>
+                <p className="text-gray-500 mb-2">{t('history.noOrders')}</p>
+                <p className="text-sm text-gray-400">{t('history.noOrders')}</p>
               </div>
             ) : (
               <div className="space-y-3">

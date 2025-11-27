@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 
 export default function AdminUsers() {
+  const { t } = useTranslation();
   const { toast } = useToast()
   const [users, setUsers] = useState([])
   const [filteredUsers, setFilteredUsers] = useState([])

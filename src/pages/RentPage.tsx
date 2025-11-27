@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -22,6 +23,7 @@ const RENT_DURATIONS = [
 ]
 
 const RentPage = () => {
+  const { t } = useTranslation()
   const { user } = useAuthStore()
   const [currentStep, setCurrentStep] = useState<'service' | 'country' | 'duration' | 'confirm'>('service')
   const [selectedService, setSelectedService] = useState<Service | null>(null)

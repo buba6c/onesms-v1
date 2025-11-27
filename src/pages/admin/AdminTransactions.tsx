@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { RefreshCw, Download, Eye, XCircle, Search } from 'lucide-react'
 
 export default function AdminTransactions() {
+  const { t } = useTranslation();
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [typeFilter, setTypeFilter] = useState('all')

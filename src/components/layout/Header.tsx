@@ -7,27 +7,8 @@ import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 
-// Component to display balance with frozen amount
+// Component to display balance (simplified - no frozen)
 function HeaderBalanceDisplay({ userId, balance }: { userId: string; balance: number }) {
-  // Calculate frozen balance from pending/waiting activations (charged=false)
-  // Ces activations ont déjà leur prix déduit du balance mais pas encore confirmées
-  const { data: frozenAmount = 0 } = useQuery<number>({
-    queryKey: ['frozen-balance', userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('activations')
-        .select('price')
-        .eq('user_id', userId)
-        .in('status', ['pending', 'waiting'])
-        .eq('charged', false);
-      
-      const total = (data as any[])?.reduce((sum: number, act: any) => sum + (act.price || 0), 0) || 0;
-      return total;
-    },
-    enabled: !!userId,
-    refetchInterval: 5000, // Refresh every 5s
-  });
-
   // Check webhook status (active activations)
   const { data: activeCount = 0 } = useQuery<number>({
     queryKey: ['active-activations', userId],
@@ -58,11 +39,6 @@ function HeaderBalanceDisplay({ userId, balance }: { userId: string; balance: nu
       <div className="flex items-center gap-1.5">
         <span className="text-sm text-gray-600">Balance:</span>
         <span className="font-bold text-blue-600">{Math.floor(balance)} Ⓐ</span>
-      </div>
-      <div className="h-4 w-px bg-gray-300"></div>
-      <div className="flex items-center gap-1.5">
-        <span className="text-sm text-gray-600">Frozen:</span>
-        <span className="font-semibold text-orange-600">{Math.floor(frozenAmount)} Ⓐ</span>
       </div>
     </div>
   );
@@ -96,18 +72,14 @@ export default function Header() {
     localStorage.setItem('language', newLang)
   }
 
-  useEffect(() => {
-    // Redirect logged in users to dashboard if they visit homepage
-    if (user && window.location.pathname === '/') {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
+  // Determine logo destination based on auth state
+  const logoDestination = user ? '/dashboard' : '/';
 
   return (
     <header className="border-b bg-white sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center space-x-3">
+          <Link to={logoDestination} className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-lg">
               OS
             </div>
@@ -119,31 +91,31 @@ export default function Header() {
             {user && user.role !== 'admin' ? (
               <>
                 <Link to="/top-up">
-                  <Button variant="ghost" className="font-medium">Top up</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.topUp')}</Button>
                 </Link>
                 <Link to="/settings">
-                  <Button variant="ghost" className="font-medium">Account</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.account')}</Button>
                 </Link>
                 <Link to="/history">
-                  <Button variant="ghost" className="font-medium">History</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.history')}</Button>
                 </Link>
-                <a href="#how-to-use">
-                  <Button variant="ghost" className="font-medium">How to use</Button>
-                </a>
+                <Link to="/how-to-use">
+                  <Button variant="ghost" className="font-medium">{t('nav.howToUse')}</Button>
+                </Link>
                 <a href="#contacts">
-                  <Button variant="ghost" className="font-medium">Contacts</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.contacts')}</Button>
                 </a>
               </>
             ) : !user && (
               <>
                 <Link to="/catalog">
-                  <Button variant="ghost" className="font-medium">Services</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.services')}</Button>
                 </Link>
                 <a href="#features">
-                  <Button variant="ghost" className="font-medium">Features</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.features')}</Button>
                 </a>
                 <a href="#pricing">
-                  <Button variant="ghost" className="font-medium">Pricing</Button>
+                  <Button variant="ghost" className="font-medium">{t('nav.pricing')}</Button>
                 </a>
               </>
             )}
@@ -156,13 +128,17 @@ export default function Header() {
               <HeaderBalanceDisplay userId={user.id} balance={userData.balance || 0} />
             )}
 
-            {/* Language Selector */}
+            {/* Language Selector - Amélioré */}
             <button
               onClick={toggleLanguage}
-              className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 rounded-xl transition-all duration-200 border border-gray-200 hover:border-blue-300 group"
+              title={i18n.language === 'en' ? 'Switch to French' : 'Passer en anglais'}
             >
-              <span className="text-xl">🇬🇧</span>
-              <span className="text-sm font-medium hidden md:inline">English</span>
+              <span className="text-xl group-hover:scale-110 transition-transform">{i18n.language === 'en' ? '🇬🇧' : '🇫🇷'}</span>
+              <span className="text-sm font-semibold text-gray-700 group-hover:text-blue-600">{i18n.language === 'en' ? 'EN' : 'FR'}</span>
+              <svg className="w-3 h-3 text-gray-400 group-hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
 
             {user ? (
@@ -182,7 +158,7 @@ export default function Header() {
                   <Button variant="ghost">{t('nav.login')}</Button>
                 </Link>
                 <Link to="/register">
-                  <Button className="bg-blue-600 hover:bg-blue-700">Get Started</Button>
+                  <Button className="bg-blue-600 hover:bg-blue-700">{t('nav.register')}</Button>
                 </Link>
               </>
             )}

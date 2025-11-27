@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,7 @@ const PAYMENT_PROVIDERS = [
 ];
 
 export default function TopUpPage() {
+  const { t } = useTranslation();
   const [selectedCurrency, setSelectedCurrency] = useState<'XOF' | 'EUR' | 'USD'>('XOF');
   const [selectedProvider, setSelectedProvider] = useState<string>('paytech');
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);

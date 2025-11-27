@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { path: '/admin/transactions', label: t('admin.transactions') },
     { path: '/admin/pricing', label: t('admin.pricing') },
     { path: '/admin/packages', label: 'Packages' },
+    { path: '/admin/sync-status', label: 'Sync Status' },
     { path: '/admin/analytics', label: t('admin.analytics') },
     { path: '/admin/logs', label: t('admin.logs') },
     { path: '/admin/settings', label: t('admin.settings') },

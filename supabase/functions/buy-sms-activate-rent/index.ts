@@ -102,9 +102,9 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    const { country, product, userId, duration = '4hours' } = await req.json()
+    const { country, product, userId, duration = '4hours', expectedPrice } = await req.json()
 
-    console.log('📞 [BUY-RENT] Request:', { country, product, userId, duration })
+    console.log('📞 [BUY-RENT] Request:', { country, product, userId, duration, expectedPrice })
 
     // 1. Get service from database (skip for universal service "full")
     let service = null
@@ -159,11 +159,17 @@ serve(async (req) => {
       }
     }
     
+    // ✅ Utiliser le prix attendu du frontend si fourni (garantit la cohérence d'affichage)
+    if (expectedPrice && expectedPrice > 0) {
+      console.log(`💰 [BUY-RENT] Using expectedPrice from frontend: ${expectedPrice} (API was: ${price})`)
+      price = expectedPrice
+    }
+    
     if (!price || price <= 0) {
       throw new Error(`Rent not available for ${serviceName} in ${country} for ${duration}. No service found (tried: ${smsActivateService}, full)`)
     }
 
-    console.log(`💰 [BUY-RENT] Rent price: $${price} for ${rentTime} hours using service: ${actualService}`)
+    console.log(`💰 [BUY-RENT] Final rent price: $${price} for ${rentTime} hours using service: ${actualService}`)
 
     // 3. Check user balance
     const { data: userProfile, error: profileError } = await supabaseClient

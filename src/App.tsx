@@ -13,6 +13,7 @@ import TransactionsPage from '@/pages/TransactionsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TopUpPage from '@/pages/TopUpPage'
 import RentPage from '@/pages/RentPage'
+import HowToUsePage from '@/pages/HowToUsePage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminProviders from '@/pages/admin/AdminProviders'
@@ -23,6 +24,7 @@ import AdminPricing from '@/pages/admin/AdminPricing'
 import AdminAnalytics from '@/pages/admin/AdminAnalytics'
 import AdminLogs from '@/pages/admin/AdminLogs'
 import AdminSettings from '@/pages/admin/AdminSettings'
+import AdminSyncStatusPage from '@/pages/admin/AdminSyncStatusPage'
 import PackagesManagementPage from '@/pages/admin/PackagesManagementPage'
 import PrivateRoute from '@/components/PrivateRoute'
 import AdminRoute from '@/components/AdminRoute'
@@ -46,6 +48,7 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+            <Route path="how-to-use" element={<HowToUsePage />} />
             
             {/* Protected Routes - Main Dashboard becomes home after login */}
             <Route element={<PrivateRoute />}>
@@ -70,6 +73,7 @@ function App() {
             <Route path="transactions" element={<AdminTransactions />} />
             <Route path="pricing" element={<AdminPricing />} />
             <Route path="packages" element={<PackagesManagementPage />} />
+            <Route path="sync-status" element={<AdminSyncStatusPage />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="logs" element={<AdminLogs />} />
             <Route path="settings" element={<AdminSettings />} />

@@ -69,42 +69,55 @@ function detectServiceIcon(code: string, name: string): string {
   return '📱'
 }
 
-// Helper function: Detect service category
-function detectServiceCategory(code: string, name: string): string {
+// Helper function: Detect service category (with popularity detection)
+function detectServiceCategory(code: string, name: string, popularityScore: number = 0): string {
   const lowerCode = code.toLowerCase()
   const lowerName = name.toLowerCase()
   
+  // POPULAR category for top services (score > 800)
+  if (popularityScore > 800) return 'popular'
+  
   // Social networks
   if (['ig', 'fb', 'tw', 'lf', 'sn', 'li', 'vk', 'ok'].includes(lowerCode)) return 'social'
+  if (lowerName.includes('instagram') || lowerName.includes('facebook') || lowerName.includes('twitter')) return 'social'
+  if (lowerName.includes('tiktok') || lowerName.includes('snapchat') || lowerName.includes('linkedin')) return 'social'
   if (lowerName.includes('social')) return 'social'
   
-  // Messengers
-  if (['wa', 'tg', 'vi', 'ds', 'wb', 'me'].includes(lowerCode)) return 'messenger'
-  if (lowerName.includes('messenger') || lowerName.includes('chat')) return 'messenger'
+  // Messaging (messengers & chat apps)
+  if (['wa', 'tg', 'vi', 'ds', 'wb', 'me'].includes(lowerCode)) return 'messaging'
+  if (lowerName.includes('whatsapp') || lowerName.includes('telegram') || lowerName.includes('discord')) return 'messaging'
+  if (lowerName.includes('viber') || lowerName.includes('wechat') || lowerName.includes('line')) return 'messaging'
+  if (lowerName.includes('messenger') || lowerName.includes('chat')) return 'messaging'
   
   // Tech/Email
   if (['go', 'mm', 'mb', 'wx'].includes(lowerCode)) return 'tech'
   if (lowerName.includes('google') || lowerName.includes('microsoft') || lowerName.includes('apple')) return 'tech'
-  if (lowerName.includes('mail') || lowerName.includes('email')) return 'email'
+  if (lowerName.includes('yahoo') || lowerName.includes('yandex')) return 'tech'
+  if (lowerName.includes('mail') || lowerName.includes('email')) return 'tech'
   
   // Shopping/E-commerce
   if (['am', 'dh', 'ka', 'dl', 'wr'].includes(lowerCode)) return 'shopping'
+  if (lowerName.includes('amazon') || lowerName.includes('ebay') || lowerName.includes('alibaba')) return 'shopping'
   if (lowerName.includes('shop') || lowerName.includes('store') || lowerName.includes('market')) return 'shopping'
   
-  // Streaming
-  if (['nf'].includes(lowerCode)) return 'streaming'
-  if (lowerName.includes('netflix') || lowerName.includes('youtube') || lowerName.includes('spotify')) return 'streaming'
+  // Entertainment (Streaming, Music, Gaming)
+  if (['nf'].includes(lowerCode)) return 'entertainment'
+  if (lowerName.includes('netflix') || lowerName.includes('spotify') || lowerName.includes('youtube')) return 'entertainment'
+  if (lowerName.includes('twitch') || lowerName.includes('steam') || lowerName.includes('game')) return 'entertainment'
   
   // Dating
   if (['oi', 'mo', 'bd', 'vz'].includes(lowerCode)) return 'dating'
-  if (lowerName.includes('tinder') || lowerName.includes('dating') || lowerName.includes('bumble')) return 'dating'
+  if (lowerName.includes('tinder') || lowerName.includes('bumble') || lowerName.includes('badoo')) return 'dating'
+  if (lowerName.includes('dating') || lowerName.includes('match')) return 'dating'
   
-  // Transport
-  if (['ub', 'jg', 'ni'].includes(lowerCode)) return 'transport'
-  if (lowerName.includes('uber') || lowerName.includes('taxi') || lowerName.includes('ride')) return 'transport'
+  // Delivery (Transport + Food delivery)
+  if (['ub', 'jg', 'ni'].includes(lowerCode)) return 'delivery'
+  if (lowerName.includes('uber') || lowerName.includes('grab') || lowerName.includes('bolt')) return 'delivery'
+  if (lowerName.includes('taxi') || lowerName.includes('ride') || lowerName.includes('delivery')) return 'delivery'
   
   // Finance
   if (['ts', 'hw'].includes(lowerCode)) return 'finance'
+  if (lowerName.includes('paypal') || lowerName.includes('alipay')) return 'finance'
   if (lowerName.includes('pay') || lowerName.includes('bank') || lowerName.includes('wallet')) return 'finance'
   
   // Default
@@ -377,8 +390,8 @@ serve(async (req) => {
         // Smart icon detection based on service name/code
         const icon = detectServiceIcon(serviceCode, displayName)
         
-        // Smart category detection based on service name
-        const category = detectServiceCategory(serviceCode, displayName)
+        // Smart category detection based on service name AND popularity score
+        const category = detectServiceCategory(serviceCode, displayName, popularityScore)
         
         servicesToUpsert.push({
           code: serviceCode,

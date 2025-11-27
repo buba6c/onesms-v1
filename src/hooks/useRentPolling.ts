@@ -48,22 +48,24 @@ export function useRentPolling({
           
           // Mettre à jour le nombre de messages dans la DB si changé
           if (messages.length > 0) {
+            // Query by order_id (number), rent_id, or rental_id
             const { data: currentRental } = await supabase
               .from('rentals')
-              .select('message_count')
-              .or(`rent_id.eq.${rentalId},rental_id.eq.${rentalId}`)
+              .select('message_count, sms_count, id')
+              .or(`order_id.eq.${rentalId},rent_id.eq.${rentalId},rental_id.eq.${rentalId}`)
               .single();
 
-            const currentCount = (currentRental as any)?.message_count || 0;
+            const currentCount = (currentRental as any)?.message_count || (currentRental as any)?.sms_count || 0;
             
-            if (messages.length !== currentCount) {
-              await (supabase
+            if (messages.length !== currentCount && currentRental) {
+              await supabase
                 .from('rentals')
                 .update({ 
                   message_count: messages.length,
+                  sms_count: messages.length, // Support both column names
                   updated_at: new Date().toISOString()
-                }) as any)
-                .or(`rent_id.eq.${rentalId},rental_id.eq.${rentalId}`);
+                })
+                .eq('id', (currentRental as any).id);
 
               // Notifier le parent
               if (onUpdate) {
@@ -107,13 +109,23 @@ export function useRentPolling({
         const messages = data.messages || [];
         
         if (messages.length > 0) {
-          await (supabase
+          // Find the rental first to get its UUID
+          const { data: currentRental } = await supabase
             .from('rentals')
-            .update({ 
-              message_count: messages.length,
-              updated_at: new Date().toISOString()
-            }) as any)
-            .or(`rent_id.eq.${rentalId},rental_id.eq.${rentalId}`);
+            .select('id')
+            .or(`order_id.eq.${rentalId},rent_id.eq.${rentalId},rental_id.eq.${rentalId}`)
+            .single();
+          
+          if (currentRental) {
+            await supabase
+              .from('rentals')
+              .update({ 
+                message_count: messages.length,
+                sms_count: messages.length,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', (currentRental as any).id);
+          }
         }
       }
       

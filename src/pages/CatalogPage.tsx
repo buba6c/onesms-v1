@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
@@ -28,6 +29,7 @@ const POPULAR_SERVICES: Service[] = [
 ];
 
 export default function CatalogPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'activation' | 'rent'>('activation');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState<string | null>(null);

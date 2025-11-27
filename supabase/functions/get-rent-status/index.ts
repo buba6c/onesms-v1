@@ -62,17 +62,55 @@ serve(async (req) => {
 
     console.log('✅ User authenticated:', user.id)
 
-    // Vérifier que le rental appartient à l'utilisateur (support both column names)
+    // Vérifier que le rental appartient à l'utilisateur (support multiple column names)
     console.log('🔍 Querying rental with:', { rentId, userId: user.id })
     
-    const { data: rental, error: fetchError } = await supabase
+    // Try to find by order_id first (most common), then rent_id, then rental_id
+    let rental = null
+    let fetchError = null
+    
+    // First try order_id (number type in some schemas)
+    const { data: rental1, error: error1 } = await supabase
       .from('rentals')
       .select('*')
       .eq('user_id', user.id)
-      .or(`rent_id.eq.${rentId},rental_id.eq.${rentId}`)
+      .eq('order_id', parseInt(rentId) || rentId)
       .single()
+    
+    if (!error1 && rental1) {
+      rental = rental1
+      console.log('✅ Found rental by order_id')
+    } else {
+      // Try rent_id
+      const { data: rental2, error: error2 } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('rent_id', rentId)
+        .single()
+      
+      if (!error2 && rental2) {
+        rental = rental2
+        console.log('✅ Found rental by rent_id')
+      } else {
+        // Try rental_id
+        const { data: rental3, error: error3 } = await supabase
+          .from('rentals')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('rental_id', rentId)
+          .single()
+        
+        if (!error3 && rental3) {
+          rental = rental3
+          console.log('✅ Found rental by rental_id')
+        } else {
+          fetchError = error1 || error2 || error3
+        }
+      }
+    }
 
-    console.log('📋 Rental query result:', { rental, fetchError })
+    console.log('📋 Rental query result:', { rental: !!rental, fetchError })
 
     if (fetchError || !rental) {
       console.error('❌ Rental not found:', { rentId, userId: user.id, error: fetchError })
@@ -127,10 +165,10 @@ serve(async (req) => {
           .update({
             last_message_date: latestMessage.date,
             message_count: parseInt(data.quantity || '0'),
+            sms_count: parseInt(data.quantity || '0'), // Support both column names
             updated_at: new Date().toISOString()
           })
-          .eq('user_id', user.id)
-          .or(`rent_id.eq.${rentId},rental_id.eq.${rentId}`)
+          .eq('id', rental.id) // Use the UUID we already found
       }
 
       return new Response(

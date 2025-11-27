@@ -109,9 +109,9 @@ serve(async (req) => {
     }
 
     console.log('📦 [BUY-SMS-ACTIVATE] Parsing request body...')
-    const { country, operator, product, userId } = await req.json()
+    const { country, operator, product, userId, expectedPrice } = await req.json()
 
-    console.log('📞 [BUY-SMS-ACTIVATE] Request:', { country, operator, product, userId })
+    console.log('📞 [BUY-SMS-ACTIVATE] Request:', { country, operator, product, userId, expectedPrice })
 
     // 1. Get service from database
     const { data: service, error: serviceError } = await supabaseClient
@@ -161,6 +161,13 @@ serve(async (req) => {
       }
     } catch (e) {
       console.error('⚠️ [BUY-SMS-ACTIVATE] Failed to fetch real-time price, using fallback:', e)
+    }
+    
+    // ✅ Utiliser le prix attendu du frontend si fourni (garantit la cohérence d'affichage)
+    // Sinon utiliser le prix API ou fallback
+    if (expectedPrice && expectedPrice > 0) {
+      console.log(`💰 [BUY-SMS-ACTIVATE] Using expectedPrice from frontend: ${expectedPrice} (API was: ${price})`)
+      price = expectedPrice
     }
     
     // Ensure price is valid
@@ -287,15 +294,34 @@ serve(async (req) => {
       throw new Error(`Failed to create activation record: ${activationError.message || JSON.stringify(activationError)}`)
     }
 
-    // 6. Freeze user balance (create pending transaction)
+    // 6. DEDUCT user balance immediately
+    const { error: balanceError } = await supabaseClient
+      .from('users')
+      .update({ balance: userProfile.balance - price })
+      .eq('id', userId)
+
+    if (balanceError) {
+      console.error('❌ [BUY-SMS-ACTIVATE] Failed to deduct balance:', balanceError)
+      // Try to cancel on SMS-Activate since we couldn't charge
+      try {
+        await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activationId}&status=8`)
+      } catch (e) {
+        console.error('Failed to cancel on SMS-Activate:', e)
+      }
+      throw new Error('Failed to deduct balance')
+    }
+
+    console.log(`💰 [BUY-SMS-ACTIVATE] Balance deducted: ${price} from ${userProfile.balance} = ${userProfile.balance - price}`)
+
+    // 7. Create transaction record (completed)
     const { error: transactionError } = await supabaseClient
       .from('transactions')
       .insert({
         user_id: userId,
-        type: 'purchase',
+        type: 'usage',
         amount: -price,
         description: `SMS activation for ${service.name} in ${country}`,
-        status: 'pending',
+        status: 'completed',
         related_activation_id: activation.id
       })
 
