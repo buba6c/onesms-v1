@@ -156,15 +156,15 @@ export default function Header() {
     <header className={headerClasses}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to={logoDestination} className="flex items-center space-x-2.5 group">
-            <div className={`w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg transition-transform group-hover:scale-105 ${
+          <Link to={logoDestination} className="flex items-center space-x-2 group">
+            <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center text-white font-bold text-base md:text-lg shadow-lg transition-transform group-hover:scale-105 ${
               isTransparent 
                 ? 'bg-white/20 backdrop-blur-sm border border-white/30' 
                 : 'bg-gradient-to-br from-blue-600 to-cyan-500'
             }`}>
               <span className="text-white">OS</span>
             </div>
-            <span className={`text-xl md:text-2xl font-bold transition-colors hidden sm:inline ${textColorClass}`}>
+            <span className={`text-lg md:text-2xl font-bold transition-colors ${textColorClass}`}>
               {t('app.name')}
             </span>
           </Link>
