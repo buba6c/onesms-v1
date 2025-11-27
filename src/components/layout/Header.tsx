@@ -156,11 +156,18 @@ export default function Header() {
     <header className={headerClasses}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to={logoDestination} className="flex items-center space-x-2 group">
+          <Link to={logoDestination} className="flex items-center group">
+            {/* Mobile Logo - Icône seule */}
             <img 
-              src="/logo.svg" 
+              src="/mobile.png" 
               alt="One SMS" 
-              className="h-8 md:h-9 w-auto transition-transform group-hover:scale-105"
+              className="md:hidden h-10 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            {/* Desktop Logo - Logo complet */}
+            <img 
+              src="/web.png" 
+              alt="One SMS" 
+              className="hidden md:block h-11 lg:h-12 w-auto object-contain transition-transform group-hover:scale-105"
             />
           </Link>
 
