@@ -419,11 +419,6 @@ export default function HomePage() {
         
         <div className="container mx-auto px-4 py-12 md:py-24 relative z-10">
           <div className="max-w-5xl mx-auto text-center">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full mb-6 md:mb-8 animate-bounce">
-              <Sparkles className="w-4 h-4 text-yellow-400" />
-              <span className="text-xs md:text-sm font-medium">{t('homepage.hero.badge')}</span>
-            </div>
             
             {/* Main Title */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-4 md:mb-6 leading-tight tracking-tight">
