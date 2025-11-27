@@ -157,17 +157,12 @@ export default function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
           <Link to={logoDestination} className="flex items-center group">
-            {/* Mobile Logo - Icône seule */}
-            <img 
-              src="/mobile.png" 
-              alt="One SMS" 
-              className="md:hidden h-12 w-auto object-contain transition-transform group-hover:scale-105"
-            />
-            {/* Desktop Logo - Logo complet */}
+            {/* Logo responsive - même image, tailles différentes */}
             <img 
               src="/web.png" 
               alt="One SMS" 
-              className="hidden md:block h-14 lg:h-16 w-auto object-contain transition-transform group-hover:scale-105"
+              className="h-9 sm:h-10 md:h-11 lg:h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              style={{ maxWidth: '160px' }}
             />
           </Link>
 
