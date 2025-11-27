@@ -231,14 +231,19 @@ export default function DashboardPage() {
       console.log('🔄 [LOAD] Chargement activations DB...');
       
       // Récupérer le timestamp actuel pour filtrer les expirés
-      const now = new Date().toISOString();
+      const now = new Date();
+      const nowISO = now.toISOString();
+      
+      // Limite: ne pas récupérer les activations expirées depuis plus de 5 minutes
+      // Cela évite de charger d'anciennes activations inutiles
+      const graceLimit = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
       
       const { data, error } = await supabase
         .from('activations')
         .select('*')
         .eq('user_id', user.id)
         .in('status', ['pending', 'waiting', 'received'])
-        .or(`expires_at.gt.${now},sms_code.not.is.null`) // Soit pas expiré, soit a reçu un SMS
+        .or(`expires_at.gt.${nowISO},and(sms_code.not.is.null,expires_at.gt.${graceLimit})`) // Pas expiré OU (a SMS et expiré depuis moins de 5 min)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -430,8 +435,10 @@ export default function DashboardPage() {
       console.log('📋 [SYNC] Premier rental dans combined:', combined.find(n => n.type === 'rental'));
     }
     
-    // Filtrer les numéros masqués ET les numéros expirés/timeout (sauf s'ils ont reçu un SMS)
+    // Filtrer les numéros masqués ET les numéros expirés/timeout
     const now = Date.now();
+    const SMS_DISPLAY_GRACE_PERIOD = 2 * 60 * 1000; // 2 minutes après expiration pour voir le SMS
+    
     const visibleNumbers = combined.filter(num => {
       // Si masqué manuellement, ne pas afficher
       if (hiddenNumbers.has(num.id)) return false;
@@ -446,8 +453,18 @@ export default function DashboardPage() {
         
         // Si expiré et pas de SMS reçu, ne pas afficher
         if (isExpired && !num.smsCode) {
-          console.log('🚫 [FILTER] Numéro expiré masqué:', num.id, num.phone);
+          console.log('🚫 [FILTER] Numéro expiré sans SMS masqué:', num.id, num.phone);
           return false;
+        }
+        
+        // NOUVEAU: Si expiré depuis plus de 2 minutes, masquer même avec SMS
+        // Cela évite d'afficher d'anciennes activations avec SMS reçus
+        if (isExpired && num.smsCode) {
+          const timeSinceExpiry = now - expiresAtTime;
+          if (timeSinceExpiry > SMS_DISPLAY_GRACE_PERIOD) {
+            console.log('🚫 [FILTER] Numéro expiré depuis trop longtemps masqué:', num.id, num.phone, 'expiré depuis', Math.round(timeSinceExpiry / 1000), 'sec');
+            return false;
+          }
         }
       }
       

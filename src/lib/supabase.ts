@@ -37,10 +37,21 @@ export const signIn = async (email: string, password: string) => {
 }
 
 export const signInWithGoogle = async () => {
+  // Utiliser l'URL de production sur Netlify, sinon localhost
+  const baseUrl = import.meta.env.PROD 
+    ? 'https://onesms-sn.com' 
+    : window.location.origin;
+  
+  console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
+  
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/dashboard`,
+      redirectTo: `${baseUrl}/dashboard`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
     },
   })
   return { data, error }
