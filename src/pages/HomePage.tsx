@@ -263,23 +263,36 @@ export default function HomePage() {
   const { data: pricingData } = useQuery({
     queryKey: ['homepage-pricing'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('services')
-        .select('retail_price')
-        .eq('active', true)
-        .gt('retail_price', 0)
-        .order('retail_price', { ascending: true })
-        .limit(100);
-      
-      if (data && data.length > 0) {
-        const prices = data.map(s => s.retail_price);
-        return {
-          min: Math.min(...prices),
-          max: Math.max(...prices),
-          avg: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
-        };
+      try {
+        // Try to get prices from services table
+        const { data, error } = await supabase
+          .from('services')
+          .select('price')
+          .eq('active', true)
+          .gt('price', 0)
+          .order('price', { ascending: true })
+          .limit(100);
+        
+        if (error) {
+          console.warn('Could not fetch service prices:', error.message);
+          return { min: 100, max: 5000, avg: 500 };
+        }
+        
+        if (data && data.length > 0) {
+          const prices = data.map((s: any) => s.price).filter((p: number) => p > 0);
+          if (prices.length > 0) {
+            return {
+              min: Math.min(...prices),
+              max: Math.max(...prices),
+              avg: Math.round(prices.reduce((a: number, b: number) => a + b, 0) / prices.length)
+            };
+          }
+        }
+        return { min: 100, max: 5000, avg: 500 };
+      } catch (err) {
+        console.warn('Pricing fetch error:', err);
+        return { min: 100, max: 5000, avg: 500 };
       }
-      return { min: 1, max: 50, avg: 5 };
     },
     staleTime: 1000 * 60 * 10,
   });
@@ -324,7 +337,7 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [topUpPackages.length]);
 
-  // Fetch platform stats
+  // Fetch platform stats - Real data from database
   const { data: stats } = useQuery({
     queryKey: ['homepage-stats'],
     queryFn: async () => {
@@ -332,10 +345,15 @@ export default function HomePage() {
         supabase.from('services').select('*', { count: 'exact', head: true }).eq('active', true),
         supabase.from('countries').select('*', { count: 'exact', head: true }).eq('active', true)
       ]);
+      
+      // Limiter les pays à 195 max (nombre réel de pays dans le monde)
+      const countriesCount = Math.min(countriesResult.count || 0, 195);
+      
       return {
-        services: servicesResult.count || 1683,
-        countries: countriesResult.count || 190,
-        activations: '5.2M+',
+        services: servicesResult.count || 0,
+        countries: countriesCount,
+        // Nombre estimé de numéros disponibles (basé sur les providers)
+        availableNumbers: '5.2M+',
         successRate: '99.7%'
       };
     },
@@ -450,15 +468,15 @@ export default function HomePage() {
             {/* Stats Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-4xl mx-auto mb-12 md:mb-16 px-4">
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
-                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.activations || '5.2M+'}</div>
-                <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.activations')}</div>
+                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.availableNumbers || '5.2M+'}</div>
+                <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.availableNumbers')}</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
                 <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.services || '1683'}+</div>
                 <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.services')}</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
-                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.countries || '190'}+</div>
+                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.countries || '180'}+</div>
                 <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.countries')}</div>
               </div>
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
@@ -467,28 +485,33 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Popular Services with Real SVG Logos */}
+            {/* Popular Services with Real SVG Logos - Animated */}
             <div className="px-4 pb-8">
               <p className="text-xs md:text-sm text-blue-200/60 mb-6 md:mb-8 uppercase tracking-widest font-medium">
                 {t('homepage.services.title', 'Supported Services')}
               </p>
               <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-                {displayServices.map((service) => (
-                  <ServiceLogo key={service.code} code={service.code} name={service.name} />
+                {displayServices.map((service, index) => (
+                  <div 
+                    key={service.code} 
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <ServiceLogo code={service.code} name={service.name} />
+                  </div>
                 ))}
               </div>
-              {/* More services indicator */}
-              <div className="mt-10 flex items-center justify-center gap-2">
-                <div className="flex -space-x-2">
-                  {[1,2,3,4,5].map((i) => (
-                    <div key={i} className="w-8 h-8 rounded-full bg-white/10 border-2 border-slate-800 flex items-center justify-center text-xs font-bold text-white/60">
-                      +
-                    </div>
-                  ))}
+              {/* More services indicator - Improved design */}
+              <div className="mt-10 flex items-center justify-center">
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-6 py-3 flex items-center gap-3">
+                  <div className="flex items-center">
+                    <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />
+                  </div>
+                  <span className="text-sm font-medium text-blue-100">
+                    {t('homepage.services.andMore', `et ${stats?.services || 1600}+ autres services`)}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-cyan-400" />
                 </div>
-                <span className="text-sm text-blue-200/60 ml-2">
-                  {t('homepage.services.andMore', 'et 1600+ autres services')}
-                </span>
               </div>
             </div>
           </div>
@@ -663,7 +686,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section - TopUp Packages Carousel */}
-      <section className="py-16 md:py-24 bg-gradient-to-b from-slate-50 to-white overflow-hidden">
+      <section id="pricing" className="py-16 md:py-24 bg-gradient-to-b from-slate-50 to-white overflow-hidden scroll-mt-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12 md:mb-16">
             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 px-5 py-2.5 rounded-full text-sm font-semibold mb-4 shadow-sm">
@@ -702,33 +725,34 @@ export default function HomePage() {
               <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
-            {/* Carousel Container */}
+            {/* Carousel Container - padding ajusté pour les badges et effets hover */}
             <div
               ref={carouselRef}
-              className="flex gap-5 overflow-x-auto scroll-smooth px-8 md:px-16 pb-4 snap-x snap-mandatory scrollbar-hide"
+              className="flex gap-6 overflow-x-auto scroll-smooth px-8 md:px-16 pt-8 pb-6 snap-x snap-mandatory scrollbar-hide"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {topUpPackages.length > 0 ? (
                 topUpPackages.map((pkg, index) => {
                   const isPopular = pkg.is_popular;
-                  // Couleurs harmonisées avec le thème de la plateforme (bleu/cyan)
-                  const gradient = 'from-blue-600 to-cyan-500';
+                  const gradient = isPopular ? 'from-orange-500 to-red-500' : 'from-blue-600 to-cyan-500';
                   
                   return (
                     <div
                       key={pkg.id}
-                      className={`flex-shrink-0 w-[280px] md:w-[300px] snap-center relative group`}
+                      className={`flex-shrink-0 w-[280px] md:w-[300px] snap-center relative group ${isPopular ? 'z-10' : ''}`}
                     >
-                      {/* Popular Badge */}
+                      {/* Popular Badge - Enhanced */}
                       {isPopular && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-                          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg animate-pulse">
-                            ⭐ {t('homepage.pricing.mostPopular', 'MOST POPULAR')}
+                          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-orange-500/40 flex items-center gap-1.5 whitespace-nowrap">
+                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+                            {t('homepage.pricing.mostPopular', 'POPULAIRE')}
+                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
                           </div>
                         </div>
                       )}
                       
-                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-yellow-400 shadow-yellow-100' : 'border-gray-100'} overflow-hidden transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02]`}>
+                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-orange-400 shadow-orange-200 ring-4 ring-orange-100' : 'border-gray-100'} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1`}>
                         {/* Header with gradient */}
                         <div className={`bg-gradient-to-r ${gradient} p-6 text-white relative overflow-hidden`}>
                           <div className="absolute inset-0 bg-black/10"></div>
@@ -749,37 +773,32 @@ export default function HomePage() {
                           </div>
                         </div>
 
-                        {/* Price Section */}
+                        {/* Price Section - XOF Only */}
                         <div className="p-6">
                           {/* Savings Badge */}
                           {pkg.savings_percentage > 0 && (
                             <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full mb-4">
                               <Sparkles className="w-3 h-3" />
-                              {t('homepage.pricing.save', 'Save')} {pkg.savings_percentage}%
+                              -{pkg.savings_percentage}%
                             </div>
                           )}
 
-                          {/* Main Price */}
+                          {/* Main Price - XOF Only */}
                           <div className="mb-4">
                             <div className="flex items-baseline gap-1">
                               <span className="text-3xl md:text-4xl font-black text-gray-900">
                                 {pkg.price_xof.toLocaleString('fr-FR')}
                               </span>
-                              <span className="text-lg font-bold text-gray-500">XOF</span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-2 text-sm text-gray-400">
-                              <span>≈ {pkg.price_eur} €</span>
-                              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                              <span>≈ ${pkg.price_usd}</span>
+                              <span className="text-lg font-bold text-gray-500">FCFA</span>
                             </div>
                           </div>
 
                           {/* Per activation */}
                           <div className="bg-gray-50 rounded-xl p-3 mb-4">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-500">{t('homepage.pricing.perUnit', 'Per activation')}</span>
+                              <span className="text-sm text-gray-500">{t('homepage.pricing.perUnit', 'Par activation')}</span>
                               <span className="font-bold text-gray-700">
-                                {Math.round(pkg.price_xof / pkg.activations).toLocaleString('fr-FR')} XOF
+                                {Math.round(pkg.price_xof / pkg.activations).toLocaleString('fr-FR')} F
                               </span>
                             </div>
                           </div>
@@ -787,9 +806,9 @@ export default function HomePage() {
                           {/* Features */}
                           <div className="space-y-2 mb-6">
                             {[
-                              t('homepage.pricing.feature1', 'Instant delivery'),
-                              t('homepage.pricing.feature2', 'No expiration'),
-                              t('homepage.pricing.feature3', '24/7 support'),
+                              t('homepage.pricing.feature1', 'Livraison instantanée'),
+                              t('homepage.pricing.feature2', 'Sans expiration'),
+                              t('homepage.pricing.feature3', 'Support 24/7'),
                             ].map((feature, i) => (
                               <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
                                 <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -799,9 +818,9 @@ export default function HomePage() {
                           </div>
 
                           {/* CTA Button */}
-                          <Link to="/dashboard" className="block">
+                          <Link to="/register" className="block">
                             <Button className={`w-full h-12 font-bold text-base bg-gradient-to-r ${gradient} hover:opacity-90 shadow-lg transition-all duration-300 group-hover:shadow-xl`}>
-                              {t('homepage.pricing.buyNow', 'Buy Now')}
+                              {t('homepage.pricing.buyNow', 'Acheter')}
                               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </Button>
                           </Link>
@@ -813,30 +832,31 @@ export default function HomePage() {
               ) : (
                 // Fallback packages if DB is empty
                 [
-                  { activations: 10, price_xof: 2000, price_eur: 3, price_usd: 4, is_popular: false, savings_percentage: 0 },
-                  { activations: 25, price_xof: 4500, price_eur: 7, price_usd: 8, is_popular: false, savings_percentage: 10 },
-                  { activations: 50, price_xof: 8000, price_eur: 12, price_usd: 14, is_popular: true, savings_percentage: 20 },
-                  { activations: 100, price_xof: 15000, price_eur: 23, price_usd: 26, is_popular: false, savings_percentage: 25 },
-                  { activations: 250, price_xof: 35000, price_eur: 53, price_usd: 60, is_popular: false, savings_percentage: 30 },
+                  { activations: 5, price_xof: 500, is_popular: false, savings_percentage: 0 },
+                  { activations: 10, price_xof: 1000, is_popular: false, savings_percentage: 0 },
+                  { activations: 20, price_xof: 2000, is_popular: true, savings_percentage: 0 },
+                  { activations: 50, price_xof: 5000, is_popular: false, savings_percentage: 0 },
+                  { activations: 100, price_xof: 10000, is_popular: false, savings_percentage: 0 },
                 ].map((pkg, index) => {
                   const isPopular = pkg.is_popular;
-                  // Couleurs harmonisées avec le thème de la plateforme (bleu/cyan)
-                  const gradient = 'from-blue-600 to-cyan-500';
+                  const gradient = isPopular ? 'from-orange-500 to-red-500' : 'from-blue-600 to-cyan-500';
                   
                   return (
                     <div
                       key={index}
-                      className={`flex-shrink-0 w-[280px] md:w-[300px] snap-center relative group`}
+                      className={`flex-shrink-0 w-[280px] md:w-[300px] snap-center relative group ${isPopular ? 'z-10' : ''}`}
                     >
                       {isPopular && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-                          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg animate-pulse">
-                            ⭐ {t('homepage.pricing.mostPopular', 'MOST POPULAR')}
+                          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-orange-500/40 flex items-center gap-1.5 whitespace-nowrap">
+                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+                            {t('homepage.pricing.mostPopular', 'POPULAIRE')}
+                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
                           </div>
                         </div>
                       )}
                       
-                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-yellow-400 shadow-yellow-100' : 'border-gray-100'} overflow-hidden transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 hover:scale-[1.02]`}>
+                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-orange-400 shadow-orange-200 ring-4 ring-orange-100' : 'border-gray-100'} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1`}>
                         <div className={`bg-gradient-to-r ${gradient} p-6 text-white relative overflow-hidden`}>
                           <div className="absolute inset-0 bg-black/10"></div>
                           <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
@@ -860,7 +880,7 @@ export default function HomePage() {
                           {pkg.savings_percentage > 0 && (
                             <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full mb-4">
                               <Sparkles className="w-3 h-3" />
-                              {t('homepage.pricing.save', 'Save')} {pkg.savings_percentage}%
+                              -{pkg.savings_percentage}%
                             </div>
                           )}
 
@@ -869,29 +889,24 @@ export default function HomePage() {
                               <span className="text-3xl md:text-4xl font-black text-gray-900">
                                 {pkg.price_xof.toLocaleString('fr-FR')}
                               </span>
-                              <span className="text-lg font-bold text-gray-500">XOF</span>
-                            </div>
-                            <div className="flex items-center gap-3 mt-2 text-sm text-gray-400">
-                              <span>≈ {pkg.price_eur} €</span>
-                              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                              <span>≈ ${pkg.price_usd}</span>
+                              <span className="text-lg font-bold text-gray-500">FCFA</span>
                             </div>
                           </div>
 
                           <div className="bg-gray-50 rounded-xl p-3 mb-4">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-500">{t('homepage.pricing.perUnit', 'Per activation')}</span>
+                              <span className="text-sm text-gray-500">{t('homepage.pricing.perUnit', 'Par activation')}</span>
                               <span className="font-bold text-gray-700">
-                                {Math.round(pkg.price_xof / pkg.activations).toLocaleString('fr-FR')} XOF
+                                {Math.round(pkg.price_xof / pkg.activations).toLocaleString('fr-FR')} F
                               </span>
                             </div>
                           </div>
 
                           <div className="space-y-2 mb-6">
                             {[
-                              t('homepage.pricing.feature1', 'Instant delivery'),
-                              t('homepage.pricing.feature2', 'No expiration'),
-                              t('homepage.pricing.feature3', '24/7 support'),
+                              t('homepage.pricing.feature1', 'Livraison instantanée'),
+                              t('homepage.pricing.feature2', 'Sans expiration'),
+                              t('homepage.pricing.feature3', 'Support 24/7'),
                             ].map((feature, i) => (
                               <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
                                 <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -900,9 +915,9 @@ export default function HomePage() {
                             ))}
                           </div>
 
-                          <Link to="/dashboard" className="block">
+                          <Link to="/register" className="block">
                             <Button className={`w-full h-12 font-bold text-base bg-gradient-to-r ${gradient} hover:opacity-90 shadow-lg transition-all duration-300 group-hover:shadow-xl`}>
-                              {t('homepage.pricing.buyNow', 'Buy Now')}
+                              {t('homepage.pricing.buyNow', 'Acheter')}
                               <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </Button>
                           </Link>
@@ -943,9 +958,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA - Removed duplicate footer-like section */}
-      <section className="py-16 md:py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_25%,rgba(255,255,255,0.05)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.05)_75%)] bg-[length:60px_60px]"></div>
+      {/* Final CTA - Clean design with proper background */}
+      <section className="py-16 md:py-20 bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white relative overflow-hidden">
+        {/* Background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.2),transparent_70%)]"></div>
+        </div>
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.02)_25%,rgba(255,255,255,0.02)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.02)_75%)] bg-[length:60px_60px]"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4">{t('homepage.cta.title')}</h2>
@@ -953,7 +972,7 @@ export default function HomePage() {
             {t('homepage.cta.subtitle')}
           </p>
           <Link to="/register">
-            <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 h-12 md:h-14 px-8 md:px-10 text-base md:text-lg font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white h-12 md:h-14 px-8 md:px-10 text-base md:text-lg font-bold shadow-xl shadow-blue-500/30 hover:shadow-2xl transition-all duration-300 hover:scale-105">
               {t('homepage.cta.button')}
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
