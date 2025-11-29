@@ -46,7 +46,7 @@ export default function RegisterPage() {
 
     if (error) {
       toast({
-        title: 'Error',
+        title: t('common.error'),
         description: error.message,
         variant: 'destructive',
       })
@@ -55,11 +55,12 @@ export default function RegisterPage() {
     }
 
     toast({
-      title: 'Success',
-      description: 'Account created successfully! Please check your email.',
+      title: t('common.success'),
+      description: t('auth.accountCreatedCheckEmail'),
     })
 
-    navigate('/login')
+    // Rediriger vers la page de vérification email
+    navigate(`/verify-email?email=${encodeURIComponent(email)}`)
   }
 
   return (

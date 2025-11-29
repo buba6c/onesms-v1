@@ -53,13 +53,15 @@
     "rentNumber": "Louer un Numéro",
     "activation": "Activation",
     "activate": "Activer",
-    "rent": "Louer",
+    "rent": "Location",
     "duration": "Durée",
-    "rentInfo": "Le numéro sera disponible pour la durée sélectionnée et peut recevoir plusieurs SMS",
-    "popular": "Populaires",
+    "rentInfo": "Le numéro sera disponible pour la durée sélectionnée et pourra recevoir plusieurs SMS",
+    "popular": "Populaire",
     "allServices": "Tous les services",
     "services": "services",
     "numbersAvailable": "numéros disponibles",
+    "noStock": "Rupture de stock",
+    "available": "Disponible",
     "universalService": "Service universel",
     "receiveFromAny": "Recevoir des SMS de n'importe quel service",
     "loadingRates": "Chargement des tarifs en direct...",
@@ -179,7 +181,39 @@
     "alreadyHaveAccount": "Vous avez déjà un compte ?",
     "signInWithGoogle": "Se connecter avec Google",
     "signInWithApple": "Se connecter avec Apple",
-    "orContinueWith": "Ou continuer avec"
+    "orContinueWith": "Ou continuer avec",
+    "forgotPasswordTitle": "Mot de passe oublié",
+    "forgotPasswordDescription": "Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
+    "sendResetLink": "Envoyer le lien de réinitialisation",
+    "emailSent": "Email envoyé !",
+    "resetEmailSentDescription": "Un lien de réinitialisation a été envoyé à votre adresse email. Vérifiez votre boîte de réception.",
+    "checkSpam": "Vérifiez aussi vos spams si vous ne trouvez pas l'email.",
+    "backToLogin": "Retour à la connexion",
+    "resetPasswordTitle": "Nouveau mot de passe",
+    "resetPasswordDescription": "Choisissez un nouveau mot de passe sécurisé pour votre compte.",
+    "newPassword": "Nouveau mot de passe",
+    "confirmNewPassword": "Confirmer le nouveau mot de passe",
+    "updatePassword": "Mettre à jour le mot de passe",
+    "passwordUpdated": "Mot de passe mis à jour !",
+    "passwordUpdatedDescription": "Votre mot de passe a été changé avec succès. Vous pouvez maintenant vous connecter.",
+    "redirectingToLogin": "Redirection vers la connexion...",
+    "invalidResetLink": "Lien invalide ou expiré",
+    "invalidResetLinkDescription": "Ce lien de réinitialisation n'est plus valide. Veuillez demander un nouveau lien.",
+    "requestNewLink": "Demander un nouveau lien",
+    "passwordsDontMatch": "Les mots de passe ne correspondent pas",
+    "passwordTooShort": "Le mot de passe doit contenir au moins 6 caractères",
+    "verifyEmailTitle": "Vérifiez votre email",
+    "verifyEmailDescription": "Nous avons envoyé un email de confirmation à votre adresse. Cliquez sur le lien pour activer votre compte.",
+    "verifyStep1": "Ouvrez votre boîte email",
+    "verifyStep2": "Cliquez sur le lien de confirmation",
+    "verifyStep3": "Revenez ici pour vous connecter",
+    "yourEmail": "Votre email",
+    "resendConfirmation": "Renvoyer l'email de confirmation",
+    "emailResent": "Email renvoyé !",
+    "confirmationEmailResent": "Un nouvel email de confirmation a été envoyé.",
+    "checkSpamFolder": "💡 N'oubliez pas de vérifier vos spams si vous ne trouvez pas l'email.",
+    "enterEmail": "Veuillez entrer votre adresse email",
+    "accountCreatedCheckEmail": "Compte créé ! Vérifiez votre email pour l'activer."
   },
   "settings": {
     "title": "Paramètres",
@@ -193,7 +227,7 @@
   "history": {
     "title": "Historique",
     "orders": "Commandes",
-    "payments": "Paiements",
+    "payments": "Transactions",
     "phoneNumber": "Numéro de Téléphone",
     "smsReceived": "SMS Reçu",
     "viewDetails": "Voir Détails",
@@ -211,15 +245,30 @@
     "received": "Reçu",
     "timeout": "Expiré",
     "cancelled": "Annulé",
+    "completed": "Complété",
+    "refunded": "Remboursé",
+    "failed": "Échoué",
     "type": "Type",
     "amount": "Montant",
     "description": "Description",
     "date": "Date",
     "noOrders": "Aucune commande trouvée",
-    "noPayments": "Aucun paiement trouvé",
+    "noPayments": "Aucune transaction trouvée",
     "previous": "Précédent",
     "page": "Page",
-    "of": "sur"
+    "of": "sur",
+    "transactionTypes": {
+      "purchase": "Achat activation",
+      "rent": "Location numéro",
+      "topup": "Recharge",
+      "refund": "Remboursement",
+      "credit": "Crédit",
+      "debit": "Débit",
+      "bonus": "Bonus"
+    },
+    "balanceBefore": "Solde avant",
+    "balanceAfter": "Solde après",
+    "transactionId": "ID Transaction"
   },
   "topup": {
     "title": "Recharger le Solde",
@@ -241,7 +290,8 @@
     "bestValue": "Meilleure Valeur"
   },
   "rent": {
-    "title": "Louer un Numéro",
+    "title": "Location de Numéros",
+    "rentNewNumber": "Louer un Nouveau Numéro",
     "selectService": "Sélectionner le Service",
     "selectCountry": "Sélectionner le Pays",
     "selectDuration": "Sélectionner la Durée",
@@ -255,7 +305,47 @@
     "viewMessages": "Voir les Messages",
     "extendRental": "Prolonger la Location",
     "activeRentals": "Locations Actives",
-    "noActiveRentals": "Aucune location active"
+    "noActiveRentals": "Aucune location active",
+    "refresh": "Actualiser",
+    "loading": "Chargement...",
+    "loadingCountries": "Chargement des pays...",
+    "loadingServices": "Chargement des services...",
+    "loadingPrices": "Chargement des prix...",
+    "noServices": "Aucun service disponible pour ce pays",
+    "copied": "Copié !",
+    "extensionFailed": "Échec de l'extension",
+    "expired": "Expiré",
+    "steps": {
+      "country": "Pays",
+      "service": "Service",
+      "duration": "Durée",
+      "confirm": "Confirmer"
+    },
+    "durations": {
+      "4hours": "4 heures",
+      "1day": "1 jour",
+      "1week": "1 semaine",
+      "1month": "1 mois",
+      "quickRental": "Location rapide",
+      "24hours": "24 heures",
+      "7days": "7 jours",
+      "30days": "30 jours"
+    },
+    "countrySelectHint": "Sélectionnez un pays avec support LOCATION ({count} disponibles)",
+    "searchCountry": "Rechercher un pays...",
+    "searchService": "Rechercher un service...",
+    "back": "← Retour",
+    "available": "disponible(s)",
+    "numbers": "numéros",
+    "notAvailable": "N/A",
+    "total": "Total",
+    "renting": "Location en cours...",
+    "confirmRental": "Confirmer la Location",
+    "country": "Pays",
+    "service": "Service",
+    "duration": "Durée",
+    "smsInbox": "Boîte SMS",
+    "noMessages": "Aucun message"
   },
   "transactions": {
     "title": "Transactions",
@@ -272,7 +362,16 @@
     "searchServices": "Rechercher des services...",
     "category": "Catégorie",
     "available": "Disponible",
-    "startingFrom": "À partir de"
+    "startingFrom": "À partir de",
+    "rentTitle": "Location",
+    "rentDesc": "Recevez plusieurs SMS sur un numéro de n'importe quel site pour une période de 4 heures à 1 mois",
+    "rentFeature1": "Nouveau numéro jamais utilisé",
+    "rentFeature2": "Durée d'utilisation : de 4 heures à 1 mois",
+    "rentFeature3": "Possibilité de louer entièrement un numéro et recevoir des SMS de tous les sites / services / applications",
+    "step": "Étape",
+    "rentStep1": "Sélectionnez la période de location et le pays pour votre numéro.",
+    "rentStep2": "Utilisez le numéro loué pour plusieurs services pendant la période de location.",
+    "rentStep3": "Recevez tous les SMS envoyés à votre numéro loué."
   },
   "myNumbers": {
     "title": "Mes Numéros",
@@ -292,10 +391,10 @@
       "description": "Obtenez un accès instantané à des numéros virtuels de plus de 190 pays. Vérifiez n'importe quel service en quelques secondes.",
       "getStarted": "Commencer Maintenant",
       "viewServices": "Voir les Services",
-      "trustedBy": "✅ Approuvé par 100 000+ utilisateurs"
+      "trustedBy": "🚀 Plateforme 100% Sénégalaise"
     },
     "stats": {
-      "activations": "Activations Totales",
+      "availableNumbers": "Numéros Disponibles",
       "services": "Services Disponibles",
       "countries": "Pays Couverts",
       "successRate": "Taux de Réussite"
@@ -350,7 +449,7 @@
     },
     "cta": {
       "title": "Prêt à Commencer ?",
-      "subtitle": "Rejoignez 100 000+ utilisateurs qui nous font confiance",
+      "subtitle": "La solution de vérification SMS la plus rapide d'Afrique",
       "button": "Créer un Compte Gratuit"
     },
     "faq": {
@@ -400,7 +499,9 @@
     "ok": "OK",
     "copied": "Copié !",
     "copyNumber": "Copier le numéro",
-    "viewAll": "Voir Tout"
+    "viewAll": "Voir Tout",
+    "activation": "Activation",
+    "rent": "Location"
   },
   "footer": {
     "about": "À propos",
@@ -435,7 +536,7 @@
     "senegal": "Sénégal",
     "paymentMethods": "Nous acceptons",
     "secured": "Sécurisé par SSL",
-    "trustedBy": "Approuvé par plus de 100 000 utilisateurs dans le monde"
+    "trustedBy": "Plateforme de confiance pour la vérification SMS"
   },
   "howToUse": {
     "badge": "Guide Complet",
@@ -520,5 +621,326 @@
     "ctaTitle": "Prêt à Commencer ?",
     "ctaDescription": "Rejoignez des milliers d'utilisateurs qui font confiance à One SMS pour leurs besoins de vérification",
     "createAccount": "Créer un Compte Gratuit"
+  },
+  "insufficientBalance": {
+    "title": "Solde Insuffisant",
+    "description": "Vous n'avez pas assez de crédits pour effectuer cet achat. Rechargez votre compte pour continuer.",
+    "needed": "Montant requis",
+    "available": "Solde actuel",
+    "missing": "Il vous manque",
+    "topUp": "Recharger maintenant"
+  },
+  "terms": {
+    "title": "Conditions d'Utilisation",
+    "subtitle": "Veuillez lire attentivement ces conditions avant d'utiliser nos services",
+    "lastUpdated": "Dernière mise à jour",
+    "tableOfContents": "Table des matières",
+    "questions": "Des questions sur nos conditions ?",
+    "contactUs": "Notre équipe est disponible pour vous aider",
+    "viewPrivacy": "Voir la Politique de Confidentialité",
+    "sections": {
+      "acceptance": {
+        "title": "Acceptation des Conditions",
+        "content": "<p>En accédant et en utilisant One SMS, vous acceptez d'être lié par ces Conditions d'Utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser notre service.</p><p>Ces conditions constituent un accord légal entre vous et One SMS. En créant un compte ou en utilisant nos services, vous confirmez que :</p><ul><li>Vous avez au moins 18 ans</li><li>Vous avez la capacité juridique de conclure des contrats</li><li>Vous utiliserez nos services conformément à la loi applicable</li></ul>"
+      },
+      "services": {
+        "title": "Description des Services",
+        "content": "<p>One SMS fournit des numéros de téléphone virtuels pour la réception de SMS de vérification. Nos services incluent :</p><ul><li><strong>Activation unique :</strong> Numéros temporaires pour recevoir un code de vérification (durée : 20 minutes)</li><li><strong>Location de numéros :</strong> Accès prolongé à un numéro pour plusieurs vérifications</li><li><strong>Couverture internationale :</strong> Numéros disponibles dans plus de 150 pays</li></ul><p>Les services sont fournis \"tels quels\" et nous ne garantissons pas la disponibilité de tous les numéros ou services à tout moment.</p>"
+      },
+      "registration": {
+        "title": "Inscription et Compte",
+        "content": "<p>Pour utiliser nos services, vous devez créer un compte en fournissant :</p><ul><li>Une adresse email valide</li><li>Un mot de passe sécurisé</li></ul><p><strong>Responsabilités du compte :</strong></p><ul><li>Vous êtes responsable de maintenir la confidentialité de vos identifiants</li><li>Vous êtes responsable de toutes les activités effectuées via votre compte</li><li>Vous devez nous notifier immédiatement de tout accès non autorisé</li><li>Un seul compte par personne est autorisé</li></ul>"
+      },
+      "payment": {
+        "title": "Paiement et Crédits",
+        "content": "<p><strong>Système de crédits :</strong></p><ul><li>Les services sont prépayés via notre système de crédits</li><li>1 crédit = 1 FCFA (ou équivalent en devise locale)</li><li>Les prix des numéros varient selon le pays et le service</li><li>Les crédits sont gelés lors de l'achat d'un numéro et débités à la réception du SMS</li></ul><p><strong>Méthodes de paiement acceptées :</strong></p><ul><li>Cartes bancaires (Visa, Mastercard)</li><li>Mobile Money (Orange Money, Wave, etc.)</li><li>Cryptomonnaies (Bitcoin, USDT)</li></ul>"
+      },
+      "refund": {
+        "title": "Politique de Remboursement",
+        "content": "<p><strong>Remboursements automatiques :</strong></p><ul><li>Si aucun SMS n'est reçu dans les 20 minutes, les crédits sont automatiquement remboursés</li><li>Vous pouvez annuler une commande avant la réception du SMS</li></ul><p><strong>Cas non remboursables :</strong></p><ul><li>SMS reçu et utilisé</li><li>Compte banni par le service cible (responsabilité de l'utilisateur)</li><li>Utilisation incorrecte de l'API</li><li>Abus du système de remboursement</li></ul><p><strong>Remboursement du solde :</strong> Sur demande, nous pouvons rembourser votre solde (moins les frais de transaction) dans un délai de 30 jours ouvrables.</p>"
+      },
+      "prohibited": {
+        "title": "Utilisations Interdites",
+        "content": "<p>Il est strictement interdit d'utiliser nos services pour :</p><ul><li>Toute activité illégale ou frauduleuse</li><li>La création de comptes pour des activités malveillantes</li><li>Le spam, le phishing ou l'escroquerie</li><li>La violation des conditions d'utilisation de services tiers</li><li>L'usurpation d'identité</li><li>Le blanchiment d'argent</li><li>Toute activité portant atteinte aux droits d'autrui</li></ul><p><strong>Conséquences :</strong> Toute violation entraînera la suspension immédiate du compte sans remboursement.</p>"
+      },
+      "liability": {
+        "title": "Limitation de Responsabilité",
+        "content": "<p>One SMS ne peut être tenu responsable pour :</p><ul><li>L'indisponibilité temporaire des services</li><li>Les bannissements de comptes par des services tiers</li><li>Les pertes indirectes liées à l'utilisation de nos services</li><li>Les actions effectuées par des tiers utilisant vos identifiants</li><li>Les interruptions dues à la maintenance ou aux mises à jour</li></ul><p>Notre responsabilité maximale est limitée au montant des crédits sur votre compte au moment de l'incident.</p>"
+      },
+      "termination": {
+        "title": "Résiliation",
+        "content": "<p><strong>Par l'utilisateur :</strong></p><ul><li>Vous pouvez fermer votre compte à tout moment depuis les paramètres</li><li>Les crédits restants peuvent être remboursés sur demande</li></ul><p><strong>Par One SMS :</strong></p><ul><li>Nous nous réservons le droit de suspendre ou résilier votre compte en cas de violation des conditions</li><li>Les comptes inactifs depuis plus d'un an peuvent être supprimés</li><li>En cas de fraude avérée, le compte sera banni sans remboursement</li></ul>"
+      },
+      "changes": {
+        "title": "Modifications des Conditions",
+        "content": "<p>Nous nous réservons le droit de modifier ces conditions à tout moment. Les modifications entrent en vigueur dès leur publication sur le site.</p><p>En cas de modifications majeures, nous vous notifierons par email. Votre utilisation continue des services après les modifications constitue votre acceptation des nouvelles conditions.</p><p>Nous vous recommandons de consulter régulièrement cette page pour rester informé des éventuelles mises à jour.</p>"
+      },
+      "contact": {
+        "title": "Nous Contacter",
+        "content": "<p>Pour toute question concernant ces Conditions d'Utilisation, contactez-nous :</p><ul><li><strong>Email :</strong> support@onesms.app</li><li><strong>Page de contact :</strong> <a href='/contact' class='text-blue-600 hover:underline'>Formulaire de contact</a></li></ul><p>Nous nous efforçons de répondre à toutes les demandes dans un délai de 48 heures ouvrables.</p>"
+      }
+    }
+  },
+  "privacy": {
+    "title": "Politique de Confidentialité",
+    "subtitle": "Comment nous protégeons et utilisons vos données personnelles",
+    "lastUpdated": "Dernière mise à jour",
+    "tableOfContents": "Table des matières",
+    "dataWeCollect": "Données que nous collectons",
+    "questions": "Des questions sur vos données ?",
+    "contactUs": "Contactez notre équipe pour toute demande relative à la vie privée",
+    "viewTerms": "Voir les Conditions d'Utilisation",
+    "yourRightsSummary": "Résumé de vos droits",
+    "dataTypes": {
+      "email": "Adresse email",
+      "ip": "Adresse IP",
+      "transactions": "Historique des transactions",
+      "usage": "Données d'utilisation"
+    },
+    "rights": {
+      "access": "Droit d'accéder à vos données personnelles",
+      "correction": "Droit de corriger les informations inexactes",
+      "deletion": "Droit de demander la suppression de vos données",
+      "portability": "Droit à la portabilité de vos données"
+    },
+    "sections": {
+      "introduction": {
+        "title": "Introduction",
+        "content": "<p>Chez One SMS, nous accordons une importance primordiale à la protection de vos données personnelles. Cette politique de confidentialité explique comment nous collectons, utilisons, stockons et protégeons vos informations.</p><p>Cette politique est conforme au Règlement Général sur la Protection des Données (RGPD) de l'Union Européenne et aux lois applicables en matière de protection des données.</p><p>En utilisant nos services, vous consentez aux pratiques décrites dans cette politique.</p>"
+      },
+      "dataCollection": {
+        "title": "Collecte des Données",
+        "content": "<p><strong>Données que nous collectons :</strong></p><ul><li><strong>Informations de compte :</strong> Email, mot de passe (chiffré)</li><li><strong>Données de transaction :</strong> Historique des achats, méthodes de paiement utilisées</li><li><strong>Données techniques :</strong> Adresse IP, type de navigateur, système d'exploitation</li><li><strong>Données d'utilisation :</strong> Pages visitées, actions effectuées, horodatages</li></ul><p><strong>Données que nous ne collectons PAS :</strong></p><ul><li>Données biométriques</li><li>Données de santé</li><li>Opinions politiques ou religieuses</li><li>Contenu des SMS reçus (nous ne stockons pas les codes de vérification)</li></ul>"
+      },
+      "dataUsage": {
+        "title": "Utilisation des Données",
+        "content": "<p>Nous utilisons vos données personnelles pour :</p><ul><li><strong>Fourniture des services :</strong> Créer et gérer votre compte, traiter les transactions</li><li><strong>Communication :</strong> Vous envoyer des notifications importantes, répondre à vos demandes</li><li><strong>Amélioration :</strong> Analyser l'utilisation pour améliorer nos services</li><li><strong>Sécurité :</strong> Détecter et prévenir la fraude, protéger nos systèmes</li><li><strong>Conformité légale :</strong> Respecter nos obligations légales et réglementaires</li></ul><p>Nous ne vendons jamais vos données personnelles à des tiers.</p>"
+      },
+      "dataSecurity": {
+        "title": "Sécurité des Données",
+        "content": "<p>Nous mettons en œuvre des mesures de sécurité robustes pour protéger vos données :</p><ul><li><strong>Chiffrement :</strong> Toutes les données sont chiffrées en transit (TLS) et au repos</li><li><strong>Mots de passe :</strong> Stockés avec un hachage sécurisé (bcrypt)</li><li><strong>Accès limité :</strong> Seul le personnel autorisé peut accéder aux données</li><li><strong>Surveillance :</strong> Systèmes de détection d'intrusion en temps réel</li><li><strong>Sauvegardes :</strong> Sauvegardes régulières et sécurisées</li></ul><p>Malgré nos efforts, aucun système n'est infaillible. En cas de violation de données, nous vous notifierons conformément à la loi.</p>"
+      },
+      "dataSharing": {
+        "title": "Partage des Données",
+        "content": "<p>Nous ne partageons vos données qu'avec :</p><ul><li><strong>Prestataires de paiement :</strong> Pour traiter vos transactions (Stripe, etc.)</li><li><strong>Services d'hébergement :</strong> Pour stocker et sécuriser vos données (Supabase)</li><li><strong>Autorités légales :</strong> Sur demande légale valide uniquement</li></ul><p><strong>Nous ne partageons jamais :</strong></p><ul><li>Vos données avec des annonceurs</li><li>Vos informations avec des courtiers en données</li><li>Votre historique d'utilisation avec des tiers commerciaux</li></ul>"
+      },
+      "cookies": {
+        "title": "Cookies et Technologies",
+        "content": "<p>Nous utilisons des cookies et technologies similaires pour :</p><ul><li><strong>Cookies essentiels :</strong> Nécessaires au fonctionnement du site (session, authentification)</li><li><strong>Cookies de préférences :</strong> Mémoriser vos choix (langue, thème)</li><li><strong>Cookies analytiques :</strong> Comprendre comment vous utilisez notre service</li></ul><p><strong>Gestion des cookies :</strong></p><p>Vous pouvez configurer votre navigateur pour refuser les cookies. Notez que certaines fonctionnalités peuvent ne pas fonctionner correctement sans cookies.</p>"
+      },
+      "userRights": {
+        "title": "Vos Droits",
+        "content": "<p>Conformément au RGPD, vous disposez des droits suivants :</p><ul><li><strong>Droit d'accès :</strong> Obtenir une copie de vos données personnelles</li><li><strong>Droit de rectification :</strong> Corriger les données inexactes</li><li><strong>Droit à l'effacement :</strong> Demander la suppression de vos données</li><li><strong>Droit à la portabilité :</strong> Recevoir vos données dans un format structuré</li><li><strong>Droit d'opposition :</strong> Vous opposer à certains traitements</li><li><strong>Droit de retrait :</strong> Retirer votre consentement à tout moment</li></ul><p>Pour exercer ces droits, contactez-nous à support@onesms.app</p>"
+      },
+      "dataRetention": {
+        "title": "Conservation des Données",
+        "content": "<p><strong>Durées de conservation :</strong></p><ul><li><strong>Données de compte :</strong> Conservées tant que le compte est actif</li><li><strong>Données de transaction :</strong> 5 ans (obligations comptables)</li><li><strong>Données de connexion :</strong> 12 mois</li><li><strong>Cookies :</strong> Selon le type (session à 2 ans maximum)</li></ul><p><strong>Après fermeture du compte :</strong></p><p>Vos données sont supprimées dans un délai de 30 jours, sauf obligation légale de conservation.</p>"
+      },
+      "international": {
+        "title": "Transferts Internationaux",
+        "content": "<p>Vos données peuvent être traitées dans des pays en dehors de votre pays de résidence.</p><p><strong>Garanties mises en place :</strong></p><ul><li>Utilisation de fournisseurs conformes au RGPD</li><li>Clauses contractuelles types de l'UE</li><li>Certifications de protection des données</li></ul><p>Nous nous assurons que tout transfert international respecte les normes de protection des données applicables.</p>"
+      },
+      "contact": {
+        "title": "Nous Contacter",
+        "content": "<p>Pour toute question relative à la vie privée ou pour exercer vos droits :</p><ul><li><strong>Email :</strong> privacy@onesms.app</li><li><strong>Support :</strong> support@onesms.app</li><li><strong>Formulaire :</strong> <a href='/contact' class='text-blue-600 hover:underline'>Page de contact</a></li></ul><p>Nous répondons à toutes les demandes dans un délai de 30 jours.</p><p>Si vous estimez que vos droits ne sont pas respectés, vous pouvez déposer une plainte auprès de l'autorité de protection des données de votre pays.</p>"
+      }
+    }
+  },
+  "common": {
+    "backToHome": "Retour à l'accueil",
+    "contactUs": "Nous contacter",
+    "success": "Succès",
+    "error": "Erreur",
+    "loading": "Chargement...",
+    "activation": "Activation",
+    "rent": "Location",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "refresh": "Actualiser",
+    "yes": "Oui",
+    "no": "Non",
+    "confirm": "Confirmer",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "search": "Rechercher",
+    "noResults": "Aucun résultat",
+    "actions": "Actions"
+  },
+  "modals": {
+    "rentMessages": {
+      "title": "Messages reçus",
+      "noMessages": "Aucun message reçu pour le moment",
+      "autoDisplay": "Les SMS seront affichés ici automatiquement",
+      "copyCode": "Copier le code",
+      "copyMessage": "Copier le message",
+      "copied": "Copié !",
+      "codeCopied": "Code {{code}} copié",
+      "messageCopied": "Message copié",
+      "refreshed": "Actualisé",
+      "messagesCount": "{{count}} message(s)"
+    },
+    "finishRental": {
+      "title": "Terminer la location",
+      "description": "Êtes-vous sûr de vouloir terminer cette location sans remboursement ?",
+      "irreversible": "Cette action est irréversible",
+      "confirm": "Oui, terminer",
+      "processing": "En cours...",
+      "success": "Location terminée",
+      "released": "Numéro libéré avec succès"
+    },
+    "insufficientBalance": {
+      "title": "Solde insuffisant",
+      "description": "Vous n'avez pas assez de crédits pour cette opération.",
+      "needed": "Montant requis",
+      "available": "Solde disponible",
+      "missing": "Manquant",
+      "topUp": "Recharger"
+    }
+  },
+  "toasts": {
+    "paymentSuccess": "Paiement réussi !",
+    "paymentSuccessDesc": "Votre solde a été crédité. Merci pour votre achat !",
+    "paymentFailed": "Paiement échoué",
+    "paymentFailedDesc": "Le paiement a été annulé ou a échoué. Veuillez réessayer.",
+    "loadingError": "Erreur de chargement",
+    "loadingErrorDesc": "Impossible de charger les services. Réessayez.",
+    "numberActivated": "Numéro activé !",
+    "numberRented": "Numéro loué !",
+    "activationSuccess": "Le numéro est prêt à recevoir des SMS",
+    "rentalSuccess": "Location active pendant {{duration}}",
+    "activationFailed": "Activation échouée",
+    "rentalFailed": "Location échouée",
+    "unknownError": "Erreur inconnue",
+    "cancelled": "Activation annulée",
+    "cancelledDesc": "Le numéro a été annulé avec succès",
+    "cancelError": "Impossible d'annuler l'activation",
+    "smsRetry": "SMS retry demandé",
+    "smsRetryDesc": "Nouveau SMS en cours d'envoi...",
+    "extendSuccess": "Location prolongée",
+    "extendSuccessDesc": "+4h ajoutées",
+    "deleted": "Supprimé",
+    "deletedDesc": "Le numéro a été supprimé",
+    "copied": "Copié !",
+    "copiedNumber": "Numéro copié dans le presse-papiers",
+    "messageSent": "Message envoyé !",
+    "messageSentDesc": "Nous vous répondrons dans les plus brefs délais."
+  },
+  "contact": {
+    "title": "Contactez-nous",
+    "subtitle": "Notre équipe est là pour vous aider",
+    "email": "Email",
+    "emailResponseTime": "Réponse sous 24h",
+    "whatsapp": "WhatsApp",
+    "whatsappHours": "Lun-Sam, 9h-18h",
+    "address": "Adresse",
+    "addressDetail": "Afrique de l'Ouest",
+    "form": {
+      "name": "Nom",
+      "namePlaceholder": "Votre nom",
+      "email": "Email",
+      "emailPlaceholder": "votre@email.com",
+      "subject": "Sujet",
+      "subjectPlaceholder": "Objet de votre message",
+      "message": "Message",
+      "messagePlaceholder": "Décrivez votre demande en détail...",
+      "send": "Envoyer le message"
+    }
+  },
+  "status": {
+    "active": "Actif",
+    "pending": "En attente",
+    "completed": "Complété",
+    "expired": "Expiré",
+    "cancelled": "Annulé",
+    "waiting": "Attente SMS",
+    "received": "Reçu",
+    "refunded": "Remboursé",
+    "failed": "Échoué"
+  },
+  "rentDurations": {
+    "4hours": "4 Heures",
+    "1day": "1 Jour",
+    "1week": "1 Semaine",
+    "1month": "1 Mois"
+  },
+  "admin": {
+    "dashboard": "Tableau de bord",
+    "users": "Utilisateurs",
+    "providers": "Fournisseurs",
+    "services": "Services",
+    "countries": "Pays",
+    "transactions": "Transactions",
+    "pricing": "Tarification",
+    "analytics": "Analytiques",
+    "logs": "Journaux",
+    "settings": "Paramètres",
+    "syncStatus": "État de Synchronisation",
+    "packages": "Forfaits",
+    "activations": "Activations",
+    "servicesManagement": "Gestion des Services",
+    "totalServices": "Total Services",
+    "activeServices": "Actifs",
+    "popularServices": "Populaires",
+    "totalNumbers": "Total Numéros",
+    "lastSync": "Dernière synchro",
+    "syncWithSMSActivate": "Synchroniser avec SMS-Activate",
+    "searchServices": "Rechercher des services...",
+    "allCategories": "Toutes les Catégories",
+    "allStatus": "Tous les Statuts",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "social": "Social",
+    "tech": "Tech",
+    "other": "Autre",
+    "category": "Catégorie",
+    "available": "Disponible",
+    "actions": "Actions",
+    "togglePopular": "Basculer Populaire",
+    "toggleActive": "Basculer Actif",
+    "noServicesFound": "Aucun service trouvé",
+    "loadingServices": "Chargement des services...",
+    "code": "Code",
+    "status": "Statut",
+    "stats": {
+      "totalUsers": "Total Utilisateurs",
+      "newToday": "nouveaux aujourd'hui",
+      "totalRevenue": "Revenu Total",
+      "today": "aujourd'hui",
+      "activeNumbers": "Numéros Actifs",
+      "total": "total",
+      "smsReceived": "SMS Reçus",
+      "activeUsers": "Utilisateurs Actifs",
+      "ofTotalUsers": "% des utilisateurs",
+      "avgOrderValue": "Valeur Moyenne",
+      "conversionRate": "Taux de Conversion",
+      "pendingTx": "transactions en attente",
+      "revenueToday": "Revenu Aujourd'hui",
+      "newUsers": "Nouveaux Utilisateurs",
+      "numbersSold": "Numéros Vendus",
+      "totalCountries": "Total Pays",
+      "avgMultiplier": "Multiplicateur Moyen",
+      "totalPrices": "Total Prix",
+      "avgMargin": "Marge Moyenne",
+      "avgActivation": "Prix Moyen Activation",
+      "totalAvailable": "Total Disponible",
+      "totalTransactions": "Total Transactions",
+      "totalRevenueStat": "Revenu Total",
+      "successRate": "Taux de Succès"
+    },
+    "sync": {
+      "manualSync": "Sync Manuelle",
+      "syncing": "Synchronisation...",
+      "syncCompleted": "Synchronisation terminée !",
+      "syncFailed": "Échec de la synchronisation",
+      "synced": "Synchronisé"
+    },
+    "users": {
+      "noName": "Pas de nom",
+      "invalidAmount": "Montant invalide"
+    },
+    "services": {
+      "serviceUpdated": "Service mis à jour avec succès"
+    }
   }
 }

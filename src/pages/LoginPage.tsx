@@ -42,7 +42,7 @@ export default function LoginPage() {
         .from('users')
         .select('role')
         .eq('id', data.user.id)
-        .single()
+        .single() as { data: { role: string } | null; error: any };
 
       toast({
         title: 'Success',
@@ -50,7 +50,7 @@ export default function LoginPage() {
       })
 
       // Rediriger selon le rôle
-      if (userData?.role === 'admin') {
+      if (userData && userData.role === 'admin') {
         navigate('/admin')
       } else {
         navigate('/dashboard')
@@ -109,8 +109,18 @@ export default function LoginPage() {
               />
             </div>
 
+            {/* Forgot password link */}
+            <div className="text-right">
+              <Link 
+                to="/forgot-password" 
+                className="text-sm text-primary hover:underline"
+              >
+                {t('auth.forgotPassword')}
+              </Link>
+            </div>
+
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Loading...' : t('nav.login')}
+              {loading ? t('common.loading') : t('nav.login')}
             </Button>
           </form>
 

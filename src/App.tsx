@@ -5,6 +5,9 @@ import Layout from '@/components/layout/Layout'
 import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import VerifyEmailPage from '@/pages/VerifyEmailPage'
 import DashboardPage from '@/pages/DashboardPage'
 import CatalogPage from '@/pages/CatalogPage'
 import MyNumbersPage from '@/pages/MyNumbersPage'
@@ -14,6 +17,8 @@ import SettingsPage from '@/pages/SettingsPage'
 import TopUpPage from '@/pages/TopUpPage'
 import RentPage from '@/pages/RentPage'
 import HowToUsePage from '@/pages/HowToUsePage'
+import TermsPage from '@/pages/TermsPage'
+import PrivacyPage from '@/pages/PrivacyPage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminProviders from '@/pages/admin/AdminProviders'
@@ -26,6 +31,9 @@ import AdminLogs from '@/pages/admin/AdminLogs'
 import AdminSettings from '@/pages/admin/AdminSettings'
 import AdminSyncStatusPage from '@/pages/admin/AdminSyncStatusPage'
 import PackagesManagementPage from '@/pages/admin/PackagesManagementPage'
+import AdminContactSettings from '@/pages/admin/AdminContactSettings'
+import AdminActivations from '@/pages/admin/AdminActivations'
+import ContactPage from '@/pages/ContactPage'
 import PrivateRoute from '@/components/PrivateRoute'
 import AdminRoute from '@/components/AdminRoute'
 
@@ -41,14 +49,20 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+            <Route path="verify-email" element={<VerifyEmailPage />} />
             <Route path="how-to-use" element={<HowToUsePage />} />
+            <Route path="contact" element={<ContactPage />} />
+            <Route path="terms" element={<TermsPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
             
             {/* Protected Routes - Main Dashboard becomes home after login */}
             <Route element={<PrivateRoute />}>
@@ -71,12 +85,14 @@ function App() {
             <Route path="services" element={<AdminServices />} />
             <Route path="countries" element={<AdminCountries />} />
             <Route path="transactions" element={<AdminTransactions />} />
+            <Route path="activations" element={<AdminActivations />} />
             <Route path="pricing" element={<AdminPricing />} />
             <Route path="packages" element={<PackagesManagementPage />} />
             <Route path="sync-status" element={<AdminSyncStatusPage />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="logs" element={<AdminLogs />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="contact-settings" element={<AdminContactSettings />} />
           </Route>
         </Routes>
         <Toaster />

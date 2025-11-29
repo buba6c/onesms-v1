@@ -90,3 +90,38 @@ export const getSession = async () => {
   const { data: { session }, error } = await supabase.auth.getSession()
   return { session, error }
 }
+
+// Password reset
+export const resetPasswordForEmail = async (email: string) => {
+  const baseUrl = import.meta.env.PROD 
+    ? 'https://onesms-sn.com' 
+    : window.location.origin;
+  
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${baseUrl}/reset-password`,
+  })
+  return { data, error }
+}
+
+export const updatePassword = async (newPassword: string) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  })
+  return { data, error }
+}
+
+// Resend confirmation email
+export const resendConfirmationEmail = async (email: string) => {
+  const baseUrl = import.meta.env.PROD 
+    ? 'https://onesms-sn.com' 
+    : window.location.origin;
+  
+  const { data, error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: `${baseUrl}/login?verified=true`,
+    },
+  })
+  return { data, error }
+}
