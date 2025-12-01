@@ -2,8 +2,9 @@ name: Sync Countries
 
 on:
   schedule:
-    # Toutes les heures
-    - cron: '0 * * * *'
+    # Toutes les 12 heures pour économiser les minutes GitHub Actions
+    # 2 exécutions/jour × 30 jours = 60 exécutions/mois (~60 minutes)
+    - cron: '0 */12 * * *'
   workflow_dispatch: # Permet déclenchement manuel
 
 jobs:
@@ -35,4 +36,4 @@ jobs:
       - name: Parse and display stats
         run: |
           echo "📊 Countries synchronized"
-          echo "🔄 Next sync in 1 hour"
+          echo "🔄 Next sync in 12 hours"

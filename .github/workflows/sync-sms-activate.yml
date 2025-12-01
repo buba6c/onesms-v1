@@ -2,8 +2,9 @@ name: Sync SMS-Activate
 
 on:
   schedule:
-    # Toutes les 30 minutes pour des données fraîches
-    - cron: '*/30 * * * *'
+    # Toutes les 6 heures pour économiser les minutes GitHub Actions
+    # 4 exécutions/jour × 30 jours = 120 exécutions/mois (~120 minutes)
+    - cron: '0 */6 * * *'
   workflow_dispatch: # Permet déclenchement manuel
 
 jobs:
@@ -38,4 +39,4 @@ jobs:
           echo "   - Services updated with icons and categories"
           echo "   - Pricing rules updated"
           echo "   - Service totals calculated (total_available)"
-          echo "🔄 Next sync in 30 minutes"
+          echo "🔄 Next sync in 6 hours"
