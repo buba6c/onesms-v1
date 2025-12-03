@@ -110,15 +110,15 @@ export async function getBestOperatorFor5sim(
     const bestOperator = selectBestOperator(countryData)
 
     if (bestOperator) {
-      console.log(
-        `✅ [OPERATOR] Meilleur opérateur pour ${serviceCode}/${countryCode}: ` +
-        `${bestOperator.name} (score: ${bestOperator.score.toFixed(0)}, ` +
-        `rate: ${bestOperator.rate}%, stock: ${bestOperator.count})`
-      )
+      // console.log(
+      //   `✅ [OPERATOR] Meilleur opérateur pour ${serviceCode}/${countryCode}: ` +
+      //   `${bestOperator.name} (score: ${bestOperator.score.toFixed(0)}, ` +
+      //   `rate: ${bestOperator.rate}%, stock: ${bestOperator.count})`
+      // )
       return bestOperator.name
     }
 
-    console.warn(`⚠️ [OPERATOR] Aucun opérateur disponible pour ${serviceCode}/${countryCode}`)
+    // console.warn(`⚠️ [OPERATOR] Aucun opérateur disponible pour ${serviceCode}/${countryCode}`)
     return 'any'
 
   } catch (error) {

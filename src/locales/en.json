@@ -131,44 +131,6 @@
       "step3Desc": "After receiving the SMS, copy the confirmation code to activate the account."
     }
   },
-  "admin": {
-    "dashboard": "Dashboard",
-    "users": "Users",
-    "providers": "Providers",
-    "services": "Services",
-    "countries": "Countries",
-    "transactions": "Transactions",
-    "pricing": "Pricing",
-    "analytics": "Analytics",
-    "logs": "Logs",
-    "settings": "Settings",
-    "syncStatus": "Sync Status",
-    "packages": "Packages",
-    "servicesManagement": "Services Management",
-    "totalServices": "Total Services",
-    "activeServices": "Active",
-    "popularServices": "Popular",
-    "totalNumbers": "Total Numbers",
-    "lastSync": "Last sync",
-    "syncWithSMSActivate": "Sync with SMS-Activate",
-    "searchServices": "Search services...",
-    "allCategories": "All Categories",
-    "allStatus": "All Status",
-    "active": "Active",
-    "inactive": "Inactive",
-    "social": "Social",
-    "tech": "Tech",
-    "other": "Other",
-    "category": "Category",
-    "available": "Available",
-    "actions": "Actions",
-    "togglePopular": "Toggle Popular",
-    "toggleActive": "Toggle Active",
-    "noServicesFound": "No services found",
-    "loadingServices": "Loading services...",
-    "code": "Code",
-    "status": "Status"
-  },
   "auth": {
     "loginTitle": "Login to Your Account",
     "registerTitle": "Create New Account",
@@ -268,7 +230,22 @@
     },
     "balanceBefore": "Balance before",
     "balanceAfter": "Balance after",
-    "transactionId": "Transaction ID"
+    "transactionId": "Transaction ID",
+    "rental": "Rental",
+    "rentalHours": "Rental {{hours}}h",
+    "messagesReceived": "{{count}} message(s) received",
+    "messagesReceivedShort": "{{count}} message(s) • {{hours}}h",
+    "clickToView": "Click to view",
+    "expired": "Expired",
+    "copy": "Copy",
+    "cancelIn": "Cancel in {{minutes}}min",
+    "rentMessages": {
+      "title": "Messages received",
+      "noMessages": "No messages",
+      "noMessagesDesc": "No messages received for this rental",
+      "code": "Code",
+      "close": "Close"
+    }
   },
   "topup": {
     "title": "Top Up Balance",
@@ -657,6 +634,14 @@
     "ctaDescription": "Join thousands of users who trust One SMS for their verification needs",
     "createAccount": "Create Free Account"
   },
+  "insufficientBalance": {
+    "title": "Insufficient Balance",
+    "description": "You don't have enough credits for this purchase. Please top up your account to continue.",
+    "needed": "Amount required",
+    "available": "Current balance",
+    "missing": "You need",
+    "topUp": "Top up now"
+  },
   "terms": {
     "title": "Terms of Service",
     "subtitle": "Please read these terms carefully before using our services",
@@ -680,7 +665,7 @@
       },
       "payment": {
         "title": "Payment and Credits",
-        "content": "<p><strong>Credit system:</strong></p><ul><li>Services are prepaid through our credit system</li><li>1 credit = 1 FCFA (or equivalent in local currency)</li><li>Number prices vary by country and service</li><li>Credits are frozen when purchasing a number and debited upon SMS receipt</li></ul><p><strong>Accepted payment methods:</strong></p><ul><li>Bank cards (Visa, Mastercard)</li><li>Mobile Money (Orange Money, Wave, etc.)</li><li>Cryptocurrencies (Bitcoin, USDT)</li></ul>"
+        "content": "<p><strong>Credit system:</strong></p><ul><li>Services are prepaid through our credit system</li><li>1 credit = 100 FCFA (or equivalent in local currency)</li><li>Number prices vary by country and service</li><li>Credits are frozen when purchasing a number and debited upon SMS receipt</li></ul><p><strong>Accepted payment methods:</strong></p><ul><li>Bank cards (Visa, Mastercard)</li><li>Mobile Money (Orange Money, Wave, etc.)</li><li>Cryptocurrencies (Bitcoin, USDT)</li></ul>"
       },
       "refund": {
         "title": "Refund Policy",
@@ -749,7 +734,7 @@
       },
       "dataSharing": {
         "title": "Data Sharing",
-        "content": "<p>We only share your data with:</p><ul><li><strong>Payment providers:</strong> To process your transactions (Stripe, etc.)</li><li><strong>Hosting services:</strong> To store and secure your data (Supabase)</li><li><strong>Legal authorities:</strong> Only upon valid legal request</li></ul><p><strong>We never share:</strong></p><ul><li>Your data with advertisers</li><li>Your information with data brokers</li><li>Your usage history with commercial third parties</li></ul>"
+        "content": "<p>We only share your data with:</p><ul><li><strong>Payment providers:</strong> To process your transactions (Moneroo, PayTech, Wave, Orange Money)</li><li><strong>Hosting services:</strong> To store and secure your data (Supabase)</li><li><strong>Legal authorities:</strong> Only upon valid legal request</li></ul><p><strong>We never share:</strong></p><ul><li>Your data with advertisers</li><li>Your information with data brokers</li><li>Your usage history with commercial third parties</li></ul>"
       },
       "cookies": {
         "title": "Cookies and Technologies",
@@ -816,6 +801,15 @@
       "success": "Rental finished",
       "released": "Number released successfully"
     },
+    "cancelRental": {
+      "title": "Cancel rental",
+      "description": "Do you want to cancel this rental and get your credits back?",
+      "confirm": "Yes, cancel & refund",
+      "processing": "Cancelling...",
+      "success": "Rental cancelled",
+      "cancelled": "Cancellation successful",
+      "refunded": "Credits refunded"
+    },
     "insufficientBalance": {
       "title": "Insufficient balance",
       "description": "You don't have enough credits for this operation.",
@@ -826,8 +820,8 @@
     }
   },
   "toasts": {
-    "paymentSuccess": "Payment successful!",
-    "paymentSuccessDesc": "Your balance has been credited. Thank you for your purchase!",
+    "paymentSuccess": "Payment successful! 🎉",
+    "paymentSuccessDesc": "Your activations have been added to your account. You can now purchase numbers.",
     "paymentFailed": "Payment failed",
     "paymentFailedDesc": "The payment was cancelled or failed. Please try again.",
     "loadingError": "Loading error",
@@ -962,11 +956,11 @@
       "syncFailed": "Sync failed",
       "synced": "Synced"
     },
-    "users": {
+    "usersPage": {
       "noName": "No name",
       "invalidAmount": "Invalid amount"
     },
-    "services": {
+    "servicesPage": {
       "serviceUpdated": "Service updated successfully"
     }
   }

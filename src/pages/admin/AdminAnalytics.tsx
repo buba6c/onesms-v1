@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
 import {
@@ -19,6 +20,8 @@ import {
 import { TrendingUp, TrendingDown, Users, Phone, DollarSign, Activity } from 'lucide-react'
 
 export default function AdminAnalytics() {
+  const { t } = useTranslation()
+  
   // Fetch revenue chart data (last 7 days)
   const { data: revenueData = [] } = useQuery({
     queryKey: ['analytics-revenue'],
@@ -27,11 +30,11 @@ export default function AdminAnalytics() {
         .from('transactions')
         .select('amount, created_at')
         .eq('status', 'completed')
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) as { data: { amount: string; created_at: string }[] | null }
 
       // Group by day
       const grouped: Record<string, number> = {}
-      data?.forEach(t => {
+      data?.forEach((t: any) => {
         const date = new Date(t.created_at).toLocaleDateString()
         grouped[date] = (grouped[date] || 0) + parseFloat(t.amount || '0')
       })
@@ -51,11 +54,11 @@ export default function AdminAnalytics() {
       const { data } = await supabase
         .from('users')
         .select('created_at')
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) as { data: { created_at: string }[] | null }
 
       // Group by day
       const grouped: Record<string, number> = {}
-      data?.forEach(u => {
+      data?.forEach((u: any) => {
         const date = new Date(u.created_at).toLocaleDateString()
         grouped[date] = (grouped[date] || 0) + 1
       })
@@ -74,17 +77,17 @@ export default function AdminAnalytics() {
     queryFn: async () => {
       const { data } = await supabase
         .from('activations')
-        .select('service, price')
-        .eq('status', 'completed')
+        .select('service_code, price')
+        .eq('status', 'completed') as { data: { service_code: string; price: string }[] | null }
 
       // Group by service
       const grouped: Record<string, { count: number; revenue: number }> = {}
-      data?.forEach(a => {
-        if (!grouped[a.service]) {
-          grouped[a.service] = { count: 0, revenue: 0 }
+      data?.forEach((a: any) => {
+        if (!grouped[a.service_code]) {
+          grouped[a.service_code] = { count: 0, revenue: 0 }
         }
-        grouped[a.service].count++
-        grouped[a.service].revenue += parseFloat(a.price || '0')
+        grouped[a.service_code].count++
+        grouped[a.service_code].revenue += parseFloat(a.price || '0')
       })
 
       return Object.entries(grouped)
@@ -105,13 +108,13 @@ export default function AdminAnalytics() {
     queryFn: async () => {
       const { data } = await supabase
         .from('activations')
-        .select('country')
-        .eq('status', 'completed')
+        .select('country_code')
+        .eq('status', 'completed') as { data: { country_code: string }[] | null }
 
       // Group by country
       const grouped: Record<string, number> = {}
-      data?.forEach(a => {
-        grouped[a.country] = (grouped[a.country] || 0) + 1
+      data?.forEach((a: any) => {
+        grouped[a.country_code] = (grouped[a.country_code] || 0) + 1
       })
 
       return Object.entries(grouped)
@@ -139,17 +142,17 @@ export default function AdminAnalytics() {
         .from('transactions')
         .select('amount')
         .eq('status', 'completed')
-        .gte('created_at', today.toISOString())
+        .gte('created_at', today.toISOString()) as { data: { amount: string }[] | null }
 
       const { data: yesterdayTransactions } = await supabase
         .from('transactions')
         .select('amount')
         .eq('status', 'completed')
         .gte('created_at', yesterday.toISOString())
-        .lt('created_at', today.toISOString())
+        .lt('created_at', today.toISOString()) as { data: { amount: string }[] | null }
 
-      const todayRevenue = todayTransactions?.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) || 0
-      const yesterdayRevenue = yesterdayTransactions?.reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) || 0
+      const todayRevenue = todayTransactions?.reduce((sum: number, t: any) => sum + parseFloat(t.amount || '0'), 0) || 0
+      const yesterdayRevenue = yesterdayTransactions?.reduce((sum: number, t: any) => sum + parseFloat(t.amount || '0'), 0) || 0
       const revenueTrend = yesterdayRevenue > 0
         ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(1)
         : '0'
@@ -219,7 +222,7 @@ export default function AdminAnalytics() {
 
   const statCards = [
     {
-      label: 'Revenue Today',
+      label: t('admin.stats.revenueToday'),
       value: `${stats?.revenue || 0} Ⓐ`,
       trend: `${stats?.revenueTrend || 0}%`,
       trendUp: (stats?.revenueTrend || 0) >= 0,
@@ -227,7 +230,7 @@ export default function AdminAnalytics() {
       color: 'text-green-500'
     },
     {
-      label: 'New Users',
+      label: t('admin.stats.newUsers'),
       value: stats?.users || 0,
       trend: `${stats?.usersTrend || 0}%`,
       trendUp: (stats?.usersTrend || 0) >= 0,
@@ -235,7 +238,7 @@ export default function AdminAnalytics() {
       color: 'text-blue-500'
     },
     {
-      label: 'Numbers Sold',
+      label: t('admin.stats.numbersSold'),
       value: stats?.numbers || 0,
       trend: `${stats?.numbersTrend || 0}%`,
       trendUp: (stats?.numbersTrend || 0) >= 0,
@@ -243,7 +246,7 @@ export default function AdminAnalytics() {
       color: 'text-purple-500'
     },
     {
-      label: 'Conversion Rate',
+      label: t('admin.stats.conversionRate'),
       value: `${stats?.conversionRate || 0}%`,
       trend: 'Global',
       trendUp: true,
@@ -256,8 +259,8 @@ export default function AdminAnalytics() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-gray-500">Detailed insights and metrics</p>
+        <h1 className="text-3xl font-bold">{t('admin.analytics')}</h1>
+        <p className="text-gray-500">{t('admin.analyticsDescription', 'Detailed insights and metrics')}</p>
       </div>
 
       {/* Stats Cards */}

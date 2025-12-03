@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Search, RefreshCw, Plus, Edit, Star, Ban, Trash2, Loader2 } from 'lucide-react'
+import { Search, RefreshCw, Star, Ban, Loader2 } from 'lucide-react'
 import { 
   getServices, 
   updateService, 
   triggerSync,
-  updatePopularityScores,
-  updateSuccessRates,
   getServiceStats, 
   getLatestSyncLog,
   type Service 
@@ -25,7 +23,7 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode
   
   // Empêcher les multiples déclenchements et boucles infinies
   if (target.dataset.fallbackLoaded === 'true') {
-    console.warn('⚠️ [ADMIN] Fallback also failed, showing emoji:', serviceCode)
+    // console.warn('⚠️ [ADMIN] Fallback also failed, showing emoji:', serviceCode)
     // Si le fallback échoue aussi, afficher l'emoji
     target.style.display = 'none'
     const emoji = target.nextElementSibling as HTMLSpanElement
@@ -37,7 +35,7 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode
   
   // Si on a un serviceCode, charger le fallback SVG
   if (serviceCode) {
-    console.log('🔄 [ADMIN] Loading fallback for:', serviceCode)
+    // console.log('🔄 [ADMIN] Loading fallback for:', serviceCode)
     target.dataset.fallbackLoaded = 'true'
     target.src = getServiceLogoFallback(serviceCode)
   } else {
@@ -89,15 +87,15 @@ export default function AdminServices() {
     onSuccess: (result) => {
       if (result.success) {
         toast({
-          title: 'Sync completed!',
-          description: `Synced ${result.stats?.services || 0} services, ${result.stats?.countries || 0} countries, ${result.stats?.prices || 0} prices`
+          title: t('admin.sync.syncCompleted'),
+          description: `${t('admin.sync.synced')} ${result.stats?.services || 0} ${t('admin.services').toLowerCase()}, ${result.stats?.countries || 0} ${t('admin.countries').toLowerCase()}, ${result.stats?.prices || 0} ${t('admin.pricing').toLowerCase()}`
         })
         queryClient.invalidateQueries({ queryKey: ['admin-services'] })
         queryClient.invalidateQueries({ queryKey: ['service-stats'] })
         queryClient.invalidateQueries({ queryKey: ['latest-sync'] })
       } else {
         toast({
-          title: 'Sync failed',
+          title: t('admin.sync.syncFailed'),
           description: result.error,
           variant: 'destructive'
         })
@@ -111,7 +109,7 @@ export default function AdminServices() {
       updateService(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-services'] })
-      toast({ title: 'Service updated successfully' })
+      toast({ title: t('admin.servicesPage.serviceUpdated') })
     }
   })
 

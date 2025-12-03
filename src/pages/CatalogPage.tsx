@@ -54,7 +54,7 @@ export default function CatalogPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Activation
+            {t('common.activation')}
           </button>
           <button
             onClick={() => setActiveTab('rent')}
@@ -64,7 +64,7 @@ export default function CatalogPage() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Rent
+            {t('common.rent')}
           </button>
         </div>
 
@@ -82,7 +82,8 @@ export default function CatalogPage() {
               />
             </div>
 
-            {/* Any Other Option */}
+            {/* Any Other Option - MASQUÉ pour activation */}
+            {/* 
             <div className="mb-6">
               <p className="text-xs text-gray-500 uppercase font-semibold mb-3">
                 IF THE REQUIRED SERVICE IS NOT IN THE LIST
@@ -102,6 +103,7 @@ export default function CatalogPage() {
                 </div>
               </button>
             </div>
+            */}
 
             {/* Popular Services */}
             <div>
@@ -202,9 +204,9 @@ export default function CatalogPage() {
               <div className="space-y-6">
                 {/* Rent Card */}
                 <Card className="p-6">
-                  <h2 className="text-2xl font-bold mb-2">Rent</h2>
+                  <h2 className="text-2xl font-bold mb-2">{t('catalog.rentTitle')}</h2>
                   <p className="text-gray-600 mb-6">
-                    Receive multiple SMS on a number from any sites for a period from 4 hours to 1 month
+                    {t('catalog.rentDesc')}
                   </p>
                   
                   <div className="space-y-3">
@@ -212,21 +214,19 @@ export default function CatalogPage() {
                       <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Check className="w-4 h-4 text-blue-600" />
                       </div>
-                      <p>New, previously unused number</p>
+                      <p>{t('catalog.rentFeature1')}</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Check className="w-4 h-4 text-blue-600" />
                       </div>
-                      <p>Number usage time: from 4 hours to 1 month</p>
+                      <p>{t('catalog.rentFeature2')}</p>
                     </div>
                     <div className="flex items-start gap-3">
                       <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Check className="w-4 h-4 text-blue-600" />
                       </div>
-                      <p>
-                        Ability to fully rent a number and receive SMS from any sites / services / applications
-                      </p>
+                      <p>{t('catalog.rentFeature3')}</p>
                     </div>
                   </div>
                 </Card>
@@ -235,31 +235,31 @@ export default function CatalogPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-lg font-bold">Step 1</h3>
+                      <h3 className="text-lg font-bold">{t('catalog.step')} 1</h3>
                       <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
                     <p className="text-sm text-gray-600">
-                      Select the rental period and country for your number.
+                      {t('catalog.rentStep1')}
                     </p>
                   </Card>
 
                   <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-lg font-bold">Step 2</h3>
+                      <h3 className="text-lg font-bold">{t('catalog.step')} 2</h3>
                       <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
                     <p className="text-sm text-gray-600">
-                      Use the rented number for multiple services during the rental period.
+                      {t('catalog.rentStep2')}
                     </p>
                   </Card>
 
                   <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-lg font-bold">Step 3</h3>
+                      <h3 className="text-lg font-bold">{t('catalog.step')} 3</h3>
                       <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
                     <p className="text-sm text-gray-600">
-                      Receive all SMS messages sent to your rented number.
+                      {t('catalog.rentStep3')}
                     </p>
                   </Card>
                 </div>

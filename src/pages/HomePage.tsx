@@ -301,41 +301,69 @@ export default function HomePage() {
   const { data: topUpPackages = [], isLoading: loadingPackages, error: packagesError } = useQuery({
     queryKey: ['homepage-packages'],
     queryFn: async () => {
-      console.log('📦 [PACKAGES] Fetching activation packages...');
       try {
         const packages = await packagesApi.getActivePackages();
-        console.log('✅ [PACKAGES] Loaded:', packages.length, 'packages', packages);
-        return packages;
+        // Trier par display_order, puis mettre le populaire au milieu
+        const sorted = packages.sort((a, b) => a.display_order - b.display_order);
+        
+        // Trouver le package populaire et le mettre au milieu
+        const popularIndex = sorted.findIndex(p => p.is_popular);
+        if (popularIndex !== -1 && sorted.length >= 3) {
+          const popular = sorted.splice(popularIndex, 1)[0];
+          const middleIndex = Math.floor(sorted.length / 2);
+          sorted.splice(middleIndex, 0, popular);
+        }
+        
+        return sorted;
       } catch (err) {
         console.error('❌ [PACKAGES] Error:', err);
-        throw err;
+        // Retourner les packages par défaut en cas d'erreur
+        return [];
       }
     },
     staleTime: 1000 * 60 * 10,
+    retry: 1, // Ne pas trop retenter en cas d'erreur
   });
   
-  // Log packages status
-  useEffect(() => {
-    console.log('📦 [PACKAGES] Current state:', { 
-      count: topUpPackages.length, 
-      loading: loadingPackages, 
-      error: packagesError 
-    });
-  }, [topUpPackages, loadingPackages, packagesError]);
+  // Log packages status - Disabled in production
+  // useEffect(() => {
+  //   console.log('📦 [PACKAGES] Current state:', { 
+  //     count: topUpPackages.length, 
+  //     loading: loadingPackages, 
+  //     error: packagesError 
+  //   });
+  // }, [topUpPackages, loadingPackages, packagesError]);
 
   // Carousel state
   const [currentPackageIndex, setCurrentPackageIndex] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<'XOF' | 'EUR' | 'USD'>('XOF');
   const carouselRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll carousel
+  // Scroll to center (popular package) on load
   useEffect(() => {
-    if (topUpPackages.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentPackageIndex(prev => (prev + 1) % topUpPackages.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [topUpPackages.length]);
+    if (carouselRef.current && topUpPackages.length > 0) {
+      // Attendre que le DOM soit prêt
+      const timer = setTimeout(() => {
+        if (carouselRef.current) {
+          const cardWidth = 320; // width + gap
+          const popularIndex = topUpPackages.findIndex(p => p.is_popular);
+          const targetIndex = popularIndex !== -1 ? popularIndex : Math.floor(topUpPackages.length / 2);
+          const scrollPosition = (targetIndex * cardWidth) - (carouselRef.current.offsetWidth / 2) + (cardWidth / 2);
+          carouselRef.current.scrollTo({ left: Math.max(0, scrollPosition), behavior: 'smooth' });
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [topUpPackages]);
+
+  // Auto-scroll carousel - DISABLED to keep popular in center
+  // useEffect(() => {
+  //   if (topUpPackages.length <= 1) return;
+  //   const interval = setInterval(() => {
+  //     setCurrentPackageIndex(prev => (prev + 1) % topUpPackages.length);
+  //   }, 4000);
+  //   return () => clearInterval(interval);
+  // }, [topUpPackages.length]);
 
   // Fetch platform stats - Real data from database
   const { data: stats } = useQuery({
@@ -424,7 +452,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section - Modern Gradient with Animation */}
-      <section className="relative min-h-[90vh] bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white overflow-hidden flex items-center">
+      <section className="relative min-h-[90vh] bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white overflow-hidden flex items-center pt-14 md:pt-0">
         {/* Animated Background */}
         <div className="absolute inset-0">
           <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
@@ -439,7 +467,7 @@ export default function HomePage() {
           <div className="max-w-5xl mx-auto text-center">
             
             {/* Main Title */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-4 md:mb-6 leading-tight tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-4 md:mb-6 leading-tight tracking-tight animate-fade-in-up">
               {t('homepage.hero.title')}
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
@@ -448,12 +476,12 @@ export default function HomePage() {
             </h1>
             
             {/* Description */}
-            <p className="text-base sm:text-lg md:text-xl text-blue-100/80 mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed px-4">
+            <p className="text-base sm:text-lg md:text-xl text-blue-100/80 mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed px-4 animate-fade-in-up animate-delay-200">
               {t('homepage.hero.description')}
             </p>
 
             {/* CTA Button */}
-            <div className="flex justify-center mb-12 md:mb-16 px-4">
+            <div className="flex justify-center mb-12 md:mb-16 px-4 animate-fade-in-up animate-delay-300">
               <Link to="/register">
                 <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 h-14 md:h-16 px-10 md:px-14 text-lg md:text-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-300 hover:scale-105">
                   {t('homepage.hero.getStarted')}
@@ -463,23 +491,23 @@ export default function HomePage() {
             </div>
 
             {/* Trust Badge */}
-            <p className="text-sm text-blue-200/60 mb-8">{t('homepage.hero.trustedBy')}</p>
+            <p className="text-sm text-blue-200/60 mb-8 animate-fade-in animate-delay-500">{t('homepage.hero.trustedBy')}</p>
 
             {/* Stats Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-4xl mx-auto mb-12 md:mb-16 px-4">
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-300">
                 <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.availableNumbers || '5.2M+'}</div>
                 <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.availableNumbers')}</div>
               </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-500">
                 <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.services || '1683'}+</div>
                 <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.services')}</div>
               </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-700">
                 <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.countries || '180'}+</div>
                 <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.countries')}</div>
               </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10">
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-1000">
                 <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.successRate || '99.7%'}</div>
                 <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.successRate')}</div>
               </div>
@@ -710,9 +738,9 @@ export default function HomePage() {
                   carouselRef.current.scrollBy({ left: -320, behavior: 'smooth' });
                 }
               }}
-              className="absolute -left-4 md:left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white rounded-full shadow-xl border border-gray-100 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:shadow-2xl hover:scale-110 transition-all duration-300 group"
+              className="absolute -left-2 md:left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-12 md:h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-white hover:shadow-xl hover:scale-110 transition-all duration-300 group"
             >
-              <ChevronLeft className="w-6 h-6 group-hover:-translate-x-0.5 transition-transform" />
+              <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 group-hover:-translate-x-0.5 transition-transform" />
             </button>
             <button
               onClick={() => {
@@ -720,15 +748,15 @@ export default function HomePage() {
                   carouselRef.current.scrollBy({ left: 320, behavior: 'smooth' });
                 }
               }}
-              className="absolute -right-4 md:right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white rounded-full shadow-xl border border-gray-100 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:shadow-2xl hover:scale-110 transition-all duration-300 group"
+              className="absolute -right-2 md:right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-12 md:h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:bg-white hover:shadow-xl hover:scale-110 transition-all duration-300 group"
             >
-              <ChevronRight className="w-6 h-6 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
-            {/* Carousel Container - padding ajusté pour les badges et effets hover */}
+            {/* Carousel Container */}
             <div
               ref={carouselRef}
-              className="flex gap-6 overflow-x-auto scroll-smooth px-8 md:px-16 pt-8 pb-6 snap-x snap-mandatory scrollbar-hide"
+              className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth px-4 md:px-12 pt-8 pb-6 snap-x snap-mandatory scrollbar-hide"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {topUpPackages.length > 0 ? (

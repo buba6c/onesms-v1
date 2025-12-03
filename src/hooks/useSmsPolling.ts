@@ -14,11 +14,12 @@ interface ActiveNumber {
   service: string;
   country: string;
   timeRemaining: number;
-  status: 'pending' | 'waiting' | 'received' | 'timeout' | 'cancelled';
+  status: 'pending' | 'waiting' | 'received' | 'timeout' | 'cancelled' | 'active';
   smsCode?: string;
   smsText?: string;
   price: number;
   charged: boolean;
+  type?: 'activation' | 'rental';
 }
 
 interface UseSmsPollingOptions {
@@ -48,11 +49,11 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
         return;
       }
 
-      console.log('🔄 [POLLING] Démarrage pour', num.orderId, num.phone);
+      // console.log('🔄 [POLLING] Démarrage pour', num.orderId, num.phone);
 
       // Fonction de vérification SMS (réutilisable)
       const checkSms = async () => {
-        console.log('🔍 [CHECK] Vérification SMS...', num.orderId);
+        // console.log('🔍 [CHECK] Vérification SMS...', num.orderId);
 
         try {
           // 1. Vérification normale avec getStatusV2
@@ -68,11 +69,11 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
             // Continue pour essayer la récupération depuis l'historique
           }
 
-          console.log('📊 [CHECK] Résultat:', checkData);
+          // console.log('📊 [CHECK] Résultat:', checkData);
 
           // SMS reçu et facturé
           if (checkData?.data?.status === 'received' && checkData.data?.charged) {
-            console.log('✅ [CHECK] SMS reçu et facturé !');
+            // console.log('✅ [CHECK] SMS reçu et facturé !');
             
             // Arrêter le polling pour ce numéro
             if (intervalsRef.current[num.orderId]) {
@@ -107,7 +108,7 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
 
           // Timeout ou Cancelled - la récupération automatique a déjà été tentée par check-sms-activate-status
           if (checkData?.data?.status === 'timeout' || checkData?.data?.status === 'cancelled') {
-            console.log('⏰ [CHECK] Timeout/Cancelled - Aucun SMS trouvé après récupération automatique');
+            // console.log('⏰ [CHECK] Timeout/Cancelled - Aucun SMS trouvé après récupération automatique');
             
             if (intervalsRef.current[num.orderId]) {
               clearInterval(intervalsRef.current[num.orderId]);
@@ -179,7 +180,7 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
         if (intervalsRef.current[num.orderId]) {
           clearTimeout(intervalsRef.current[num.orderId]);
           delete intervalsRef.current[num.orderId];
-          console.log('⏰ [POLLING] Timeout sécurité pour', num.orderId);
+          // console.log('⏰ [POLLING] Timeout sécurité pour', num.orderId);
         }
       }, 25 * 60 * 1000);
     });
@@ -197,7 +198,7 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
       clearTimeout(intervalsRef.current[orderId]);
       delete intervalsRef.current[orderId];
       processedOrdersRef.current.add(orderId);
-      console.log('🛑 [POLLING] Arrêté pour', orderId);
+      // console.log('🛑 [POLLING] Arrêté pour', orderId);
     }
   };
 

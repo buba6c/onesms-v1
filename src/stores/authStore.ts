@@ -18,23 +18,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   checkAuth: async () => {
     try {
-      console.log('🔐 [AUTH] Checking authentication...')
+      // Checking authentication silently
       
       const { user: authUser, error } = await getCurrentUser()
       
       if (error) {
-        console.error('❌ [AUTH] getCurrentUser error:', error)
+        // Erreur réseau - ne pas afficher dans la console en production
+        if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+          console.warn('⚠️ [AUTH] Network error, will retry...')
+        } else {
+          console.error('❌ [AUTH] getCurrentUser error:', error)
+        }
         set({ user: null, loading: false })
         return
       }
       
       if (!authUser) {
-        console.log('⚠️ [AUTH] No authenticated user')
+        // console.log('⚠️ [AUTH] No authenticated user')
         set({ user: null, loading: false })
         return
       }
 
-      console.log('✅ [AUTH] Auth user found:', authUser.id, authUser.email)
+      // User found, fetching profile
 
       // Get user profile from database
       const { data: profile, error: profileError } = await supabase
@@ -48,17 +53,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         // Si le profil n'existe pas, créer un profil basique
         if (profileError.code === 'PGRST116') {
-          console.log('🔄 [AUTH] Creating missing user profile...')
+          // console.log('🔄 [AUTH] Creating missing user profile...')
           
-          const { data: newProfile, error: createError } = await supabase
-            .from('users')
-            .insert({
-              id: authUser.id,
-              email: authUser.email,
-              full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
-              role: 'user',
-              balance: 0
-            })
+          const newUserData = {
+            id: authUser.id,
+            email: authUser.email,
+            full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
+            role: 'user',
+            balance: 0
+          };
+          
+          const { data: newProfile, error: createError } = await (supabase
+            .from('users') as any)
+            .insert(newUserData)
             .select()
             .single()
           
@@ -78,7 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return
           }
           
-          console.log('✅ [AUTH] Profile created:', newProfile)
+          // console.log('✅ [AUTH] Profile created:', newProfile)
           set({ user: newProfile, loading: false })
           return
         }
@@ -97,7 +104,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return
       }
 
-      console.log('✅ [AUTH] Profile loaded:', profile?.email, 'Role:', profile?.role)
+      if (profile) {
+        // Profile loaded successfully
+      }
       set({ user: profile, loading: false })
       
     } catch (error) {
@@ -107,7 +116,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   
   signOut: async () => {
-    console.log('🚪 [AUTH] Signing out...')
     await supabaseSignOut()
     set({ user: null, loading: false })
   },
@@ -115,19 +123,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 // Initialize auth on load
 if (typeof window !== 'undefined') {
-  console.log('🚀 [AUTH] Initializing auth store...')
   useAuthStore.getState().checkAuth()
 
   // Listen to auth changes
   supabase.auth.onAuthStateChange((event, session) => {
-    console.log('🔔 [AUTH] Auth state changed:', event, session?.user?.email)
-    
     if (event === 'SIGNED_IN' && session) {
       useAuthStore.getState().checkAuth()
     } else if (event === 'SIGNED_OUT') {
       useAuthStore.getState().setUser(null)
-    } else if (event === 'TOKEN_REFRESHED') {
-      console.log('🔄 [AUTH] Token refreshed')
     }
+    // Token refresh handled silently
   })
 }

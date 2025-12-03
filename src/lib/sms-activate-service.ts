@@ -5,7 +5,7 @@
 import { supabase } from '@/lib/supabase'
 
 const SMS_ACTIVATE_API_KEY = import.meta.env.VITE_SMS_ACTIVATE_API_KEY
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 // Country mapping: code → numeric ID
 const COUNTRY_TO_ID: Record<string, number> = {
@@ -74,7 +74,7 @@ export interface CountryServiceData {
 export const fetchSMSActivateCountries = async (serviceCode: string): Promise<CountryServiceData[]> => {
   try {
     const smsActivateService = SERVICE_CODE_MAP[serviceCode.toLowerCase()] || serviceCode
-    console.log(`🌍 [SMS-ACTIVATE] Récupération des pays pour ${smsActivateService}...`)
+    // console.log(`🌍 [SMS-ACTIVATE] Récupération des pays pour ${smsActivateService}...`)
     
     // Top countries to scan (ordered by popularity)
     const topCountries = [
@@ -135,7 +135,7 @@ export const fetchSMSActivateCountries = async (serviceCode: string): Promise<Co
     // Sort by popularity
     results.sort((a, b) => b.popularity - a.popularity)
 
-    console.log(`✅ [SMS-ACTIVATE] ${results.length} pays disponibles pour ${smsActivateService}`)
+    // console.log(`✅ [SMS-ACTIVATE] ${results.length} pays disponibles pour ${smsActivateService}`)
     
     return results
   } catch (error) {

@@ -7,6 +7,11 @@
  * 2. Maintenir la compatibilité avec l'API SMS-Activate
  * 3. Gérer les alias et variations de noms
  * 
+ * ORDRE OFFICIEL SMS-ACTIVATE (Homepage 2025):
+ * 1. Snapchat, 2. WeChat, 3. Google, 4. TikTok, 5. Facebook, 
+ * 6. OpenAI, 7. VK, 8. Instagram, 9. Viber, 10. WhatsApp,
+ * 11. Amazon, 12. Netflix, 13. PayPal, 14. Grindr, etc.
+ * 
  * Source: https://sms-activate.ae/api2
  */
 
@@ -21,75 +26,85 @@ export interface ServiceMapping {
 }
 
 /**
- * Top 100 services SMS-Activate par ordre de popularité
- * Basé sur l'ordre de l'API getNumbersStatus et la homepage SMS-Activate
+ * Top 60+ services SMS-Activate par ordre de popularité OFFICIEL
+ * Basé sur l'ordre exact affiché sur la homepage de SMS-Activate.io (2025)
+ * 
+ * L'ordre suit exactement la grille de services sur leur homepage:
+ * Row 1: Snapchat, WeChat, Google, TikTok, Facebook, OpenAI, VK, Instagram, Viber, WhatsApp
+ * Row 2: Amazon, Netflix, PayPal, Grindr, Telegram, Discord, Twitter, Tinder, Uber, Apple
  */
 export const SMS_ACTIVATE_SERVICES: ServiceMapping[] = [
-  // Top 20 - Services les plus populaires
-  { code: 'wa', name: 'WhatsApp', displayName: 'WhatsApp', icon: '💬', category: 'messaging', aliases: ['whatsapp'], popularityRank: 1 },
-  { code: 'tg', name: 'Telegram', displayName: 'Telegram', icon: '✈️', category: 'messaging', aliases: ['telegram'], popularityRank: 2 },
-  { code: 'vi', name: 'Viber', displayName: 'Viber', icon: '📞', category: 'messaging', aliases: ['viber'], popularityRank: 3 },
-  { code: 'ig', name: 'Instagram', displayName: 'Instagram', icon: '📷', category: 'social', aliases: ['instagram'], popularityRank: 4 },
-  { code: 'fb', name: 'Facebook', displayName: 'Facebook', icon: '👤', category: 'social', aliases: ['facebook'], popularityRank: 5 },
-  { code: 'go', name: 'Google', displayName: 'Google', icon: '🔍', category: 'tech', aliases: ['google', 'gmail'], popularityRank: 6 },
-  { code: 'tw', name: 'Twitter', displayName: 'Twitter (X)', icon: '🐦', category: 'social', aliases: ['twitter', 'x'], popularityRank: 7 },
-  { code: 'wb', name: 'Weibo', displayName: 'Weibo', icon: '🇨🇳', category: 'social', aliases: ['weibo'], popularityRank: 8 },
-  { code: 'ds', name: 'Discord', displayName: 'Discord', icon: '💬', category: 'messaging', aliases: ['discord'], popularityRank: 9 },
-  { code: 'vk', name: 'VKontakte', displayName: 'VKontakte', icon: '🔵', category: 'social', aliases: ['vkontakte', 'vk'], popularityRank: 10 },
-  { code: 'ok', name: 'Odnoklassniki', displayName: 'Odnoklassniki', icon: '🟠', category: 'social', aliases: ['odnoklassniki'], popularityRank: 11 },
-  { code: 'mm', name: 'Microsoft', displayName: 'Microsoft', icon: '🪟', category: 'tech', aliases: ['microsoft', 'outlook'], popularityRank: 12 },
-  { code: 'am', name: 'Amazon', displayName: 'Amazon', icon: '📦', category: 'shopping', aliases: ['amazon'], popularityRank: 13 },
-  { code: 'nf', name: 'Netflix', displayName: 'Netflix', icon: '🎬', category: 'entertainment', aliases: ['netflix'], popularityRank: 14 },
-  { code: 'ub', name: 'Uber', displayName: 'Uber', icon: '🚗', category: 'delivery', aliases: ['uber', 'ubereats'], popularityRank: 15 },
-  { code: 'ts', name: 'PayPal', displayName: 'PayPal', icon: '💳', category: 'financial', aliases: ['paypal'], popularityRank: 16 },
-  { code: 'li', name: 'LinkedIn', displayName: 'LinkedIn', icon: '💼', category: 'social', aliases: ['linkedin'], popularityRank: 17 },
-  { code: 'ya', name: 'Yandex', displayName: 'Yandex', icon: '🔴', category: 'tech', aliases: ['yandex'], popularityRank: 18 },
-  { code: 'sc', name: 'Snapchat', displayName: 'Snapchat', icon: '👻', category: 'social', aliases: ['snapchat'], popularityRank: 19 },
-  { code: 'tt', name: 'TikTok', displayName: 'TikTok', icon: '🎵', category: 'entertainment', aliases: ['tiktok'], popularityRank: 20 },
+  // TOP 1-10 - Homepage Row 1 (Services les plus mis en avant)
+  { code: 'fu', name: 'Snapchat', displayName: 'Snapchat', icon: '👻', category: 'social', aliases: ['snapchat', 'snap'], popularityRank: 1 },
+  { code: 'wb', name: 'WeChat', displayName: 'WeChat', icon: '💬', category: 'messaging', aliases: ['wechat', 'weixin'], popularityRank: 2 },
+  { code: 'go', name: 'Google', displayName: 'Google', icon: '🔍', category: 'tech', aliases: ['google', 'gmail', 'youtube'], popularityRank: 3 },
+  { code: 'lf', name: 'TikTok', displayName: 'TikTok', icon: '🎵', category: 'social', aliases: ['tiktok', 'douyin'], popularityRank: 4 },
+  { code: 'fb', name: 'Facebook', displayName: 'Facebook', icon: '👤', category: 'social', aliases: ['facebook', 'meta'], popularityRank: 5 },
+  { code: 'dr', name: 'OpenAI', displayName: 'OpenAI', icon: '🤖', category: 'tech', aliases: ['openai', 'chatgpt', 'gpt'], popularityRank: 6 },
+  { code: 'vk', name: 'VKontakte', displayName: 'VKontakte', icon: '🔵', category: 'social', aliases: ['vkontakte', 'vk'], popularityRank: 7 },
+  { code: 'ig', name: 'Instagram', displayName: 'Instagram', icon: '📷', category: 'social', aliases: ['instagram', 'threads'], popularityRank: 8 },
+  { code: 'vi', name: 'Viber', displayName: 'Viber', icon: '📞', category: 'messaging', aliases: ['viber'], popularityRank: 9 },
+  { code: 'wa', name: 'WhatsApp', displayName: 'WhatsApp', icon: '💬', category: 'messaging', aliases: ['whatsapp'], popularityRank: 10 },
 
-  // 21-40 - Services populaires
-  { code: 'ap', name: 'Apple', displayName: 'Apple', icon: '🍎', category: 'tech', aliases: ['apple', 'icloud'], popularityRank: 21 },
-  { code: 'sp', name: 'Spotify', displayName: 'Spotify', icon: '🎵', category: 'entertainment', aliases: ['spotify'], popularityRank: 22 },
-  { code: 'rd', name: 'Reddit', displayName: 'Reddit', icon: '🤖', category: 'social', aliases: ['reddit'], popularityRank: 23 },
-  { code: 'pn', name: 'Pinterest', displayName: 'Pinterest', icon: '📌', category: 'social', aliases: ['pinterest'], popularityRank: 24 },
-  { code: 'yt', name: 'YouTube', displayName: 'YouTube', icon: '▶️', category: 'entertainment', aliases: ['youtube'], popularityRank: 25 },
-  { code: 'oi', name: 'Tinder', displayName: 'Tinder', icon: '🔥', category: 'dating', aliases: ['tinder'], popularityRank: 26 },
-  { code: 'bu', name: 'Bumble', displayName: 'Bumble', icon: '💛', category: 'dating', aliases: ['bumble'], popularityRank: 27 },
-  { code: 'ma', name: 'Match', displayName: 'Match', icon: '💕', category: 'dating', aliases: ['match'], popularityRank: 28 },
-  { code: 'sg', name: 'Signal', displayName: 'Signal', icon: '🔒', category: 'messaging', aliases: ['signal'], popularityRank: 29 },
-  { code: 'ln', name: 'Line', displayName: 'Line', icon: '💚', category: 'messaging', aliases: ['line'], popularityRank: 30 },
-  { code: 'wc', name: 'WeChat', displayName: 'WeChat', icon: '💬', category: 'messaging', aliases: ['wechat'], popularityRank: 31 },
-  { code: 'kk', name: 'KakaoTalk', displayName: 'KakaoTalk', icon: '💛', category: 'messaging', aliases: ['kakao', 'kakaotalk'], popularityRank: 32 },
-  { code: 'cb', name: 'Coinbase', displayName: 'Coinbase', icon: '🪙', category: 'financial', aliases: ['coinbase'], popularityRank: 33 },
-  { code: 'bn', name: 'Binance', displayName: 'Binance', icon: '🟡', category: 'financial', aliases: ['binance'], popularityRank: 34 },
-  { code: 'rv', name: 'Revolut', displayName: 'Revolut', icon: '💳', category: 'financial', aliases: ['revolut'], popularityRank: 35 },
-  { code: 'ws', name: 'Wise', displayName: 'Wise', icon: '💸', category: 'financial', aliases: ['wise', 'transferwise'], popularityRank: 36 },
-  { code: 'ca', name: 'Cash App', displayName: 'Cash App', icon: '💵', category: 'financial', aliases: ['cashapp'], popularityRank: 37 },
-  { code: 'dd', name: 'DoorDash', displayName: 'DoorDash', icon: '🍔', category: 'delivery', aliases: ['doordash'], popularityRank: 38 },
-  { code: 'gh', name: 'GrubHub', displayName: 'GrubHub', icon: '🍕', category: 'delivery', aliases: ['grubhub'], popularityRank: 39 },
-  { code: 'pm', name: 'Postmates', displayName: 'Postmates', icon: '🚚', category: 'delivery', aliases: ['postmates'], popularityRank: 40 },
+  // TOP 11-20 - Homepage Row 2
+  { code: 'am', name: 'Amazon', displayName: 'Amazon', icon: '📦', category: 'shopping', aliases: ['amazon'], popularityRank: 11 },
+  { code: 'nf', name: 'Netflix', displayName: 'Netflix', icon: '🎬', category: 'entertainment', aliases: ['netflix'], popularityRank: 12 },
+  { code: 'ts', name: 'PayPal', displayName: 'PayPal', icon: '💳', category: 'financial', aliases: ['paypal'], popularityRank: 13 },
+  { code: 'yw', name: 'Grindr', displayName: 'Grindr', icon: '🌈', category: 'dating', aliases: ['grindr'], popularityRank: 14 },
+  { code: 'tg', name: 'Telegram', displayName: 'Telegram', icon: '✈️', category: 'messaging', aliases: ['telegram'], popularityRank: 15 },
+  { code: 'ds', name: 'Discord', displayName: 'Discord', icon: '🎮', category: 'social', aliases: ['discord'], popularityRank: 16 },
+  { code: 'tw', name: 'Twitter', displayName: 'Twitter (X)', icon: '🐦', category: 'social', aliases: ['twitter', 'x'], popularityRank: 17 },
+  { code: 'oi', name: 'Tinder', displayName: 'Tinder', icon: '🔥', category: 'dating', aliases: ['tinder'], popularityRank: 18 },
+  { code: 'ub', name: 'Uber', displayName: 'Uber', icon: '🚗', category: 'delivery', aliases: ['uber', 'ubereats'], popularityRank: 19 },
+  { code: 'wx', name: 'Apple', displayName: 'Apple', icon: '🍎', category: 'tech', aliases: ['apple', 'icloud'], popularityRank: 20 },
 
-  // 41-60 - Services moyennement populaires
-  { code: 'dl', name: 'Deliveroo', displayName: 'Deliveroo', icon: '🛵', category: 'delivery', aliases: ['deliveroo'], popularityRank: 41 },
-  { code: 'eb', name: 'eBay', displayName: 'eBay', icon: '🛍️', category: 'shopping', aliases: ['ebay'], popularityRank: 42 },
-  { code: 'al', name: 'Alibaba', displayName: 'Alibaba', icon: '🛒', category: 'shopping', aliases: ['alibaba'], popularityRank: 43 },
-  { code: 'et', name: 'Etsy', displayName: 'Etsy', icon: '🎨', category: 'shopping', aliases: ['etsy'], popularityRank: 44 },
-  { code: 'wp', name: 'Wish', displayName: 'Wish', icon: '⭐', category: 'shopping', aliases: ['wish'], popularityRank: 45 },
-  { code: 'sh', name: 'Shopify', displayName: 'Shopify', icon: '🏪', category: 'shopping', aliases: ['shopify'], popularityRank: 46 },
-  { code: 'az', name: 'Airbnb', displayName: 'Airbnb', icon: '🏠', category: 'travel', aliases: ['airbnb'], popularityRank: 47 },
-  { code: 'bk', name: 'Booking', displayName: 'Booking.com', icon: '🏨', category: 'travel', aliases: ['booking'], popularityRank: 48 },
-  { code: 'ex', name: 'Expedia', displayName: 'Expedia', icon: '✈️', category: 'travel', aliases: ['expedia'], popularityRank: 49 },
-  { code: 'sk', name: 'Skype', displayName: 'Skype', icon: '📞', category: 'messaging', aliases: ['skype'], popularityRank: 50 },
-  { code: 'zm', name: 'Zoom', displayName: 'Zoom', icon: '📹', category: 'tech', aliases: ['zoom'], popularityRank: 51 },
-  { code: 'sl', name: 'Slack', displayName: 'Slack', icon: '💬', category: 'tech', aliases: ['slack'], popularityRank: 52 },
-  { code: 'dr', name: 'Dropbox', displayName: 'Dropbox', icon: '📦', category: 'tech', aliases: ['dropbox'], popularityRank: 53 },
-  { code: 'gd', name: 'Google Drive', displayName: 'Google Drive', icon: '☁️', category: 'tech', aliases: ['googledrive', 'gdrive'], popularityRank: 54 },
-  { code: 'od', name: 'OneDrive', displayName: 'OneDrive', icon: '☁️', category: 'tech', aliases: ['onedrive'], popularityRank: 55 },
-  { code: 'tw', name: 'Twitch', displayName: 'Twitch', icon: '🎮', category: 'entertainment', aliases: ['twitch'], popularityRank: 56 },
-  { code: 'dc', name: 'Disney+', displayName: 'Disney+', icon: '🏰', category: 'entertainment', aliases: ['disney', 'disneyplus'], popularityRank: 57 },
-  { code: 'hp', name: 'HBO Max', displayName: 'HBO Max', icon: '📺', category: 'entertainment', aliases: ['hbo', 'hbomax'], popularityRank: 58 },
-  { code: 'pr', name: 'Prime Video', displayName: 'Prime Video', icon: '📺', category: 'entertainment', aliases: ['primevideo', 'prime'], popularityRank: 59 },
-  { code: 'hulu', name: 'Hulu', displayName: 'Hulu', icon: '📺', category: 'entertainment', aliases: ['hulu'], popularityRank: 60 },
+  // 21-30 - Services très populaires
+  { code: 'mm', name: 'Microsoft', displayName: 'Microsoft', icon: '🪟', category: 'tech', aliases: ['microsoft', 'outlook'], popularityRank: 21 },
+  { code: 'mt', name: 'Steam', displayName: 'Steam', icon: '🎮', category: 'gaming', aliases: ['steam'], popularityRank: 22 },
+  { code: 'aon', name: 'Binance', displayName: 'Binance', icon: '🟡', category: 'financial', aliases: ['binance'], popularityRank: 23 },
+  { code: 're', name: 'Coinbase', displayName: 'Coinbase', icon: '🪙', category: 'financial', aliases: ['coinbase'], popularityRank: 24 },
+  { code: 'tn', name: 'LinkedIn', displayName: 'LinkedIn', icon: '💼', category: 'social', aliases: ['linkedin'], popularityRank: 25 },
+  { code: 'aiw', name: 'Roblox', displayName: 'Roblox', icon: '🎲', category: 'gaming', aliases: ['roblox'], popularityRank: 26 },
+  { code: 'alj', name: 'Spotify', displayName: 'Spotify', icon: '🎵', category: 'entertainment', aliases: ['spotify'], popularityRank: 27 },
+  { code: 'hb', name: 'Twitch', displayName: 'Twitch', icon: '📺', category: 'entertainment', aliases: ['twitch'], popularityRank: 28 },
+  { code: 'ep', name: 'Temu', displayName: 'Temu', icon: '🛍️', category: 'shopping', aliases: ['temu'], popularityRank: 29 },
+  { code: 'hx', name: 'AliExpress', displayName: 'AliExpress', icon: '🛒', category: 'shopping', aliases: ['aliexpress', 'ali'], popularityRank: 30 },
+
+  // 31-40 - Services populaires
+  { code: 'ka', name: 'Shopee', displayName: 'Shopee', icon: '🧡', category: 'shopping', aliases: ['shopee'], popularityRank: 31 },
+  { code: 'aez', name: 'Shein', displayName: 'Shein', icon: '👗', category: 'shopping', aliases: ['shein'], popularityRank: 32 },
+  { code: 'ij', name: 'Revolut', displayName: 'Revolut', icon: '💳', category: 'financial', aliases: ['revolut'], popularityRank: 33 },
+  { code: 'bo', name: 'Wise', displayName: 'Wise', icon: '💸', category: 'financial', aliases: ['wise', 'transferwise'], popularityRank: 34 },
+  { code: 'ti', name: 'Crypto.com', displayName: 'Crypto.com', icon: '🔷', category: 'financial', aliases: ['cryptocom', 'crypto.com'], popularityRank: 35 },
+  { code: 'nc', name: 'Payoneer', displayName: 'Payoneer', icon: '💱', category: 'financial', aliases: ['payoneer'], popularityRank: 36 },
+  { code: 'mo', name: 'Bumble', displayName: 'Bumble', icon: '💛', category: 'dating', aliases: ['bumble'], popularityRank: 37 },
+  { code: 'qv', name: 'Badoo', displayName: 'Badoo', icon: '💕', category: 'dating', aliases: ['badoo'], popularityRank: 38 },
+  { code: 'vz', name: 'Hinge', displayName: 'Hinge', icon: '💖', category: 'dating', aliases: ['hinge'], popularityRank: 39 },
+  { code: 'df', name: 'Happn', displayName: 'Happn', icon: '❤️', category: 'dating', aliases: ['happn'], popularityRank: 40 },
+
+  // 41-50 - Services moyennement populaires
+  { code: 'jg', name: 'Grab', displayName: 'Grab', icon: '🚕', category: 'delivery', aliases: ['grab'], popularityRank: 41 },
+  { code: 'ac', name: 'DoorDash', displayName: 'DoorDash', icon: '🍔', category: 'delivery', aliases: ['doordash'], popularityRank: 42 },
+  { code: 'aq', name: 'Glovo', displayName: 'Glovo', icon: '🛵', category: 'delivery', aliases: ['glovo'], popularityRank: 43 },
+  { code: 'nz', name: 'Foodpanda', displayName: 'Foodpanda', icon: '🐼', category: 'delivery', aliases: ['foodpanda'], popularityRank: 44 },
+  { code: 'rr', name: 'Wolt', displayName: 'Wolt', icon: '🍕', category: 'delivery', aliases: ['wolt'], popularityRank: 45 },
+  { code: 'dl', name: 'Lazada', displayName: 'Lazada', icon: '🛒', category: 'shopping', aliases: ['lazada'], popularityRank: 46 },
+  { code: 'xt', name: 'Flipkart', displayName: 'Flipkart', icon: '📱', category: 'shopping', aliases: ['flipkart'], popularityRank: 47 },
+  { code: 'blm', name: 'Epic Games', displayName: 'Epic Games', icon: '🎯', category: 'gaming', aliases: ['epicgames', 'epic'], popularityRank: 48 },
+  { code: 'bz', name: 'Blizzard', displayName: 'Blizzard', icon: '❄️', category: 'gaming', aliases: ['blizzard', 'battlenet'], popularityRank: 49 },
+  { code: 'ah', name: 'Escape From Tarkov', displayName: 'EFT', icon: '🎖️', category: 'gaming', aliases: ['tarkov', 'eft'], popularityRank: 50 },
+
+  // 51-60 - Services supplémentaires
+  { code: 'bnl', name: 'Reddit', displayName: 'Reddit', icon: '🤖', category: 'social', aliases: ['reddit'], popularityRank: 51 },
+  { code: 'mb', name: 'Yahoo', displayName: 'Yahoo', icon: '📧', category: 'tech', aliases: ['yahoo'], popularityRank: 52 },
+  { code: 'pm', name: 'AOL', displayName: 'AOL', icon: '📩', category: 'tech', aliases: ['aol'], popularityRank: 53 },
+  { code: 'ok', name: 'Odnoklassniki', displayName: 'Odnoklassniki', icon: '🟠', category: 'social', aliases: ['odnoklassniki', 'ok'], popularityRank: 54 },
+  { code: 'ln', name: 'Line', displayName: 'Line', icon: '💚', category: 'messaging', aliases: ['line'], popularityRank: 55 },
+  { code: 'kk', name: 'KakaoTalk', displayName: 'KakaoTalk', icon: '💛', category: 'messaging', aliases: ['kakao', 'kakaotalk'], popularityRank: 56 },
+  { code: 'sg', name: 'Signal', displayName: 'Signal', icon: '🔒', category: 'messaging', aliases: ['signal'], popularityRank: 57 },
+  { code: 'zm', name: 'Zoom', displayName: 'Zoom', icon: '📹', category: 'tech', aliases: ['zoom'], popularityRank: 58 },
+  { code: 'sk', name: 'Skype', displayName: 'Skype', icon: '📞', category: 'messaging', aliases: ['skype'], popularityRank: 59 },
+  { code: 'sl', name: 'Slack', displayName: 'Slack', icon: '💬', category: 'tech', aliases: ['slack'], popularityRank: 60 },
 ];
 
 /**

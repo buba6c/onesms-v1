@@ -14,6 +14,11 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
   },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
 })
 
 // Auth helpers
@@ -23,6 +28,7 @@ export const signUp = async (email: string, password: string, metadata?: any) =>
     password,
     options: {
       data: metadata,
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   })
   return { data, error }
@@ -42,7 +48,7 @@ export const signInWithGoogle = async () => {
     ? 'https://onesms-sn.com' 
     : window.location.origin;
   
-  console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
+  // console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
   
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

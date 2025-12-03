@@ -131,44 +131,6 @@
       "step3Desc": "Après réception du SMS, copiez le code de confirmation pour activer le compte."
     }
   },
-  "admin": {
-    "dashboard": "Tableau de bord",
-    "users": "Utilisateurs",
-    "providers": "Fournisseurs",
-    "services": "Services",
-    "countries": "Pays",
-    "transactions": "Transactions",
-    "pricing": "Tarification",
-    "analytics": "Analytiques",
-    "logs": "Journaux",
-    "settings": "Paramètres",
-    "syncStatus": "État de Synchronisation",
-    "packages": "Forfaits",
-    "servicesManagement": "Gestion des Services",
-    "totalServices": "Total Services",
-    "activeServices": "Actifs",
-    "popularServices": "Populaires",
-    "totalNumbers": "Total Numéros",
-    "lastSync": "Dernière synchro",
-    "syncWithSMSActivate": "Synchroniser avec SMS-Activate",
-    "searchServices": "Rechercher des services...",
-    "allCategories": "Toutes les Catégories",
-    "allStatus": "Tous les Statuts",
-    "active": "Actif",
-    "inactive": "Inactif",
-    "social": "Social",
-    "tech": "Tech",
-    "other": "Autre",
-    "category": "Catégorie",
-    "available": "Disponible",
-    "actions": "Actions",
-    "togglePopular": "Basculer Populaire",
-    "toggleActive": "Basculer Actif",
-    "noServicesFound": "Aucun service trouvé",
-    "loadingServices": "Chargement des services...",
-    "code": "Code",
-    "status": "Statut"
-  },
   "auth": {
     "loginTitle": "Connexion à Votre Compte",
     "registerTitle": "Créer un Nouveau Compte",
@@ -268,7 +230,22 @@
     },
     "balanceBefore": "Solde avant",
     "balanceAfter": "Solde après",
-    "transactionId": "ID Transaction"
+    "transactionId": "ID Transaction",
+    "rental": "Location",
+    "rentalHours": "Location {{hours}}h",
+    "messagesReceived": "{{count}} message(s) reçu(s)",
+    "messagesReceivedShort": "{{count}} message(s) • {{hours}}h",
+    "clickToView": "Cliquer pour voir",
+    "expired": "Expirée",
+    "copy": "Copier",
+    "cancelIn": "Annuler dans {{minutes}}min",
+    "rentMessages": {
+      "title": "Messages reçus",
+      "noMessages": "Aucun message",
+      "noMessagesDesc": "Aucun message reçu pour cette location",
+      "code": "Code",
+      "close": "Fermer"
+    }
   },
   "topup": {
     "title": "Recharger le Solde",
@@ -625,8 +602,8 @@
   "insufficientBalance": {
     "title": "Solde Insuffisant",
     "description": "Vous n'avez pas assez de crédits pour effectuer cet achat. Rechargez votre compte pour continuer.",
-    "needed": "Montant requis",
-    "available": "Solde actuel",
+    "needed": "Prix de l'achat",
+    "available": "Votre solde",
     "missing": "Il vous manque",
     "topUp": "Recharger maintenant"
   },
@@ -653,7 +630,7 @@
       },
       "payment": {
         "title": "Paiement et Crédits",
-        "content": "<p><strong>Système de crédits :</strong></p><ul><li>Les services sont prépayés via notre système de crédits</li><li>1 crédit = 1 FCFA (ou équivalent en devise locale)</li><li>Les prix des numéros varient selon le pays et le service</li><li>Les crédits sont gelés lors de l'achat d'un numéro et débités à la réception du SMS</li></ul><p><strong>Méthodes de paiement acceptées :</strong></p><ul><li>Cartes bancaires (Visa, Mastercard)</li><li>Mobile Money (Orange Money, Wave, etc.)</li><li>Cryptomonnaies (Bitcoin, USDT)</li></ul>"
+        "content": "<p><strong>Système de crédits :</strong></p><ul><li>Les services sont prépayés via notre système de crédits</li><li>1 crédit = 100 FCFA (ou équivalent en devise locale)</li><li>Les prix des numéros varient selon le pays et le service</li><li>Les crédits sont gelés lors de l'achat d'un numéro et débités à la réception du SMS</li></ul><p><strong>Méthodes de paiement acceptées :</strong></p><ul><li>Cartes bancaires (Visa, Mastercard)</li><li>Mobile Money (Orange Money, Wave, etc.)</li><li>Cryptomonnaies (Bitcoin, USDT)</li></ul>"
       },
       "refund": {
         "title": "Politique de Remboursement",
@@ -722,7 +699,7 @@
       },
       "dataSharing": {
         "title": "Partage des Données",
-        "content": "<p>Nous ne partageons vos données qu'avec :</p><ul><li><strong>Prestataires de paiement :</strong> Pour traiter vos transactions (Stripe, etc.)</li><li><strong>Services d'hébergement :</strong> Pour stocker et sécuriser vos données (Supabase)</li><li><strong>Autorités légales :</strong> Sur demande légale valide uniquement</li></ul><p><strong>Nous ne partageons jamais :</strong></p><ul><li>Vos données avec des annonceurs</li><li>Vos informations avec des courtiers en données</li><li>Votre historique d'utilisation avec des tiers commerciaux</li></ul>"
+        "content": "<p>Nous ne partageons vos données qu'avec :</p><ul><li><strong>Prestataires de paiement :</strong> Pour traiter vos transactions (Moneroo, PayTech, Wave, Orange Money)</li><li><strong>Services d'hébergement :</strong> Pour stocker et sécuriser vos données (Supabase)</li><li><strong>Autorités légales :</strong> Sur demande légale valide uniquement</li></ul><p><strong>Nous ne partageons jamais :</strong></p><ul><li>Vos données avec des annonceurs</li><li>Vos informations avec des courtiers en données</li><li>Votre historique d'utilisation avec des tiers commerciaux</li></ul>"
       },
       "cookies": {
         "title": "Cookies et Technologies",
@@ -789,6 +766,15 @@
       "success": "Location terminée",
       "released": "Numéro libéré avec succès"
     },
+    "cancelRental": {
+      "title": "Annuler la location",
+      "description": "Voulez-vous annuler cette location et récupérer vos crédits ?",
+      "confirm": "Oui, annuler & rembourser",
+      "processing": "Annulation...",
+      "success": "Location annulée",
+      "cancelled": "Annulation réussie",
+      "refunded": "Crédits remboursés"
+    },
     "insufficientBalance": {
       "title": "Solde insuffisant",
       "description": "Vous n'avez pas assez de crédits pour cette opération.",
@@ -799,8 +785,8 @@
     }
   },
   "toasts": {
-    "paymentSuccess": "Paiement réussi !",
-    "paymentSuccessDesc": "Votre solde a été crédité. Merci pour votre achat !",
+    "paymentSuccess": "Paiement réussi ! 🎉",
+    "paymentSuccessDesc": "Vos activations ont été ajoutées à votre compte. Vous pouvez maintenant acheter des numéros.",
     "paymentFailed": "Paiement échoué",
     "paymentFailedDesc": "Le paiement a été annulé ou a échoué. Veuillez réessayer.",
     "loadingError": "Erreur de chargement",
@@ -935,11 +921,11 @@
       "syncFailed": "Échec de la synchronisation",
       "synced": "Synchronisé"
     },
-    "users": {
+    "usersPage": {
       "noName": "Pas de nom",
       "invalidAmount": "Montant invalide"
     },
-    "services": {
+    "servicesPage": {
       "serviceUpdated": "Service mis à jour avec succès"
     }
   }

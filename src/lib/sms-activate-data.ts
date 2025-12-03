@@ -1,7 +1,20 @@
 /**
  * DONNÉES SMS-ACTIVATE STATIQUES - Ultra optimisé
- * Basé sur les fichiers JSON officiels fournis par SMS-Activate
+ * Basé sur l'ordre exact affiché sur la homepage de SMS-Activate.io
+ * 
+ * ORDRE OFFICIEL SMS-ACTIVATE (Homepage 2025):
+ * 1. Snapchat, 2. WeChat, 3. Google, 4. TikTok, 5. Facebook, 
+ * 6. OpenAI, 7. VK, 8. Instagram, 9. Viber, 10. WhatsApp,
+ * 11. Amazon, 12. Netflix, 13. PayPal, 14. Grindr, etc.
  */
+
+// Type pour un service SMS-Activate
+export interface SMSActivateService {
+  code: string;
+  name: string;
+  category: string;
+  popularity: number; // Plus élevé = plus populaire (1000 = top 1)
+}
 
 // TOUS les pays SMS-Activate (204 pays)
 export const SMS_ACTIVATE_COUNTRIES = {
@@ -46,101 +59,141 @@ export const SMS_ACTIVATE_COUNTRIES = {
   "196": { id: 196, code: "singapore", name: "Singapore", priority: 200 }
 } as const
 
-// Services populaires organisés par catégorie
+/**
+ * TOP 50+ SERVICES SMS-ACTIVATE - ORDRE OFFICIEL DE LA HOMEPAGE
+ * Les scores de popularité suivent exactement l'ordre affiché sur sms-activate.io
+ * Score = 1000 - (position - 1) * 10
+ */
+export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
+  // TOP 1-10 (Homepage Order - Row 1)
+  { code: "fu", name: "Snapchat", category: "social", popularity: 1000 },      // #1
+  { code: "wb", name: "WeChat", category: "messaging", popularity: 990 },      // #2
+  { code: "go", name: "Google", category: "tech", popularity: 980 },           // #3
+  { code: "lf", name: "TikTok", category: "social", popularity: 970 },         // #4
+  { code: "fb", name: "Facebook", category: "social", popularity: 960 },       // #5
+  { code: "dr", name: "OpenAI", category: "tech", popularity: 950 },           // #6
+  { code: "vk", name: "VKontakte", category: "social", popularity: 940 },      // #7
+  { code: "ig", name: "Instagram", category: "social", popularity: 930 },      // #8
+  { code: "vi", name: "Viber", category: "messaging", popularity: 920 },       // #9
+  { code: "wa", name: "WhatsApp", category: "messaging", popularity: 910 },    // #10
+  
+  // TOP 11-20 (Homepage Order - Row 2)
+  { code: "am", name: "Amazon", category: "shopping", popularity: 900 },       // #11
+  { code: "nf", name: "Netflix", category: "entertainment", popularity: 890 }, // #12
+  { code: "ts", name: "PayPal", category: "finance", popularity: 880 },        // #13
+  { code: "gr", name: "Grindr", category: "dating", popularity: 870 },         // #14
+  { code: "tg", name: "Telegram", category: "messaging", popularity: 860 },    // #15
+  { code: "ds", name: "Discord", category: "social", popularity: 850 },        // #16
+  { code: "tw", name: "Twitter", category: "social", popularity: 840 },        // #17
+  { code: "oi", name: "Tinder", category: "dating", popularity: 830 },         // #18
+  { code: "ub", name: "Uber", category: "delivery", popularity: 820 },         // #19
+  { code: "wx", name: "Apple", category: "tech", popularity: 810 },            // #20
+  
+  // TOP 21-30
+  { code: "mm", name: "Microsoft", category: "tech", popularity: 800 },        // #21
+  { code: "mt", name: "Steam", category: "gaming", popularity: 790 },          // #22
+  { code: "aon", name: "Binance", category: "finance", popularity: 780 },      // #23
+  { code: "re", name: "Coinbase", category: "finance", popularity: 770 },      // #24
+  { code: "tn", name: "LinkedIn", category: "social", popularity: 760 },       // #25
+  { code: "aiw", name: "Roblox", category: "gaming", popularity: 750 },        // #26
+  { code: "alj", name: "Spotify", category: "entertainment", popularity: 740 },// #27
+  { code: "hb", name: "Twitch", category: "entertainment", popularity: 730 },  // #28
+  { code: "ep", name: "Temu", category: "shopping", popularity: 720 },         // #29
+  { code: "hx", name: "AliExpress", category: "shopping", popularity: 710 },   // #30
+  
+  // TOP 31-40
+  { code: "ka", name: "Shopee", category: "shopping", popularity: 700 },       // #31
+  { code: "aez", name: "Shein", category: "shopping", popularity: 690 },       // #32
+  { code: "ij", name: "Revolut", category: "finance", popularity: 680 },       // #33
+  { code: "bo", name: "Wise", category: "finance", popularity: 670 },          // #34
+  { code: "ti", name: "Crypto.com", category: "finance", popularity: 660 },    // #35
+  { code: "nc", name: "Payoneer", category: "finance", popularity: 650 },      // #36
+  { code: "mo", name: "Bumble", category: "dating", popularity: 640 },         // #37
+  { code: "qv", name: "Badoo", category: "dating", popularity: 630 },          // #38
+  { code: "vz", name: "Hinge", category: "dating", popularity: 620 },          // #39
+  { code: "df", name: "Happn", category: "dating", popularity: 610 },          // #40
+  
+  // TOP 41-50
+  { code: "jg", name: "Grab", category: "delivery", popularity: 600 },         // #41
+  { code: "ac", name: "DoorDash", category: "delivery", popularity: 590 },     // #42
+  { code: "aq", name: "Glovo", category: "delivery", popularity: 580 },        // #43
+  { code: "nz", name: "Foodpanda", category: "delivery", popularity: 570 },    // #44
+  { code: "rr", name: "Wolt", category: "delivery", popularity: 560 },         // #45
+  { code: "dl", name: "Lazada", category: "shopping", popularity: 550 },       // #46
+  { code: "xt", name: "Flipkart", category: "shopping", popularity: 540 },     // #47
+  { code: "blm", name: "Epic Games", category: "gaming", popularity: 530 },    // #48
+  { code: "bz", name: "Blizzard", category: "gaming", popularity: 520 },       // #49
+  { code: "ah", name: "Escape From Tarkov", category: "gaming", popularity: 510 }, // #50
+  
+  // Additional popular services (51-60)
+  { code: "bnl", name: "Reddit", category: "social", popularity: 500 },        // #51
+  { code: "mb", name: "Yahoo", category: "tech", popularity: 490 },            // #52
+  { code: "pm", name: "AOL", category: "tech", popularity: 480 },              // #53
+  { code: "ok", name: "Odnoklassniki", category: "social", popularity: 470 },  // #54
+  { code: "ln", name: "Line", category: "messaging", popularity: 460 },        // #55
+  { code: "kk", name: "KakaoTalk", category: "messaging", popularity: 450 },   // #56
+  { code: "sg", name: "Signal", category: "messaging", popularity: 440 },      // #57
+  { code: "zm", name: "Zoom", category: "tech", popularity: 430 },             // #58
+  { code: "sk", name: "Skype", category: "messaging", popularity: 420 },       // #59
+  { code: "sl", name: "Slack", category: "tech", popularity: 410 },            // #60
+  
+  // Additional services for RENT (SMS-Activate rent services)
+  { code: "hw", name: "Alipay/Alibaba/1688", category: "finance", popularity: 400 }, // Alipay, Alibaba, 1688
+  { code: "full", name: "Full Rent (Any Service)", category: "other", popularity: 395 }, // Full Rent
+  { code: "ot", name: "Any Other", category: "other", popularity: 390 },       // Any Other Service
+  { code: "nv", name: "Naver", category: "tech", popularity: 385 },            // Naver
+  { code: "yw", name: "Yandex", category: "tech", popularity: 380 },           // Yandex
+  { code: "qq", name: "QQ/Tencent", category: "messaging", popularity: 375 },  // QQ
+  { code: "bd", name: "Baidu", category: "tech", popularity: 370 },            // Baidu
+  { code: "dz", name: "Douyin", category: "social", popularity: 365 },         // Douyin (TikTok China)
+  { code: "xhs", name: "Xiaohongshu", category: "social", popularity: 360 },   // Xiaohongshu (RED)
+  { code: "meituan", name: "Meituan", category: "delivery", popularity: 355 }, // Meituan
+  { code: "jd", name: "JD.com", category: "shopping", popularity: 350 },       // JD.com
+  { code: "pdd", name: "Pinduoduo", category: "shopping", popularity: 345 },   // Pinduoduo
+  { code: "weibo", name: "Weibo", category: "social", popularity: 340 },       // Weibo
+  { code: "taobao", name: "Taobao", category: "shopping", popularity: 335 },   // Taobao
+]
+
+// Services organisés par catégorie (pour filtrage UI)
 export const SMS_ACTIVATE_SERVICES = {
-  // Social Media (Plus populaires)
-  social: [
-    { code: "wa", name: "WhatsApp", category: "social", popularity: 1000 },
-    { code: "tg", name: "Telegram", category: "social", popularity: 950 },
-    { code: "ig", name: "Instagram", category: "social", popularity: 900 },
-    { code: "fb", name: "Facebook", category: "social", popularity: 850 },
-    { code: "tw", name: "Twitter", category: "social", popularity: 800 },
-    { code: "ds", name: "Discord", category: "social", popularity: 750 },
-    { code: "fu", name: "Snapchat", category: "social", popularity: 700 },
-    { code: "lf", name: "TikTok", category: "social", popularity: 900 },
-    { code: "tn", name: "LinkedIn", category: "social", popularity: 650 },
-    { code: "bnl", name: "Reddit", category: "social", popularity: 600 },
-  ],
+  // Social Media
+  social: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "social"),
+  
+  // Messaging
+  messaging: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "messaging"),
   
   // Shopping & E-commerce
-  shopping: [
-    { code: "am", name: "Amazon", category: "shopping", popularity: 800 },
-    { code: "ka", name: "Shopee", category: "shopping", popularity: 700 },
-    { code: "dl", name: "Lazada", category: "shopping", popularity: 650 },
-    { code: "ep", name: "Temu", category: "shopping", popularity: 750 },
-    { code: "hx", name: "AliExpress", category: "shopping", popularity: 750 },
-    { code: "aez", name: "Shein", category: "shopping", popularity: 700 },
-    { code: "xt", name: "Flipkart", category: "shopping", popularity: 600 },
-  ],
+  shopping: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "shopping"),
   
   // Finance & Payment
-  finance: [
-    { code: "ts", name: "PayPal", category: "finance", popularity: 850 },
-    { code: "nc", name: "Payoneer", category: "finance", popularity: 700 },
-    { code: "re", name: "Coinbase", category: "finance", popularity: 750 },
-    { code: "aon", name: "Binance", category: "finance", popularity: 800 },
-    { code: "ij", name: "Revolut", category: "finance", popularity: 700 },
-    { code: "bo", name: "Wise", category: "finance", popularity: 650 },
-    { code: "ti", name: "Crypto.com", category: "finance", popularity: 650 },
-  ],
+  finance: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "finance"),
   
   // Food & Delivery
-  delivery: [
-    { code: "ub", name: "Uber", category: "delivery", popularity: 800 },
-    { code: "jg", name: "Grab", category: "delivery", popularity: 750 },
-    { code: "ac", name: "DoorDash", category: "delivery", popularity: 700 },
-    { code: "aq", name: "Glovo", category: "delivery", popularity: 650 },
-    { code: "rr", name: "Wolt", category: "delivery", popularity: 600 },
-    { code: "nz", name: "Foodpanda", category: "delivery", popularity: 650 },
-  ],
+  delivery: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "delivery"),
   
   // Tech & Services
-  tech: [
-    { code: "go", name: "Google", category: "tech", popularity: 950 },
-    { code: "mm", name: "Microsoft", category: "tech", popularity: 850 },
-    { code: "wx", name: "Apple", category: "tech", popularity: 900 },
-    { code: "mb", name: "Yahoo", category: "tech", popularity: 700 },
-    { code: "pm", name: "AOL", category: "tech", popularity: 600 },
-    { code: "dr", name: "OpenAI", category: "tech", popularity: 850 },
-  ],
+  tech: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "tech"),
   
   // Dating
-  dating: [
-    { code: "oi", name: "Tinder", category: "dating", popularity: 850 },
-    { code: "mo", name: "Bumble", category: "dating", popularity: 750 },
-    { code: "df", name: "Happn", category: "dating", popularity: 650 },
-    { code: "qv", name: "Badoo", category: "dating", popularity: 700 },
-    { code: "vz", name: "Hinge", category: "dating", popularity: 700 },
-  ],
+  dating: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "dating"),
   
   // Gaming
-  gaming: [
-    { code: "mt", name: "Steam", category: "gaming", popularity: 850 },
-    { code: "bz", name: "Blizzard", category: "gaming", popularity: 700 },
-    { code: "ah", name: "Escape From Tarkov", category: "gaming", popularity: 650 },
-    { code: "aiw", name: "Roblox", category: "gaming", popularity: 800 },
-    { code: "blm", name: "Epic Games", category: "gaming", popularity: 750 },
-  ],
+  gaming: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "gaming"),
   
   // Entertainment
-  entertainment: [
-    { code: "nf", name: "Netflix", category: "entertainment", popularity: 850 },
-    { code: "alj", name: "Spotify", category: "entertainment", popularity: 800 },
-    { code: "hb", name: "Twitch", category: "entertainment", popularity: 750 },
-  ]
+  entertainment: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "entertainment"),
 } as const
 
-// Fonction pour obtenir TOUS les services (flat)
-export const getAllServices = () => {
-  return Object.values(SMS_ACTIVATE_SERVICES)
-    .flat()
-    .sort((a, b) => b.popularity - a.popularity)
+// Fonction pour obtenir TOUS les services (triés par popularité - ordre SMS-Activate)
+export const getAllServices = (): SMSActivateService[] => {
+  // Retourne directement la liste triée par popularité (ordre SMS-Activate)
+  return [...SMS_ACTIVATE_TOP_SERVICES].sort((a, b) => b.popularity - a.popularity)
 }
 
 // Fonction pour obtenir les top pays
 export const getTopCountries = () => {
   return Object.values(SMS_ACTIVATE_COUNTRIES)
-    .filter(c => c.popular)
+    .filter(c => 'popular' in c && c.popular)
     .sort((a, b) => b.priority - a.priority)
 }
 

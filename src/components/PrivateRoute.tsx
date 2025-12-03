@@ -19,10 +19,10 @@ export default function PrivateRoute() {
     return () => clearTimeout(timeout)
   }, [loading, checkAuth])
 
-  // Log pour debug
-  useEffect(() => {
-    console.log('🔒 [PrivateRoute] State:', { user: user?.email, loading, timeoutReached })
-  }, [user, loading, timeoutReached])
+  // Log pour debug (désactivé en production)
+  // useEffect(() => {
+  //   console.log('🔒 [PrivateRoute] State:', { user: user?.email, loading, timeoutReached })
+  // }, [user, loading, timeoutReached])
 
   if (loading) {
     return (

@@ -22,16 +22,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const menuItems = [
     { path: '/admin', label: t('admin.dashboard') },
+    { path: '/admin/monitoring', label: t('admin.monitoring', 'Monitoring') },
     { path: '/admin/users', label: t('admin.users') },
     { path: '/admin/providers', label: t('admin.providers') },
     { path: '/admin/services', label: t('admin.services') },
     { path: '/admin/countries', label: t('admin.countries') },
     { path: '/admin/transactions', label: t('admin.transactions') },
+    { path: '/admin/activations', label: t('admin.activations') },
+    { path: '/admin/rentals', label: t('admin.rentals', 'Locations') },
     { path: '/admin/pricing', label: t('admin.pricing') },
-    { path: '/admin/packages', label: 'Packages' },
-    { path: '/admin/sync-status', label: 'Sync Status' },
+    { path: '/admin/packages', label: t('admin.packages') },
+    { path: '/admin/sync-status', label: t('admin.syncStatus') },
     { path: '/admin/analytics', label: t('admin.analytics') },
     { path: '/admin/logs', label: t('admin.logs') },
+    { path: '/admin/contact-settings', label: t('contact.title', 'Contact') },
     { path: '/admin/settings', label: t('admin.settings') },
   ]
 

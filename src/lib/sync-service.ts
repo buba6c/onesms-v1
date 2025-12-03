@@ -92,7 +92,7 @@ export const triggerSync = async (): Promise<{ success: boolean; message?: strin
   try {
     const { data: { session } } = await supabase.auth.getSession()
     
-    console.log('🚀 [SYNC] Démarrage de la synchronisation SMS-Activate...')
+    // console.log('🚀 [SYNC] Démarrage de la synchronisation SMS-Activate...')
     
     // L'Edge Function crée son propre sync_log, pas besoin de le faire ici
     
@@ -120,7 +120,7 @@ export const triggerSync = async (): Promise<{ success: boolean; message?: strin
       }
 
       const result = await response.json()
-      console.log('✅ [SYNC] Résultat:', result)
+      // console.log('✅ [SYNC] Résultat:', result)
       
       // L'Edge Function gère le log de sync
       return result
@@ -142,7 +142,7 @@ export const updatePopularityScores = async (): Promise<{ success: boolean; mess
   try {
     const { data: { session } } = await supabase.auth.getSession()
     
-    console.log('🔄 [SCORES] Mise à jour des popularity scores...')
+    // console.log('🔄 [SCORES] Mise à jour des popularity scores...')
     
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-popularity-scores`, {
       method: 'POST',
@@ -159,7 +159,7 @@ export const updatePopularityScores = async (): Promise<{ success: boolean; mess
     }
 
     const result = await response.json()
-    console.log('✅ [SCORES] Résultat:', result)
+    // console.log('✅ [SCORES] Résultat:', result)
     return result
   } catch (error: any) {
     console.error('❌ [SCORES] Erreur:', error)
@@ -177,7 +177,7 @@ export const updatePopularityScores = async (): Promise<{ success: boolean; mess
  */
 export const fetch5simPricesForService = async (serviceCode: string): Promise<Sim5CountryData[]> => {
   try {
-    console.log(`🌍 [5SIM] Récupération des prix pour ${serviceCode}...`)
+    // console.log(`🌍 [5SIM] Récupération des prix pour ${serviceCode}...`)
     
     // Appel direct à l'API 5sim (publique, pas besoin d'auth)
     const response = await fetch(`https://5sim.net/v1/guest/prices?product=${serviceCode.toLowerCase()}`, {
@@ -193,7 +193,7 @@ export const fetch5simPricesForService = async (serviceCode: string): Promise<Si
     }
 
     const data = await response.json()
-    console.log(`✅ [5SIM] Données reçues pour ${serviceCode}:`, Object.keys(data).length, 'pays')
+    // console.log(`✅ [5SIM] Données reçues pour ${serviceCode}:`, Object.keys(data).length, 'pays')
 
     // Transformer la réponse 5sim en format exploitable
     // Structure RÉELLE: { serviceName: { countryName: { operatorName: { cost, count, rate? } } } }
@@ -254,7 +254,7 @@ export const fetch5simPricesForService = async (serviceCode: string): Promise<Si
       return scoreB - scoreA
     })
 
-    console.log(`📊 [5SIM] Pays triés (Stock×Rate):`, countries.slice(0, 5).map(c => `${c.countryName} (score: ${(c.totalCount * (c.maxRate / 100)).toFixed(0)}, ${c.maxRate}%, ${c.totalCount} nums)`))
+    // console.log(`📊 [5SIM] Pays triés (Stock×Rate):`, countries.slice(0, 5).map(c => `${c.countryName} (score: ${(c.totalCount * (c.maxRate / 100)).toFixed(0)}, ${c.maxRate}%, ${c.totalCount} nums)`))
     return countries
 
   } catch (error) {
@@ -268,7 +268,7 @@ export const updateSuccessRates = async (): Promise<{ success: boolean; message?
   try {
     const { data: { session } } = await supabase.auth.getSession()
     
-    console.log('🌍 [RATES] Mise à jour des success rates...')
+    // console.log('🌍 [RATES] Mise à jour des success rates...')
     
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-success-rates`, {
       method: 'POST',
@@ -285,7 +285,7 @@ export const updateSuccessRates = async (): Promise<{ success: boolean; message?
     }
 
     const result = await response.json()
-    console.log('✅ [RATES] Résultat:', result)
+    // console.log('✅ [RATES] Résultat:', result)
     return result
   } catch (error: any) {
     console.error('❌ [RATES] Erreur:', error)
@@ -331,15 +331,15 @@ export const getServices = async (filters?: {
 
 // Update service
 export const updateService = async (id: string, updates: Partial<Service>): Promise<Service> => {
-  const { data, error } = await supabase
-    .from('services')
+  const { data, error } = await (supabase
+    .from('services') as any)
     .update(updates)
     .eq('id', id)
     .select()
     .single()
 
   if (error) throw error
-  return data
+  return data as Service
 }
 
 // Get all countries
@@ -370,15 +370,15 @@ export const getCountries = async (filters?: {
 
 // Update country
 export const updateCountry = async (id: string, updates: Partial<Country>): Promise<Country> => {
-  const { data, error } = await supabase
-    .from('countries')
+  const { data, error } = await (supabase
+    .from('countries') as any)
     .update(updates)
     .eq('id', id)
     .select()
     .single()
 
   if (error) throw error
-  return data
+  return data as Country
 }
 
 // Get pricing rules
@@ -412,15 +412,15 @@ export const getPricingRules = async (filters?: {
 
 // Update pricing rule
 export const updatePricingRule = async (id: string, updates: Partial<PricingRule>): Promise<PricingRule> => {
-  const { data, error } = await supabase
-    .from('pricing_rules')
+  const { data, error } = await (supabase
+    .from('pricing_rules') as any)
     .update(updates)
     .eq('id', id)
     .select()
     .single()
 
   if (error) throw error
-  return data
+  return data as PricingRule
 }
 
 // Get sync logs
@@ -466,14 +466,14 @@ export const updateServiceIcon = async (serviceCode: string, updates: Partial<Se
     .upsert({
       service_code: serviceCode,
       ...updates
-    }, {
+    } as any, {
       onConflict: 'service_code'
     })
     .select()
     .single()
 
   if (error) throw error
-  return data
+  return data as ServiceIcon
 }
 
 // Get service statistics
@@ -533,12 +533,12 @@ export const getServiceStats = async () => {
 
   const totalServices = totalServicesCount || 0
   const activeServices = activeServicesCount || 0
-  const popularServices = services?.filter(s => s.popularity_score >= 50).length || 0
+  const popularServices = (services as any[])?.filter((s: any) => s.popularity_score >= 50).length || 0
   const totalCountries = countries?.length || 0
-  const activeCountries = countries?.filter(c => c.active).length || 0
+  const activeCountries = (countries as any[])?.filter((c: any) => c.active).length || 0
   const totalAvailable = allPricing.reduce((sum, p) => sum + (p.available_count || 0), 0)
 
-  console.log('📊 [STATS] Services:', totalServices, 'Active:', activeServices, 'Popular:', popularServices, 'Pricing rules:', pricingRulesCount, 'Total available:', totalAvailable, `(from ${allPricing.length} records)`)
+  // console.log('📊 [STATS] Services:', totalServices, 'Active:', activeServices, 'Popular:', popularServices, 'Pricing rules:', pricingRulesCount, 'Total available:', totalAvailable, `(from ${allPricing.length} records)`)
 
   return {
     totalServices,

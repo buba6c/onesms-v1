@@ -45,19 +45,21 @@ export const logEvent = async (
       user_id: userId || null,
       ip_address: null, // Could be set from headers
       user_agent: navigator.userAgent
-    })
+    } as any)
 
     if (error) throw error
 
-    // Also console log for development
-    const emoji = {
-      info: 'ℹ️',
-      warning: '⚠️',
-      error: '❌',
-      success: '✅'
-    }[level]
+    // Also console log in development mode only
+    if (import.meta.env.DEV) {
+      const emoji = {
+        info: 'ℹ️',
+        warning: '⚠️',
+        error: '❌',
+        success: '✅'
+      }[level]
 
-    console.log(`${emoji} [${category.toUpperCase()}] ${message}`, metadata)
+      console.log(`${emoji} [${category.toUpperCase()}] ${message}`, metadata)
+    }
 
     return { success: true }
   } catch (error: any) {
@@ -130,7 +132,7 @@ export const getLogStats = async (): Promise<{
   try {
     const { data: logs, error } = await supabase
       .from('system_logs')
-      .select('level, category, created_at')
+      .select('level, category, created_at') as { data: { level: string; category: string; created_at: string }[] | null; error: any }
 
     if (error) throw error
 
@@ -139,14 +141,14 @@ export const getLogStats = async (): Promise<{
 
     const stats = {
       totalLogs: logs?.length || 0,
-      errorCount: logs?.filter(l => l.level === 'error').length || 0,
-      warningCount: logs?.filter(l => l.level === 'warning').length || 0,
-      todayLogs: logs?.filter(l => new Date(l.created_at) >= today).length || 0,
+      errorCount: logs?.filter((l: any) => l.level === 'error').length || 0,
+      warningCount: logs?.filter((l: any) => l.level === 'warning').length || 0,
+      todayLogs: logs?.filter((l: any) => new Date(l.created_at) >= today).length || 0,
       byCategory: {} as Record<string, number>
     }
 
     // Count by category
-    logs?.forEach(log => {
+    logs?.forEach((log: any) => {
       stats.byCategory[log.category] = (stats.byCategory[log.category] || 0) + 1
     })
 

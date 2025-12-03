@@ -1,5 +1,5 @@
-// @ts-nocheck
-import { useState } from 'react';
+ 
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +17,12 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Calendar,
-  Receipt
+  Receipt,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { formatDate, formatCurrency, generateRef } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -34,6 +39,15 @@ interface Transaction {
   payment_ref: string | null;
   description: string | null;
   created_at: string;
+  related_activation_id?: string | null;
+  related_rental_id?: string | null;
+  metadata?: any;
+}
+
+interface Activation {
+  id: string;
+  status: string;
+  expires_at: string;
 }
 
 interface CreditHistory {
@@ -55,7 +69,7 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   // Fetch transactions
-  const { data: transactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({
+  const { data: transactions, isLoading: transactionsLoading, refetch: refetchTransactions } = useQuery<Transaction[]>({
     queryKey: ['transactions', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
@@ -71,6 +85,61 @@ export default function TransactionsPage() {
     },
     enabled: !!user?.id,
   });
+
+  // Fetch activations to check their real status
+  const { data: activations } = useQuery<Activation[]>({
+    queryKey: ['activations-for-transactions', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const { data, error } = await supabase
+        .from('activations')
+        .select('id, status, expires_at')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Helper function to get real status of transaction based on activation status
+  const getRealTransactionStatus = (transaction: Transaction): string => {
+    // Si déjà complété, refunded ou failed, garder le statut
+    if (['completed', 'refunded', 'failed', 'cancelled'].includes(transaction.status)) {
+      return transaction.status;
+    }
+    
+    // Si c'est un achat (purchase) avec pending, vérifier l'activation liée
+    if (transaction.type === 'purchase' && transaction.status === 'pending') {
+      const activationId = transaction.related_activation_id || transaction.metadata?.activation_id;
+      
+      if (activationId && activations) {
+        const activation = activations.find(a => a.id === activationId);
+        if (activation) {
+          // Vérifier si expirée
+          const now = new Date();
+          const expiresAt = new Date(activation.expires_at);
+          
+          if (activation.status === 'received') {
+            return 'completed';
+          } else if (activation.status === 'cancelled' || activation.status === 'refunded') {
+            return 'refunded';
+          } else if (activation.status === 'timeout' || (now > expiresAt && activation.status !== 'received')) {
+            return 'refunded'; // Timeout = refunded
+          }
+        }
+      }
+      
+      // Vérifier si la transaction est trop ancienne (plus de 30 min = expirée)
+      const txnAge = (Date.now() - new Date(transaction.created_at).getTime()) / 1000 / 60;
+      if (txnAge > 30) {
+        return 'refunded'; // Probablement expirée et remboursée
+      }
+    }
+    
+    return transaction.status;
+  };
 
   // Fetch credits history
   const { data: creditsHistory, isLoading: creditsLoading } = useQuery<CreditHistory[]>({
@@ -103,6 +172,7 @@ export default function TransactionsPage() {
           item_name: 'Rechargement crédits One SMS',
           item_price: amount,
           command_name: ref,
+          ref_command: ref,
         },
         import.meta.env.VITE_PAYTECH_IPN_URL,
         import.meta.env.VITE_PAYTECH_SUCCESS_URL,
@@ -110,8 +180,8 @@ export default function TransactionsPage() {
       );
 
       // Save transaction
-      const { error } = await supabase
-        .from('transactions')
+      const { error } = await (supabase
+        .from('transactions') as any)
         .insert({
           user_id: user.id,
           type: 'recharge',
@@ -214,23 +284,25 @@ export default function TransactionsPage() {
     });
   };
 
-  // Filter transactions
+  // Filter transactions - using real status
   const filteredTransactions = (transactions || []).filter(t => {
     const matchesType = filterType === 'all' || t.type === filterType;
-    const matchesStatus = filterStatus === 'all' || t.status === filterStatus;
+    const realStatus = getRealTransactionStatus(t);
+    const matchesStatus = filterStatus === 'all' || realStatus === filterStatus;
     const matchesDate = (!dateRange.start || new Date(t.created_at) >= new Date(dateRange.start)) &&
                        (!dateRange.end || new Date(t.created_at) <= new Date(dateRange.end));
     return matchesType && matchesStatus && matchesDate;
   });
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      completed: { label: 'Complété', variant: 'default' },
-      pending: { label: 'En attente', variant: 'secondary' },
-      failed: { label: 'Échoué', variant: 'destructive' },
-      cancelled: { label: 'Annulé', variant: 'outline' },
+    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon?: React.ReactNode }> = {
+      completed: { label: t('status.completed'), variant: 'default', icon: <CheckCircle2 className="h-3 w-3 mr-1" /> },
+      pending: { label: t('status.pending'), variant: 'secondary', icon: <Clock className="h-3 w-3 mr-1 animate-pulse" /> },
+      failed: { label: t('status.failed'), variant: 'destructive', icon: <XCircle className="h-3 w-3 mr-1" /> },
+      cancelled: { label: t('status.cancelled'), variant: 'outline', icon: <XCircle className="h-3 w-3 mr-1" /> },
+      refunded: { label: 'Remboursé', variant: 'outline', icon: <RefreshCw className="h-3 w-3 mr-1" /> },
     };
-    return config[status] || { label: status, variant: 'outline' };
+    return config[status] || { label: status, variant: 'outline', icon: <AlertCircle className="h-3 w-3 mr-1" /> };
   };
 
   const getTypeIcon = (type: string) => {
@@ -245,15 +317,15 @@ export default function TransactionsPage() {
   const totalSpent = transactions?.filter(t => t.type === 'purchase' && t.status === 'completed').reduce((sum, t) => sum + t.amount, 0) || 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pt-10 lg:pt-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Transactions</h1>
-          <p className="text-gray-600">Consultez l'historique de vos transactions</p>
+          <h1 className="text-3xl font-bold">{t('nav.transactions')}</h1>
+          <p className="text-gray-600">{t('history.viewTransactions', 'View your transaction history')}</p>
         </div>
         <Button onClick={() => setShowRechargeModal(true)} className="gap-2">
           <Plus className="h-4 w-4" />
-          Recharger
+          {t('nav.topUp')}
         </Button>
       </div>
 
@@ -310,7 +382,7 @@ export default function TransactionsPage() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="p-2 border rounded-lg"
+              className="p-2 border rounded-lg bg-background"
             >
               <option value="all">Tous les types</option>
               <option value="recharge">Rechargements</option>
@@ -321,11 +393,12 @@ export default function TransactionsPage() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="p-2 border rounded-lg"
+              className="p-2 border rounded-lg bg-background"
             >
               <option value="all">Tous les statuts</option>
               <option value="completed">Complété</option>
               <option value="pending">En attente</option>
+              <option value="refunded">Remboursé</option>
               <option value="failed">Échoué</option>
               <option value="cancelled">Annulé</option>
             </select>
@@ -351,41 +424,87 @@ export default function TransactionsPage() {
       {transactionsLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-20 bg-gray-200 rounded animate-pulse"></div>
+            <div key={i} className="h-20 bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse"></div>
           ))}
         </div>
       ) : filteredTransactions.length > 0 ? (
         <div className="space-y-3">
-          {filteredTransactions.map(transaction => (
-            <Card key={transaction.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-gray-100">
-                      {getTypeIcon(transaction.type)}
+          {filteredTransactions.map(transaction => {
+            // Obtenir le statut réel basé sur l'activation liée
+            const realStatus = getRealTransactionStatus(transaction);
+            const statusConfig = getStatusBadge(realStatus);
+            
+            // Déterminer si c'est un crédit ou débit
+            const isCredit = ['recharge', 'topup', 'credit', 'refund', 'bonus'].includes(transaction.type);
+            const isRefunded = realStatus === 'refunded';
+            
+            return (
+              <Card key={transaction.id} className={`hover:shadow-md transition-shadow ${
+                isRefunded ? 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10' : ''
+              }`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {/* Icon */}
+                      <div className={`p-2.5 rounded-full flex-shrink-0 ${
+                        isRefunded ? 'bg-orange-100 dark:bg-orange-900/30' :
+                        isCredit ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+                      }`}>
+                        {isRefunded ? (
+                          <RefreshCw className="h-4 w-4 text-orange-600" />
+                        ) : isCredit ? (
+                          <ArrowDownRight className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <ArrowUpRight className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                      
+                      {/* Details */}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm capitalize truncate">
+                          {transaction.description || transaction.type}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDate(transaction.created_at)}
+                          </span>
+                          {transaction.payment_ref && (
+                            <span className="text-[10px] text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                              {transaction.payment_ref.slice(0, 15)}...
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold capitalize">{transaction.description || transaction.type}</p>
-                      <p className="text-sm text-gray-600">{formatDate(transaction.created_at)}</p>
-                      {transaction.payment_ref && (
-                        <p className="text-xs text-gray-500 font-mono">Réf: {transaction.payment_ref}</p>
-                      )}
+                    
+                    {/* Amount + Status */}
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-base font-bold ${
+                        isRefunded ? 'text-orange-600' :
+                        isCredit ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {isCredit ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount), 'XOF')}
+                      </p>
+                      <Badge 
+                        variant={statusConfig.variant}
+                        className={`mt-1 text-xs ${
+                          realStatus === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          realStatus === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          realStatus === 'refunded' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                          ''
+                        }`}
+                      >
+                        <span className="flex items-center">
+                          {statusConfig.icon}
+                          {statusConfig.label}
+                        </span>
+                      </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-bold ${
-                      transaction.type === 'recharge' ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {transaction.type === 'recharge' ? '+' : '-'}{formatCurrency(transaction.amount, 'XOF')}
-                    </p>
-                    <Badge {...getStatusBadge(transaction.status)}>
-                      {getStatusBadge(transaction.status).label}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card>

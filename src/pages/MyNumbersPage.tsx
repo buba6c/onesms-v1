@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { 
   Phone, 
   MessageSquare, 
@@ -50,6 +51,24 @@ export default function MyNumbersPage() {
   const [selectedNumber, setSelectedNumber] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // 🔴 REALTIME: Écoute les changements sur virtual_numbers en temps réel
+  useRealtimeSubscription({
+    table: 'virtual_numbers',
+    filter: user?.id ? `user_id=eq.${user.id}` : undefined,
+    enabled: !!user?.id,
+    queryKeys: [['virtual-numbers', user?.id]],
+    onUpdate: (payload) => {
+      const newData = payload.new as any;
+      if (newData?.sms && newData.sms.length > 0) {
+        toast({
+          title: '📱 Nouveau SMS !',
+          description: `Message reçu sur ${newData.phone_number}`,
+          duration: 5000,
+        });
+      }
+    }
+  });
+
   // Fetch user's virtual numbers
   const { data: numbers, isLoading } = useQuery<VirtualNumber[]>({
     queryKey: ['virtual-numbers', user?.id],
@@ -75,7 +94,8 @@ export default function MyNumbersPage() {
       return data as VirtualNumber[];
     },
     enabled: !!user?.id,
-    refetchInterval: 5000, // Refresh every 5 seconds
+    // Polling désactivé - realtime activé
+    refetchInterval: false,
   });
 
   // Cancel/Delete number mutation
@@ -106,13 +126,13 @@ export default function MyNumbersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['virtual-numbers'] });
       toast({
-        title: 'Supprimé',
-        description: 'Le numéro a été supprimé',
+        title: t('toasts.deleted'),
+        description: t('toasts.deletedDesc'),
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Erreur',
+        title: t('common.error'),
         description: error.message,
         variant: 'destructive',
       });
@@ -121,11 +141,11 @@ export default function MyNumbersPage() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      active: { label: 'Actif', variant: 'default' },
-      pending: { label: 'En attente', variant: 'secondary' },
-      completed: { label: 'Complété', variant: 'outline' },
-      expired: { label: 'Expiré', variant: 'destructive' },
-      cancelled: { label: 'Annulé', variant: 'destructive' },
+      active: { label: t('status.active'), variant: 'default' },
+      pending: { label: t('status.pending'), variant: 'secondary' },
+      completed: { label: t('status.completed'), variant: 'outline' },
+      expired: { label: t('status.expired'), variant: 'destructive' },
+      cancelled: { label: t('status.cancelled'), variant: 'destructive' },
     };
     return config[status] || { label: status, variant: 'outline' };
   };
@@ -135,8 +155,8 @@ export default function MyNumbersPage() {
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
     toast({
-      title: 'Copié !',
-      description: 'Numéro copié dans le presse-papiers',
+      title: t('toasts.copied'),
+      description: t('toasts.copiedNumber'),
     });
   };
 
@@ -146,7 +166,7 @@ export default function MyNumbersPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 pt-10 lg:pt-8">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-gray-200 rounded w-1/4"></div>
           {[1, 2, 3].map(i => (
@@ -158,7 +178,7 @@ export default function MyNumbersPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 pt-10 lg:pt-8">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Mes Numéros</h1>

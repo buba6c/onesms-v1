@@ -17,9 +17,11 @@ import SettingsPage from '@/pages/SettingsPage'
 import TopUpPage from '@/pages/TopUpPage'
 import RentPage from '@/pages/RentPage'
 import HowToUsePage from '@/pages/HowToUsePage'
+import SupportPage from '@/pages/SupportPage'
 import TermsPage from '@/pages/TermsPage'
 import PrivacyPage from '@/pages/PrivacyPage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
+import AdminMonitoring from '@/pages/admin/AdminMonitoring'
 import AdminUsers from '@/pages/admin/AdminUsers'
 import AdminProviders from '@/pages/admin/AdminProviders'
 import AdminServices from '@/pages/admin/AdminServices'
@@ -33,6 +35,7 @@ import AdminSyncStatusPage from '@/pages/admin/AdminSyncStatusPage'
 import PackagesManagementPage from '@/pages/admin/PackagesManagementPage'
 import AdminContactSettings from '@/pages/admin/AdminContactSettings'
 import AdminActivations from '@/pages/admin/AdminActivations'
+import AdminRentals from '@/pages/admin/AdminRentals'
 import ContactPage from '@/pages/ContactPage'
 import PrivateRoute from '@/components/PrivateRoute'
 import AdminRoute from '@/components/AdminRoute'
@@ -60,6 +63,7 @@ function App() {
             <Route path="reset-password" element={<ResetPasswordPage />} />
             <Route path="verify-email" element={<VerifyEmailPage />} />
             <Route path="how-to-use" element={<HowToUsePage />} />
+            <Route path="support" element={<SupportPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
@@ -80,12 +84,14 @@ function App() {
           {/* Admin Routes - SANS Layout principal (AdminLayout inclus dans AdminRoute) */}
           <Route path="admin" element={<AdminRoute />}>
             <Route index element={<AdminDashboard />} />
+            <Route path="monitoring" element={<AdminMonitoring />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="providers" element={<AdminProviders />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="countries" element={<AdminCountries />} />
             <Route path="transactions" element={<AdminTransactions />} />
             <Route path="activations" element={<AdminActivations />} />
+            <Route path="rentals" element={<AdminRentals />} />
             <Route path="pricing" element={<AdminPricing />} />
             <Route path="packages" element={<PackagesManagementPage />} />
             <Route path="sync-status" element={<AdminSyncStatusPage />} />

@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency, extractCodeFromSMS, calculateTimeRemaining } from '@/lib/utils';
+import { getCountryFlag, getFlagEmoji } from '@/lib/logo-service';
 import { 
   Check, 
   Clock, 
@@ -118,11 +119,12 @@ export default function BuyNumberModal({
       // Check user credits
       const { data: userData } = await supabase
         .from('users')
-        .select('credits')
+        .select('credits, balance')
         .eq('id', user.id)
-        .single();
+        .single() as { data: { credits?: number; balance?: number } | null };
 
-      if (!userData || userData.credits < purchaseData.price) {
+      const userBalance = userData?.balance || userData?.credits || 0;
+      if (!userData || userBalance < purchaseData.price) {
         throw new Error('Crédits insuffisants');
       }
 
@@ -132,7 +134,7 @@ export default function BuyNumberModal({
 
       toast({
         title: '✅ Numéro Acheté !',
-        description: `Numéro: ${activation.phone}`,
+        description: `Numéro acheté avec succès`,
       });
     } catch (error: any) {
       console.error('Purchase error:', error);
@@ -194,10 +196,10 @@ export default function BuyNumberModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Acheter un Numéro Virtuel</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pb-2 sm:pb-4">
+          <DialogTitle className="text-lg sm:text-2xl">Acheter un Numéro Virtuel</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             {step === 'select' && 'Sélectionnez les options de votre numéro'}
             {step === 'confirm' && 'Confirmez votre achat'}
             {step === 'processing' && 'Traitement en cours...'}
@@ -367,216 +369,193 @@ export default function BuyNumberModal({
 
         {/* Step 3: Processing */}
         {step === 'processing' && (
-          <div className="text-center py-12">
-            <Loader2 className="h-16 w-16 mx-auto mb-4 text-blue-600 animate-spin" />
-            <h3 className="text-xl font-bold mb-2">Traitement en cours...</h3>
-            <p className="text-gray-600">Veuillez patienter quelques secondes</p>
+          <div className="text-center py-16">
+            <div className="relative w-16 h-16 mx-auto mb-6">
+              <div className="absolute inset-0 rounded-full border-4 border-gray-100"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Traitement en cours</h3>
+            <p className="text-sm text-gray-500">Veuillez patienter...</p>
           </div>
         )}
 
-        {/* Step 4: Waiting for SMS */}
+        {/* Step 4: Waiting for SMS - Clean Modern Design */}
         {step === 'waiting' && activationData && (
-          <div className="space-y-4">
-            {/* Header avec status */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                    {activationData.status === 'RECEIVED' ? (
-                      <CheckCircle2 className="h-7 w-7" />
-                    ) : activationData.status === 'TIMEOUT' || activationData.status === 'CANCELED' ? (
-                      <AlertCircle className="h-7 w-7" />
-                    ) : (
-                      <MessageSquare className="h-7 w-7 animate-pulse" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">
-                      {activationData.status === 'RECEIVED' ? 'SMS Reçu !' : 
-                       activationData.status === 'TIMEOUT' ? 'Timeout' :
-                       activationData.status === 'CANCELED' ? 'Annulé' :
-                       'En attente du SMS...'}
-                    </h3>
-                    <p className="text-sm text-white/80">
-                      {activationData.status === 'RECEIVED' ? 'Votre code est prêt' :
-                       activationData.status === 'TIMEOUT' ? 'Aucun SMS reçu' :
-                       'Le code apparaîtra automatiquement'}
-                    </p>
-                  </div>
-                </div>
-                {frozenBalance > 0 && (
-                  <div className="text-right">
-                    <p className="text-xs text-white/70">Gelé</p>
-                    <p className="text-lg font-bold">{formatCurrency(frozenBalance, 'XOF')}</p>
-                  </div>
+          <div className="space-y-5">
+            {/* Status Badge */}
+            <div className="flex justify-center">
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
+                activationData.status === 'RECEIVED' 
+                  ? 'bg-green-100 text-green-700' 
+                  : activationData.status === 'TIMEOUT' || activationData.status === 'CANCELED'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-blue-100 text-blue-700'
+              }`}>
+                {activationData.status === 'RECEIVED' ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    SMS Reçu
+                  </>
+                ) : activationData.status === 'TIMEOUT' ? (
+                  <>
+                    <AlertCircle className="h-4 w-4" />
+                    Expiré
+                  </>
+                ) : activationData.status === 'CANCELED' ? (
+                  <>
+                    <AlertCircle className="h-4 w-4" />
+                    Annulé
+                  </>
+                ) : (
+                  <>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    En attente
+                  </>
                 )}
               </div>
+            </div>
 
-              {/* Timer avec barre de progression */}
-              {activationData.status !== 'RECEIVED' && activationData.status !== 'TIMEOUT' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/80">Temps restant</span>
-                    <span className="font-mono font-bold text-lg">{formatTime(countdown)}</span>
-                  </div>
-                  <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
+            {/* Phone Number - Clean Card */}
+            <div className="bg-gray-50 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Numéro</span>
+                <span className="text-xs text-gray-400">
+                  {getFlagEmoji(purchaseData.country)} {purchaseData.service}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 text-center">
+                  <span className="text-2xl sm:text-3xl font-mono font-bold text-gray-900 tracking-wide">
+                    {activationData.phone}
+                  </span>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(activationData.phone, 'phone')}
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+                    copiedPhone 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {copiedPhone ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Timer - Minimal */}
+            {activationData.status !== 'RECEIVED' && activationData.status !== 'TIMEOUT' && activationData.status !== 'CANCELED' && (
+              <div className="flex items-center justify-center gap-3">
+                <Clock className="h-4 w-4 text-gray-400" />
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-mono font-bold text-gray-900">{formatTime(countdown)}</span>
+                  <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                     <div 
-                      className={`h-2 rounded-full transition-all duration-1000 ${
-                        countdown < 120 ? 'bg-red-400' : 
-                        countdown < 300 ? 'bg-yellow-400' : 
-                        'bg-green-400'
+                      className={`h-full rounded-full transition-all duration-1000 ${
+                        countdown < 120 ? 'bg-red-500' : countdown < 300 ? 'bg-amber-500' : 'bg-green-500'
                       }`}
                       style={{ width: `${(countdown / 600) * 100}%` }}
                     />
                   </div>
-                  {lastPollTime && (
-                    <div className="flex items-center gap-1 text-xs text-white/60">
-                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                      <span>Dernière vérification: il y a {Math.floor((Date.now() - lastPollTime.getTime()) / 1000)}s</span>
+                </div>
+              </div>
+            )}
+
+            {/* SMS Content */}
+            <div className="min-h-[180px] flex flex-col">
+              {activationData.sms && activationData.sms.length > 0 ? (
+                <div className="space-y-4">
+                  {activationData.sms.map((sms, index) => {
+                    const code = extractCodeFromSMS(sms.text);
+                    return (
+                      <div key={index} className="space-y-3">
+                        {/* Code Display - Big & Clear */}
+                        {code && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-center">
+                            <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-2">
+                              Votre code
+                            </p>
+                            <div className="flex items-center justify-center gap-3">
+                              <span className="text-4xl sm:text-5xl font-mono font-bold text-blue-600 tracking-[0.2em]">
+                                {code}
+                              </span>
+                              <button
+                                onClick={() => copyToClipboard(code, 'code')}
+                                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                                  copiedCode 
+                                    ? 'bg-blue-500 text-white scale-95' 
+                                    : 'bg-blue-100 text-blue-600 hover:bg-blue-200 active:scale-95'
+                                }`}
+                              >
+                                {copiedCode ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Message Text */}
+                        <div className="bg-gray-50 rounded-xl p-3">
+                          <p className="text-sm text-gray-600 leading-relaxed">{sms.text}</p>
+                          <p className="text-xs text-gray-400 mt-2">
+                            {new Date(sms.date).toLocaleTimeString('fr-FR')}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-8">
+                  <div className="relative mb-4">
+                    <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
+                      <MessageSquare className="h-8 w-8 text-blue-500" />
                     </div>
-                  )}
+                    <div className="absolute -top-1 -right-1 w-4 h-4">
+                      <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-75"></div>
+                      <div className="absolute inset-0 bg-blue-500 rounded-full"></div>
+                    </div>
+                  </div>
+                  <p className="font-medium text-gray-900 mb-1">En attente du SMS</p>
+                  <p className="text-sm text-gray-500 text-center max-w-[200px]">
+                    Utilisez ce numéro sur {purchaseData.service} pour recevoir le code
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Phone Number Card */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Votre Numéro
-                  </label>
-                  <span className="text-xs text-gray-500 capitalize">
-                    {getFlagEmoji(purchaseData.country)} {purchaseData.country}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    value={activationData.phone} 
-                    readOnly 
-                    className="text-xl font-mono font-bold text-center bg-gray-50 border-2"
-                  />
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => copyToClipboard(activationData.phone, 'phone')}
-                    className="h-11 w-11"
-                  >
-                    {copiedPhone ? <Check className="h-5 w-5 text-green-600" /> : <Copy className="h-5 w-5" />}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* SMS Display */}
-            <Card>
-              <CardContent className="pt-6">
-                {activationData.sms && activationData.sms.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <MessageSquare className="h-5 w-5 text-green-600" />
-                      </div>
-                      <span className="font-bold text-green-600">SMS Reçu !</span>
-                    </div>
-                    {activationData.sms.map((sms, index) => {
-                      const code = extractCodeFromSMS(sms.text);
-                      return (
-                        <div key={index} className="space-y-3">
-                          {/* Message texte */}
-                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
-                            <p className="text-sm text-gray-700 leading-relaxed">{sms.text}</p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {new Date(sms.date).toLocaleTimeString('fr-FR')}
-                            </p>
-                          </div>
-                          
-                          {/* Code extrait */}
-                          {code && (
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 shadow-lg">
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="text-sm font-semibold text-green-700 flex items-center gap-2">
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  Code de Validation
-                                </span>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => copyToClipboard(code, 'code')}
-                                  className="h-8 hover:bg-green-100"
-                                >
-                                  {copiedCode ? (
-                                    <Check className="h-4 w-4 text-green-600 mr-1" />
-                                  ) : (
-                                    <Copy className="h-4 w-4 mr-1" />
-                                  )}
-                                  <span className="text-xs">Copier</span>
-                                </Button>
-                              </div>
-                              <div className="bg-white rounded-lg p-4 text-center">
-                                <span className="text-4xl font-mono font-bold text-green-600 tracking-wider">
-                                  {code}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="relative inline-block mb-4">
-                      <MessageSquare className="h-16 w-16 text-blue-400 animate-pulse" />
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-ping" />
-                    </div>
-                    <h4 className="font-semibold text-gray-900 mb-2">En attente du SMS...</h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Le code de validation s'affichera automatiquement ici
-                    </p>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                      <span className="text-xs font-medium text-blue-700">Vérification toutes les 3 secondes</span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Action buttons */}
+            {/* Actions */}
             <div className="flex gap-3 pt-2">
               <Button 
                 variant="outline" 
                 onClick={onClose}
-                className="flex-1"
-                size="lg"
+                className="flex-1 h-12 rounded-xl text-sm font-medium"
               >
                 Fermer
               </Button>
-              {activationData.status === 'RECEIVED' && (
+              {activationData.status === 'RECEIVED' ? (
                 <Button 
                   onClick={() => {
                     onClose();
                     window.location.href = '/my-numbers';
                   }}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  size="lg"
+                  className="flex-1 h-12 rounded-xl text-sm font-medium bg-green-500 hover:bg-green-600"
                 >
                   <Check className="h-4 w-4 mr-2" />
                   Terminer
                 </Button>
+              ) : (
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(activationData.phone);
+                    toast({ title: 'Numéro copié !', description: activationData.phone });
+                  }}
+                  className="flex-1 h-12 rounded-xl text-sm font-medium"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copier le numéro
+                </Button>
               )}
             </div>
-
-            {/* Info footer */}
-            {activationData.status === 'PENDING' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                <p className="text-sm text-amber-800">
-                  💡 <strong>Astuce:</strong> Utilisez ce numéro dans l'application {purchaseData.service} maintenant
-                </p>
-              </div>
-            )}
           </div>
         )}
       </DialogContent>

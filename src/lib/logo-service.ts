@@ -5,70 +5,364 @@
 
 const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
 
-// Mapping services vers domaines (prioritaire)
+// ============================================================================
+// Mapping services SMS-Activate vers domaines
+// OFFICIEL: Basé sur API getServicesList de SMS-Activate (29 Nov 2025)
+// ============================================================================
 const SERVICE_DOMAINS: Record<string, string> = {
-  // Codes SMS-Activate TOP services
-  'wa': 'whatsapp.com',
-  'tg': 'telegram.org',
-  'vi': 'viber.com',
-  'ig': 'instagram.com',
-  'fb': 'facebook.com',
-  'tw': 'x.com',
-  'ds': 'discord.com',
-  'vk': 'vk.com',
-  'am': 'amazon.com',
-  'nf': 'netflix.com',
-  'ub': 'uber.com',
-  'ts': 'paypal.com',
-  'mb': 'mamba.ru',
-  'ms': 'microsoft.com',
-  'om': 'microsoft.com',
-  'go': 'google.com',
-  'ym': 'yandex.com',
-  'ok': 'ok.ru',
-  'ma': 'mail.ru',
-  'av': 'avito.ru',
-  'yz': 'youla.ru',
-  'wb': 'wildberries.ru',
-  'me': 'line.me',
-  'we': 'wechat.com',
-  'sn': 'snapchat.com',
-  'tt': 'tiktok.com',
-  'lf': 'aliexpress.com',
-  'gm': 'gmail.com',
-  'mm': 'mamba.ru',
-  'uk': 'ukr.net',
-  'kp': 'kp.ru',
-  'mr': 'mail.ru',
-  'oi': 'tinder.com',
-  'qv': 'badoo.com',
-  'bd': 'baddoo.com',
-  'zn': 'dzen.ru',
-  'tn': 'tinder.com',
-  'ka': 'kakao.com',
-  'kt': 'kakaotalk.com',
-  'wx': 'wechat.com',
-  'qq': 'qq.com',
-  'li': 'linkedin.com',
-  'gp': 'play.google.com',
-  'mc': 'mastercard.com',
-  'bl': 'blizzard.com',
-  'dr': 'dribbble.com',
-  'zr': 'zara.com',
-  'im': 'imo.im',
-  'tx': 'tencent.com',
-  'mt': 'mercadolibre.com',
-  'pm': 'payeer.com',
-  'pf': 'postfinance.ch',
+  // 🔥 TOP SERVICES (ordre API SMS-Activate)
+  'full': 'sms-activate.io',      // Full rent
+  'fb': 'facebook.com',           // facebook
+  'ig': 'instagram.com',          // Instagram+Threads
+  'wa': 'whatsapp.com',           // Whatsapp
+  'go': 'google.com',             // Google,youtube,Gmail
+  'am': 'amazon.com',             // Amazon
+  'oi': 'tinder.com',             // Tinder
+  'tg': 'telegram.org',           // Telegram
+  'hw': 'alibaba.com',            // Alipay/Alibaba/1688
+  'lf': 'tiktok.com',             // TikTok/Douyin
+  'yw': 'grindr.com',             // Grindr (code yw, pas gr!)
+  'ot': 'sms-activate.io',        // Any other
+  'tw': 'x.com',                  // Twitter
+  'mm': 'microsoft.com',          // Microsoft (PAS Mamba!)
+  'ka': 'shopee.com',             // Shopee (PAS KakaoTalk!)
+  'wb': 'wechat.com',             // WeChat
+  'ds': 'discord.com',            // Discord
+  'gp': 'ticketmaster.com',       // Ticketmaster (pas Google Play!)
+  'jg': 'grab.com',               // Grab
+  'li': 'baidu.com',              // Baidu (PAS LinkedIn!)
+  'vi': 'viber.com',              // Viber
+  'nv': 'naver.com',              // Naver
+  'ni': 'gojek.com',              // Gojek
+  'mb': 'yahoo.com',              // Yahoo (PAS Mamba!)
+  'ub': 'uber.com',               // Uber
+  'vk': 'vk.com',                 // vk.com
+  'xh': 'ovo.id',                 // OVO
+  'me': 'line.me',                // Line messenger
+  'cq': 'mercadolibre.com',       // Mercado
+  'vz': 'hinge.co',               // Hinge
+  'dl': 'lazada.com',             // Lazada
+  'fr': 'dana.id',                // Dana
+  'dh': 'ebay.com',               // eBay
+  'pm': 'aol.com',                // AOL (PAS Payeer!)
+  'ts': 'paypal.com',             // PayPal
+  'wr': 'walmart.com',            // Walmart
+  'df': 'happn.com',              // Happn
+  'ki': '99app.com',              // 99app
+  'za': 'jd.com',                 // JDcom
+  'ya': 'yandex.com',             // Yandex/Uber
+  'wx': 'apple.com',              // Apple (PAS WeChat!)
+  'bn': 'alfagift.id',            // Alfagift (PAS Binance!)
+  'nf': 'netflix.com',            // Netflix
+  'ok': 'ok.ru',                  // ok.ru
+  'nc': 'payoneer.com',           // Payoneer
+  'bw': 'signal.org',             // Signal
+  'nz': 'foodpanda.com',          // Foodpanda
+  'aez': 'shein.com',             // Shein
+  'mo': 'bumble.com',             // Bumble
+  'pf': 'pof.com',                // pof.com
+  'tn': 'linkedin.com',           // LinkedIN
+  'tx': 'bolt.eu',                // Bolt (PAS Tencent!)
+  'sn': 'olx.com',                // OLX (PAS Snapchat!)
+  'ah': 'escapefromtarkov.com',   // EscapeFromTarkov
+  'cn': 'fiverr.com',             // Fiverr
+  'zk': 'deliveroo.com',          // Deliveroo
+  'kc': 'vinted.com',             // Vinted
+  'xk': 'didiglobal.com',         // DiDi
+  'fu': 'snapchat.com',           // Snapchat
+  're': 'coinbase.com',           // Coinbase
+  'pc': 'bet365.com',             // Casino/bet/gambling
+  'xd': 'tokopedia.com',          // Tokopedia
+  'mv': 'fruitz.io',              // Fruitz
+  'kt': 'kakaocorp.com',          // KakaoTalk
+  'bz': 'blizzard.com',           // Blizzard
+  'do': 'leboncoin.fr',           // Leboncoin
+  'ac': 'doordash.com',           // DoorDash
+  'im': 'imo.im',                 // Imo
+  'kl': 'kolesa.kz',              // kolesa.kz
+  'ua': 'blablacar.com',          // BlaBlaCar
+  'kf': 'weibo.com',              // Weibo
+  'ew': 'nike.com',               // Nike
+  'rr': 'wolt.com',               // Wolt
+  'pr': 'trendyol.com',           // Trendyol
+  'gf': 'voice.google.com',       // GoogleVoice
+  'yl': 'yalla.com',              // Yalla
+  'uu': 'wildberries.ru',         // Wildberries
+  'sg': 'ozon.ru',                // OZON (PAS Signal!)
+  'fz': 'kfc.com',                // KFC
+  'vm': 'okcupid.com',            // OkCupid
+  'pd': 'ifood.com.br',           // IFood
+  'rs': 'lotuscars.com',          // Lotus
+  'wh': 'tantan.com',             // TanTan
+  'uk': 'airbnb.com',             // Airbnb (PAS ukr.net!)
+  'ef': 'nextdoor.com',           // Nextdoor
+  'ep': 'temu.com',               // Temu
+  'hx': 'aliexpress.com',         // AliExpress
+  'bo': 'wise.com',               // Wise
+  'zh': 'zoho.com',               // Zoho
+  'fd': 'mamba.ru',               // Mamba (code fd, pas mm!)
+  'aiw': 'roblox.com',            // Roblox
+  'qq': 'qq.com',                 // Tencent QQ
+  'bl': 'bigo.tv',                // BIGO LIVE
+  'mt': 'steampowered.com',       // Steam (PAS MercadoLibre!)
+  'dr': 'openai.com',             // OpenAI
+  'qv': 'badoo.com',              // Badoo
+  'iq': 'icq.com',                // icq
+  'dp': 'protonmail.com',         // ProtonMail (pas Disney+!)
+  'acz': 'anthropic.com',         // Claude
+  'aon': 'binance.com',           // Binance (code aon!)
   
-  // Services manquants ajoutés
-  'fu': 'snapchat.com',      // Snapchat
-  'bnl': 'reddit.com',       // Reddit
-  'aon': 'binance.com',      // Binance
-  'ij': 'revolut.com',       // Revolut
-  'alj': 'spotify.com',      // Spotify
+  // ============================================================================
+  // Services demandés - Mappings ajoutés (30 Nov 2025)
+  // ============================================================================
+  'aq': 'glovoapp.com',           // Glovo
+  'aow': 'geekay.com',            // Geekay
+  'yq': 'mail.com',               // mail.com
+  'mw': 'transfergo.com',         // Transfergo
+  'bgj': 'moonpay.com',           // MoonPay
+  'baa': 'wirex.com',             // Wirex
+  'bwv': 'manus.im',              // Manus
+  'gmx': 'gmx.net',               // gmx
+  'abk': 'gmx.net',               // GMX
+  'ahx': 'bitrue.com',            // Bitrue
+  'ma': 'mail.ru',                // Mail.ru
+  'apa': 'exness.com',            // Exness
+  'rl': 'indriver.com',           // inDriver
+  'um': 'belwest.by',             // Belwest
+  'ij': 'revolut.com',            // Revolut
+  'abn': 'bybit.com',             // Bybit
+  'aor': 'okx.com',               // OKX
+  'okx': 'okx.com',               // okx
+  'aqt': 'skrill.com',            // Skrill
+  'my': 'caixabank.es',           // CAIXA
+  'aol': 'paysera.com',           // Paysera
+  'cad': 'bossrevolution.com',    // BOSS Revolution
   
-  // Noms complets
+  // ============================================================================
+  // TOP 100 Services populaires - Mappings complets
+  // ============================================================================
+  'alj': 'spotify.com',           // Spotify
+  'hb': 'twitch.tv',              // Twitch
+  'ti': 'crypto.com',             // Crypto.com
+  'blm': 'epicgames.com',         // Epic Games
+  'bnl': 'reddit.com',            // Reddit
+  'xt': 'flipkart.com',           // Flipkart
+  'ln': 'grofers.com',            // Grofers
+  'kk': 'idealista.com',          // Idealista
+  'zm': 'offerup.com',            // OfferUp
+  'cc': 'sms-activate.io',        // Service CC
+  'bqp': 'zara.com',              // Zara
+  'ccb': 'nintendo.com',          // Nintendo
+  'baz': 'christianfilipina.com', // Christian Filipina
+  'an': 'adidas.com',             // Adidas
+  'aqf': 'coze.com',              // Coze
+  'dc': 'yikyak.com',             // YikYak
+  'acc': 'luckyland.com',         // LuckyLand Slots
+  'dd': 'cloudchat.com',          // CloudChat
+  'acb': 'sparkdriver.com',       // Spark Driver
+  'wc': 'craigslist.org',         // Craigslist
+  'fs': 'sikayetvar.com',         // Şikayet var
+  'avu': 'karos.fr',              // Karos
+  'bli': 'scalapay.com',          // Scalapay
+  'bub': 'sparda.de',             // Sparda Bank
+  
+  // ============================================================================
+  // Services financiers et crypto populaires
+  // ============================================================================
+  'kraken': 'kraken.com',         // Kraken
+  'gemini': 'gemini.com',         // Gemini
+  'kucoin': 'kucoin.com',         // KuCoin
+  'huobi': 'huobi.com',           // Huobi
+  'ftx': 'ftx.com',               // FTX
+  'bitstamp': 'bitstamp.net',     // Bitstamp
+  'n26': 'n26.com',               // N26
+  'monzo': 'monzo.com',           // Monzo
+  'chime': 'chime.com',           // Chime
+  'venmo': 'venmo.com',           // Venmo
+  'cashapp': 'cashapp.com',       // Cash App
+  'klarna': 'klarna.com',         // Klarna
+  'afterpay': 'afterpay.com',     // Afterpay
+  'affirm': 'affirm.com',         // Affirm
+  'nubank': 'nubank.com.br',      // Nubank
+  'westernunion': 'westernunion.com', // Western Union
+  'moneygram': 'moneygram.com',   // MoneyGram
+  'remitly': 'remitly.com',       // Remitly
+  'worldremit': 'worldremit.com', // WorldRemit
+  
+  // ============================================================================
+  // Services de livraison et transport
+  // ============================================================================
+  'ubereats': 'ubereats.com',     // Uber Eats
+  'grubhub': 'grubhub.com',       // GrubHub
+  'postmates': 'postmates.com',   // Postmates
+  'instacart': 'instacart.com',   // Instacart
+  'rappi': 'rappi.com',           // Rappi
+  'pedidosya': 'pedidosya.com',   // PedidosYa
+  'justeat': 'justeat.com',       // Just Eat
+  'takeaway': 'takeaway.com',     // Takeaway
+  'didi': 'didiglobal.com',       // DiDi
+  'lyft': 'lyft.com',             // Lyft
+  'cabify': 'cabify.com',         // Cabify
+  
+  // ============================================================================
+  // Services de streaming et gaming
+  // ============================================================================
+  'deezer': 'deezer.com',         // Deezer
+  'soundcloud': 'soundcloud.com', // SoundCloud
+  'pandora': 'pandora.com',       // Pandora
+  'tidal': 'tidal.com',           // Tidal
+  'primevideo': 'primevideo.com', // Prime Video
+  'hulu': 'hulu.com',             // Hulu
+  'disneyplus': 'disneyplus.com', // Disney+
+  'hbomax': 'hbomax.com',         // HBO Max
+  'peacock': 'peacocktv.com',     // Peacock
+  'paramount': 'paramountplus.com', // Paramount+
+  'ea': 'ea.com',                 // EA Games
+  'ubisoft': 'ubisoft.com',       // Ubisoft
+  'riotgames': 'riotgames.com',   // Riot Games
+  'activision': 'activision.com', // Activision
+  'bethesda': 'bethesda.net',     // Bethesda
+  
+  // ============================================================================
+  // Services de voyage et hébergement
+  // ============================================================================
+  'booking': 'booking.com',       // Booking.com
+  'expedia': 'expedia.com',       // Expedia
+  'kayak': 'kayak.com',           // Kayak
+  'skyscanner': 'skyscanner.com', // Skyscanner
+  'agoda': 'agoda.com',           // Agoda
+  'hotels': 'hotels.com',         // Hotels.com
+  'trivago': 'trivago.com',       // Trivago
+  'vrbo': 'vrbo.com',             // VRBO
+  'hostelworld': 'hostelworld.com', // Hostelworld
+  
+  // ============================================================================
+  // Services professionnels et emploi
+  // ============================================================================
+  'indeed': 'indeed.com',         // Indeed
+  'glassdoor': 'glassdoor.com',   // Glassdoor
+  'monster': 'monster.com',       // Monster
+  'ziprecruiter': 'ziprecruiter.com', // ZipRecruiter
+  'upwork': 'upwork.com',         // Upwork
+  'fiverr': 'fiverr.com',         // Fiverr
+  'freelancer': 'freelancer.com', // Freelancer
+  
+  // ============================================================================
+  // VPN et sécurité
+  // ============================================================================
+  'nordvpn': 'nordvpn.com',       // NordVPN
+  'expressvpn': 'expressvpn.com', // ExpressVPN
+  'surfshark': 'surfshark.com',   // Surfshark
+  'protonvpn': 'protonvpn.com',   // ProtonVPN
+  'cyberghost': 'cyberghostvpn.com', // CyberGhost
+  
+  // Services additionnels
+  'gr': 'astropay.com',           // AstroPay (code SMS-Activate: gr)
+  'afk': 'astropay.com',          // AstroPay (autre code possible)
+  'astropay': 'astropay.com',     // AstroPay (nom complet)
+  'et': 'clubhouse.com',          // Clubhouse (code SMS-Activate: et)
+  'ch': 'clubhouse.com',          // Clubhouse (fallback)
+  'clubhouse': 'clubhouse.com',   // Clubhouse (nom complet)
+  'ms': 'novaposhta.ua',          // NovaPoshta (code SMS-Activate: ms)
+  'np': 'novaposhta.ua',          // Nova Poshta (fallback)
+  'novaposhta': 'novaposhta.ua',  // Nova Poshta (nom complet)
+  'pn': 'allegro.pl',             // Allegro
+  'ld': 'zalo.me',                // Zalo
+  'bd': 'weverse.io',             // Weverse/Hybe
+  'dz': 'akulaku.com',            // Akulaku
+  // 'ot' déjà défini plus haut
+  'st': 'steampowered.com',       // Steam (code st)
+  'gl': 'globo.com',              // Globo
+  'gm': 'game.com',               // Game
+  'gu': 'groupon.com',            // Groupon
+  'hz': 'hepsiburada.com',        // Hepsiburada
+  'ly': 'lydia-app.com',          // Lydia
+  'lz': 'lalamove.com',           // Lalamove
+  'mz': 'mercadopago.com',        // MercadoPago
+  'nk': 'nykaa.com',              // Nykaa
+  'oe': 'omegle.com',             // Omegle
+  'ol': 'olacabs.com',            // Ola
+  'pz': 'pizza.com',              // Pizza Hut
+  'qz': 'quora.com',              // Quora
+  'rc': 'rakuten.com',            // Rakuten
+  'sd': 'swiggy.com',             // Swiggy
+  'sf': 'salesforce.com',         // Salesforce
+  'sk': 'skype.com',              // Skype
+  'sl': 'shopee.com',             // Shopee (autre code)
+  'sm': 'samsung.com',            // Samsung
+  'sp': 'spotify.com',            // Spotify
+  'sq': 'squarespace.com',        // Squarespace
+  'sr': 'surveymonkey.com',       // SurveyMonkey
+  'sv': 'imgur.com',              // Imgur
+  'sy': 'symphony.com',           // Symphony
+  'sz': 'souq.com',               // Souq
+  'ta': 'talabat.com',            // Talabat
+  'tc': 'ticketfly.com',          // Ticketfly
+  'te': 'telegram.org',           // Telegram (autre code)
+  'tf': 'tiffany.com',            // Tiffany
+  // 'ti' déjà défini comme crypto.com plus haut
+  'to': 'tokopedia.com',          // Tokopedia (autre code)
+  'tp': 'tripadvisor.com',        // TripAdvisor
+  'tt': 'tiktok.com',             // TikTok (autre code)
+  'tv': 'twitch.tv',              // Twitch
+  'ty': 'toyota.com',             // Toyota
+  'tz': 'taobao.com',             // Taobao
+  'vd': 'vodafone.com',           // Vodafone
+  've': 'verizon.com',            // Verizon
+  'vf': 'vodafone.com',           // Vodafone
+  'vp': 'vimeo.com',              // Vimeo
+  'vr': 'vrbo.com',               // VRBO
+  'vs': 'visa.com',               // Visa
+  'wd': 'weddingwire.com',        // WeddingWire
+  'we': 'wework.com',             // WeWork
+  'wf': 'wellsfargo.com',         // Wells Fargo
+  'wl': 'walmart.com',            // Walmart
+  'wm': 'walmart.com',            // Walmart
+  'wn': 'southwest.com',          // Southwest
+  'wo': 'woocommerce.com',        // WooCommerce
+  'wp': 'wordpress.com',          // WordPress
+  'ws': 'wsj.com',                // Wall Street Journal
+  'wt': 'wetransfer.com',         // WeTransfer
+  'wy': 'wyze.com',               // Wyze
+  'xp': 'expedia.com',            // Expedia
+  'xr': 'xero.com',               // Xero
+  'xs': 'xsolla.com',             // Xsolla
+  // 'xt' déjà défini comme flipkart.com plus haut
+  'yb': 'youtube.com',            // YouTube
+  'yc': 'ycombinator.com',        // Y Combinator
+  'yd': 'yandex.com',             // Yandex
+  'ye': 'yelp.com',               // Yelp
+  'yi': 'yidio.com',              // Yidio
+  'yo': 'yahoo.com',              // Yahoo
+  'yp': 'yellowpages.com',        // Yellow Pages
+  'yr': 'yoox.com',               // Yoox
+  'ys': 'yousign.com',            // YouSign
+  'yt': 'youtube.com',            // YouTube
+  'yu': 'yubo.live',              // Yubo
+  'yv': 'yves-rocher.com',        // Yves Rocher
+  'zb': 'zomato.com',             // Zomato
+  'zc': 'zendesk.com',            // Zendesk
+  'zd': 'zdnet.com',              // ZDNet
+  'ze': 'zellepay.com',           // Zelle
+  'zf': 'zaful.com',              // Zaful
+  'zg': 'zillow.com',             // Zillow
+  'zi': 'zoom.us',                // Zoom
+  'zl': 'zalo.me',                // Zalo
+  // 'zm' déjà défini comme offerup.com plus haut
+  'zn': 'zenith.com',             // Zenith
+  'zo': 'zomato.com',             // Zomato
+  'zp': 'zapier.com',             // Zapier
+  'zr': 'zara.com',               // Zara
+  'zs': 'zscaler.com',            // Zscaler
+  'zt': 'zepto.com',              // Zepto
+  'zu': 'zuora.com',              // Zuora
+  'zv': 'zwift.com',              // Zwift
+  'zw': 'zomato.com',             // Zomato
+  'zx': 'zoox.com',               // Zoox
+  'zy': 'zynga.com',              // Zynga
+  'zz': 'zazzle.com',             // Zazzle
+  
+  // Noms complets (fallback pour recherche)
   'whatsapp': 'whatsapp.com',
   'instagram': 'instagram.com',
   'facebook': 'facebook.com',
@@ -113,11 +407,9 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'stripe': 'stripe.com',
   'coinbase': 'coinbase.com',
   'binance': 'binance.com',
-  'bn': 'binance.com',
   'revolut': 'revolut.com',
   'tinder': 'tinder.com',
   'badoo': 'badoo.com',
-  'full': 'sms-activate.org',
 }
 
 /**
@@ -131,6 +423,32 @@ const generateFallbackLogo = (serviceCode: string, emoji?: string): string => {
   // SVG avec emoji ou première lettre
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234f46e5;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23grad)' width='200' height='200' rx='20'/%3E%3Ctext x='50%25' y='50%25' font-family='system-ui,-apple-system,sans-serif' font-size='80' text-anchor='middle' dominant-baseline='middle'%3E${displayEmoji}%3C/text%3E%3Ctext x='50%25' y='85%25' font-family='system-ui,-apple-system,sans-serif' font-size='16' fill='white' text-anchor='middle' opacity='0.8'%3E${firstLetter}${code.slice(1, 8)}%3C/text%3E%3C/svg%3E`
 }
+
+// Liste des codes pays ISO-2 à exclure de logo.dev (ils génèrent des erreurs 404)
+const ISO_COUNTRY_CODES = new Set([
+  'ad', 'ae', 'af', 'ag', 'ai', 'al', 'am', 'ao', 'aq', 'ar', 'as', 'at', 'au', 'aw', 'ax', 'az',
+  'ba', 'bb', 'bd', 'be', 'bf', 'bg', 'bh', 'bi', 'bj', 'bl', 'bm', 'bn', 'bo', 'bq', 'br', 'bs', 'bt', 'bv', 'bw', 'by', 'bz',
+  'ca', 'cc', 'cd', 'cf', 'cg', 'ch', 'ci', 'ck', 'cl', 'cm', 'cn', 'co', 'cr', 'cu', 'cv', 'cw', 'cx', 'cy', 'cz',
+  'de', 'dj', 'dk', 'dm', 'do', 'dz', 'ec', 'ee', 'eg', 'eh', 'er', 'es', 'et', 'fi', 'fj', 'fk', 'fm', 'fo', 'fr',
+  'ga', 'gb', 'gd', 'ge', 'gf', 'gg', 'gh', 'gi', 'gl', 'gm', 'gn', 'gp', 'gq', 'gr', 'gs', 'gt', 'gu', 'gw', 'gy',
+  'hk', 'hm', 'hn', 'hr', 'ht', 'hu', 'id', 'ie', 'il', 'im', 'in', 'io', 'iq', 'ir', 'is', 'it',
+  'je', 'jm', 'jo', 'jp', 'ke', 'kg', 'kh', 'ki', 'km', 'kn', 'kp', 'kr', 'kw', 'ky', 'kz',
+  'la', 'lb', 'lc', 'li', 'lk', 'lr', 'ls', 'lt', 'lu', 'lv', 'ly',
+  'ma', 'mc', 'md', 'me', 'mf', 'mg', 'mh', 'mk', 'ml', 'mm', 'mn', 'mo', 'mp', 'mq', 'mr', 'ms', 'mt', 'mu', 'mv', 'mw', 'mx', 'my', 'mz',
+  'na', 'nc', 'ne', 'nf', 'ng', 'ni', 'nl', 'no', 'np', 'nr', 'nu', 'nz',
+  'om', 'pa', 'pe', 'pf', 'pg', 'ph', 'pk', 'pl', 'pm', 'pn', 'pr', 'ps', 'pt', 'pw', 'py',
+  'qa', 're', 'ro', 'rs', 'ru', 'rw',
+  'sa', 'sb', 'sc', 'sd', 'se', 'sg', 'sh', 'si', 'sj', 'sk', 'sl', 'sm', 'sn', 'so', 'sr', 'ss', 'st', 'sv', 'sx', 'sy', 'sz',
+  'tc', 'td', 'tf', 'tg', 'th', 'tj', 'tk', 'tl', 'tm', 'tn', 'to', 'tr', 'tt', 'tv', 'tw', 'tz',
+  'ua', 'ug', 'um', 'us', 'uy', 'uz', 'va', 've', 'vg', 'vi', 'vn', 'vu', 'wf', 'ws', 'ye', 'yt', 'za', 'zm', 'zw',
+  // Codes pays SMS-Activate communs
+  'usa', 'russia', 'ukraine', 'china', 'india', 'indonesia', 'philippines', 'thailand', 'vietnam', 'malaysia',
+  'england', 'france', 'germany', 'spain', 'italy', 'poland', 'netherlands', 'belgium', 'sweden', 'norway',
+  'brazil', 'mexico', 'argentina', 'colombia', 'chile', 'peru', 'venezuela',
+  'egypt', 'nigeria', 'southafrica', 'kenya', 'morocco', 'algeria', 'tunisia',
+  'turkey', 'saudiarabia', 'uae', 'israel', 'pakistan', 'bangladesh', 'srilanka',
+  'australia', 'newzealand', 'japan', 'southkorea', 'hongkong', 'taiwan', 'singapore'
+])
 
 /**
  * Obtenir le logo d'un service via Logo.dev avec fallback
@@ -146,7 +464,20 @@ export const getServiceLogo = (serviceCode: string): string => {
     return generateFallbackLogo(code)
   }
   
-  const domain = SERVICE_DOMAINS[code] || `${code}.com`
+  // PRIORITÉ 1: Si le code est dans SERVICE_DOMAINS, utiliser le domaine mappé
+  // Ceci résout le conflit tg=Telegram vs tg=Togo, am=Amazon vs am=Armenia, etc.
+  if (SERVICE_DOMAINS[code]) {
+    const domain = SERVICE_DOMAINS[code]
+    return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
+  }
+  
+  // PRIORITÉ 2: Si c'est un code pays ISO (et PAS un service connu), retourner le fallback
+  if (ISO_COUNTRY_CODES.has(code)) {
+    return generateFallbackLogo(code)
+  }
+  
+  // PRIORITÉ 3: Essayer avec le domaine .com par défaut
+  const domain = `${code}.com`
   return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
 }
 
@@ -159,147 +490,117 @@ export const getServiceLogoFallback = (serviceCode: string): string => {
 
 /**
  * Emojis de services (fallback uniquement)
+ * OFFICIEL: Basé sur API getServicesList de SMS-Activate
  */
 export const getServiceIcon = (serviceCode: string): string => {
   const iconMap: Record<string, string> = {
-    // Messaging & Social
-    'whatsapp': '💬',
-    'wa': '💬',
-    'telegram': '✈️',
-    'tg': '✈️',
-    'instagram': '📸',
-    'ig': '📸',
-    'facebook': '👥',
-    'fb': '👥',
-    'twitter': '🐦',
-    'tw': '🐦',
-    'x': '🐦',
-    'discord': '💬',
-    'ds': '💬',
-    'snapchat': '👻',
-    'fu': '👻',
-    'sn': '👻',
-    'viber': '📞',
-    'vi': '📞',
-    'line': '💬',
-    'me': '💬',
-    'wechat': '💬',
-    'we': '💬',
-    'wx': '💬',
-    'kakao': '📱',
-    'kt': '📱',
-    'ka': '📱',
-    'imo': '📱',
-    'im': '📱',
+    // TOP Services SMS-Activate
+    'full': '📱',     // Full rent
+    'fb': '👥',       // Facebook
+    'ig': '📸',       // Instagram+Threads
+    'wa': '💬',       // Whatsapp
+    'go': '🔍',       // Google,youtube,Gmail
+    'am': '📦',       // Amazon
+    'oi': '❤️',       // Tinder
+    'tg': '✈️',       // Telegram
+    'hw': '🛍️',       // Alipay/Alibaba/1688
+    'lf': '🎵',       // TikTok/Douyin
+    'yw': '🌈',       // Grindr (code yw!)
+    'ot': '📱',       // Any other
+    'tw': '🐦',       // Twitter
+    'mm': '🪟',       // Microsoft (PAS Mamba!)
+    'ka': '🛒',       // Shopee (PAS KakaoTalk!)
+    'wb': '💬',       // WeChat
+    'ds': '🎮',       // Discord
+    'gp': '🎫',       // Ticketmaster (pas Google Play!)
+    'jg': '🚕',       // Grab
+    'li': '🔍',       // Baidu (PAS LinkedIn!)
+    'vi': '📞',       // Viber
+    'nv': '🇰🇷',      // Naver
+    'ni': '🛵',       // Gojek
+    'mb': '📧',       // Yahoo (PAS Mamba!)
+    'ub': '🚗',       // Uber
+    'vk': '🔵',       // vk.com
+    'me': '💚',       // Line messenger
+    'ts': '💳',       // PayPal
+    'dh': '🛒',       // eBay
+    'pm': '📩',       // AOL (PAS Payeer!)
+    'ya': '🔍',       // Yandex/Uber
+    'wx': '🍎',       // Apple (PAS WeChat!)
+    'bn': '🏪',       // Alfagift (PAS Binance!)
+    'nf': '🎬',       // Netflix
+    'ok': '🟠',       // ok.ru
+    'nc': '💱',       // Payoneer
+    'bw': '🔒',       // Signal
+    'nz': '🐼',       // Foodpanda
+    'aez': '👗',      // Shein
+    'mo': '💛',       // Bumble
+    'tn': '💼',       // LinkedIN
+    'tx': '🚗',       // Bolt (PAS Tencent!)
+    'sn': '📦',       // OLX (PAS Snapchat!)
+    'fu': '👻',       // Snapchat
+    're': '🪙',       // Coinbase
+    'kt': '💛',       // KakaoTalk
+    'bz': '❄️',       // Blizzard
+    'ac': '🍔',       // DoorDash
+    'im': '📱',       // Imo
+    'kf': '📱',       // Weibo
+    'ew': '👟',       // Nike
+    'rr': '🍕',       // Wolt
+    'uu': '🛍️',       // Wildberries
+    'sg': '🛒',       // OZON (PAS Signal!)
+    'vm': '💗',       // OkCupid
+    'uk': '🏠',       // Airbnb (PAS ukr.net!)
+    'ep': '🛍️',       // Temu
+    'hx': '🛒',       // AliExpress
+    'bo': '💸',       // Wise
+    'zh': '📧',       // Zoho
+    'fd': '💘',       // Mamba (code fd!)
+    'aiw': '🎲',      // Roblox
+    'qq': '🐧',       // Tencent QQ
+    'bl': '📺',       // BIGO LIVE
+    'mt': '🎮',       // Steam
+    'dr': '🤖',       // OpenAI
+    'qv': '💙',       // Badoo
+    'aon': '🔶',      // Binance (code aon!)
+    'acz': '🤖',      // Claude
+    'df': '❤️',       // Happn
+    'vz': '💖',       // Hinge
     
-    // Tech Giants
+    // Noms complets (fallback)
+    'whatsapp': '💬',
+    'telegram': '✈️',
+    'instagram': '📸',
+    'facebook': '👥',
+    'twitter': '🐦',
+    'x': '🐦',
+    'discord': '🎮',
+    'snapchat': '👻',
+    'viber': '📞',
+    'line': '💚',
+    'wechat': '💬',
     'google': '🔍',
-    'go': '🔍',
     'microsoft': '🪟',
-    'ms': '🪟',
-    'om': '🪟',
     'apple': '🍎',
     'amazon': '📦',
-    'am': '📦',
-    
-    // Entertainment
     'netflix': '🎬',
-    'nf': '🎬',
     'spotify': '🎵',
-    'alj': '🎵',
     'tiktok': '🎵',
-    'tt': '🎵',
-    'lf': '🎵',
-    'twitch': '🎮',
-    'youtube': '📺',
-    
-    // Finance & Crypto
-    'paypal': '💳',
-    'ts': '💳',
-    'revolut': '💳',
-    'ij': '💳',
-    'coinbase': '🪙',
-    're': '🪙',
-    'binance': '🔶',
-    'aon': '🔶',
-    'bn': '🔶',
-    'stripe': '💳',
-    'payeer': '💰',
-    'pm': '💰',
-    
-    // E-commerce
     'uber': '🚗',
-    'ub': '🚗',
     'airbnb': '🏠',
-    'shopee': '🛒',
-    'alibaba': '🛍️',
-    'mercadolibre': '🛍️',
-    'mg': '🛍️',
-    'mt': '🛍️',
-    'avito': '🏪',
-    'av': '🏪',
-    'wildberries': '🛍️',
-    'wb': '🛍️',
-    'youla': '🛒',
-    'yz': '🛒',
-    'zara': '👗',
-    'zr': '👗',
-    
-    // Dating apps
-    'tinder': '❤️',
-    'oi': '❤️',
-    'tn': '💼',        // LinkedIn (corrigé)
-    'badoo': '💙',
-    'qv': '💙',
-    'bumble': '💛',
-    'bd': '💛',
-    'mamba': '💘',
-    'mb': '💘',
-    'mm': '💘',
-    
-    // Social Networks
-    'reddit': '🤖',
-    'bnl': '🤖',
+    'paypal': '💳',
     'linkedin': '💼',
-    'li': '💼',
-    'vkontakte': '🎵',
-    'vk': '🎵',
-    'odnoklassniki': '👥',
-    'ok': '👥',
+    'reddit': '🤖',
     'pinterest': '📌',
-    'dribbble': '🎨',
-    'dr': '🎨',
-    
-    // Email & Communication
-    'gmail': '📧',
-    'gm': '📧',
-    'outlook': '📧',
-    'yahoo': '📧',
-    'yandex': '🔍',
-    'ym': '🔍',
-    'mail.ru': '📧',
-    'ma': '📧',
-    'mr': '📧',
-    'ukr.net': '📧',
-    'uk': '📧',
-    
-    // Gaming
     'steam': '🎮',
-    'blizzard': '🎮',
-    'bl': '🎮',
-    
-    // News & Media
-    'dzen': '📰',
-    'zn': '📰',
-    'kp.ru': '📰',
-    'kp': '📰',
-    
-    // Other
-    'tencent': '🐧',
-    'tx': '🐧',
-    'postfinance': '🏦',
-    'pf': '🏦',
-    'full': '🏠',      // Full rent
+    'twitch': '📺',
+    'youtube': '📺',
+    'yahoo': '📧',
+    'coinbase': '🪙',
+    'binance': '🔶',
+    'tinder': '❤️',
+    'badoo': '💙',
+    'bumble': '💛',
   }
   return iconMap[serviceCode.toLowerCase()] || '📱'
 }
@@ -333,9 +634,9 @@ const COUNTRY_TO_ISO: Record<string, string> = {
   'burundi': 'bi', 'cambodia': 'kh', 'cameroon': 'cm', 'canada': 'ca',
   'chad': 'td', 'chile': 'cl', 'china': 'cn', 'colombia': 'co',
   'congo': 'cg', 'costarica': 'cr', 'croatia': 'hr', 'cuba': 'cu',
-  'cyprus': 'cy', 'czech': 'cz', 'denmark': 'dk', 'djibouti': 'dj',
-  'dominicana': 'do', 'ecuador': 'ec', 'egypt': 'eg', 'england': 'gb',
-  'estonia': 'ee', 'ethiopia': 'et', 'fiji': 'fj', 'finland': 'fi',
+  'cyprus': 'cy', 'czech': 'cz', 'czechrepublic': 'cz', 'denmark': 'dk', 'djibouti': 'dj',
+  'dominicana': 'do', 'dominicanrepublic': 'do', 'ecuador': 'ec', 'egypt': 'eg', 'england': 'gb',
+  'elsalvador': 'sv', 'estonia': 'ee', 'ethiopia': 'et', 'fiji': 'fj', 'finland': 'fi',
   'france': 'fr', 'gabon': 'ga', 'gambia': 'gm', 'georgia': 'ge',
   'germany': 'de', 'ghana': 'gh', 'greece': 'gr', 'guatemala': 'gt',
   'guinea': 'gn', 'guyana': 'gy', 'haiti': 'ht', 'honduras': 'hn',
@@ -345,7 +646,7 @@ const COUNTRY_TO_ISO: Record<string, string> = {
   'japan': 'jp', 'jordan': 'jo', 'kazakhstan': 'kz', 'kenya': 'ke',
   'kuwait': 'kw', 'kyrgyzstan': 'kg', 'laos': 'la', 'latvia': 'lv',
   'lebanon': 'lb', 'liberia': 'lr', 'libya': 'ly', 'lithuania': 'lt',
-  'luxembourg': 'lu', 'macau': 'mo', 'macedonia': 'mk', 'madagascar': 'mg',
+  'luxembourg': 'lu', 'macau': 'mo', 'macedonia': 'mk', 'northmacedonia': 'mk', 'madagascar': 'mg',
   'malawi': 'mw', 'malaysia': 'my', 'maldives': 'mv', 'mali': 'ml',
   'malta': 'mt', 'mauritania': 'mr', 'mauritius': 'mu', 'mexico': 'mx',
   'moldova': 'md', 'mongolia': 'mn', 'montenegro': 'me', 'morocco': 'ma',
@@ -360,19 +661,191 @@ const COUNTRY_TO_ISO: Record<string, string> = {
   'somalia': 'so', 'southafrica': 'za', 'southkorea': 'kr', 'spain': 'es',
   'srilanka': 'lk', 'sudan': 'sd', 'suriname': 'sr', 'sweden': 'se',
   'switzerland': 'ch', 'syria': 'sy', 'taiwan': 'tw', 'tajikistan': 'tj',
-  'tanzania': 'tz', 'thailand': 'th', 'togo': 'tg', 'tunisia': 'tn',
-  'turkey': 'tr', 'turkmenistan': 'tm', 'uganda': 'ug', 'ukraine': 'ua',
+  'tanzania': 'tz', 'thailand': 'th', 'togo': 'tg', 'trinidad': 'tt', 'trinidadandtobago': 'tt', 'tunisia': 'tn',
+  'turkey': 'tr', 'turkmenistan': 'tm', 'uae': 'ae', 'uganda': 'ug', 'ukraine': 'ua',
   'unitedarabemirates': 'ae', 'unitedkingdom': 'gb', 'usa': 'us',
   'uruguay': 'uy', 'uzbekistan': 'uz', 'venezuela': 've', 'vietnam': 'vn',
   'yemen': 'ye', 'zambia': 'zm', 'zimbabwe': 'zw',
+}
+
+// Liste des codes ISO valides pour validation
+const VALID_ISO_CODES = new Set([
+  'ad', 'ae', 'af', 'ag', 'ai', 'al', 'am', 'ao', 'aq', 'ar', 'as', 'at', 'au', 'aw', 'ax', 'az',
+  'ba', 'bb', 'bd', 'be', 'bf', 'bg', 'bh', 'bi', 'bj', 'bl', 'bm', 'bn', 'bo', 'bq', 'br', 'bs', 'bt', 'bv', 'bw', 'by', 'bz',
+  'ca', 'cc', 'cd', 'cf', 'cg', 'ch', 'ci', 'ck', 'cl', 'cm', 'cn', 'co', 'cr', 'cu', 'cv', 'cw', 'cx', 'cy', 'cz',
+  'de', 'dj', 'dk', 'dm', 'do', 'dz', 'ec', 'ee', 'eg', 'eh', 'er', 'es', 'et', 'fi', 'fj', 'fk', 'fm', 'fo', 'fr',
+  'ga', 'gb', 'gd', 'ge', 'gf', 'gg', 'gh', 'gi', 'gl', 'gm', 'gn', 'gp', 'gq', 'gr', 'gs', 'gt', 'gu', 'gw', 'gy',
+  'hk', 'hm', 'hn', 'hr', 'ht', 'hu', 'id', 'ie', 'il', 'im', 'in', 'io', 'iq', 'ir', 'is', 'it',
+  'je', 'jm', 'jo', 'jp', 'ke', 'kg', 'kh', 'ki', 'km', 'kn', 'kp', 'kr', 'kw', 'ky', 'kz',
+  'la', 'lb', 'lc', 'li', 'lk', 'lr', 'ls', 'lt', 'lu', 'lv', 'ly',
+  'ma', 'mc', 'md', 'me', 'mf', 'mg', 'mh', 'mk', 'ml', 'mm', 'mn', 'mo', 'mp', 'mq', 'mr', 'ms', 'mt', 'mu', 'mv', 'mw', 'mx', 'my', 'mz',
+  'na', 'nc', 'ne', 'nf', 'ng', 'ni', 'nl', 'no', 'np', 'nr', 'nu', 'nz',
+  'om', 'pa', 'pe', 'pf', 'pg', 'ph', 'pk', 'pl', 'pm', 'pn', 'pr', 'ps', 'pt', 'pw', 'py',
+  'qa', 're', 'ro', 'rs', 'ru', 'rw',
+  'sa', 'sb', 'sc', 'sd', 'se', 'sg', 'sh', 'si', 'sj', 'sk', 'sl', 'sm', 'sn', 'so', 'sr', 'ss', 'st', 'sv', 'sx', 'sy', 'sz',
+  'tc', 'td', 'tf', 'tg', 'th', 'tj', 'tk', 'tl', 'tm', 'tn', 'to', 'tr', 'tt', 'tv', 'tw', 'tz',
+  'ua', 'ug', 'um', 'us', 'uy', 'uz', 'va', 've', 'vg', 'vi', 'vn', 'vu', 'wf', 'ws', 'ye', 'yt', 'za', 'zm', 'zw'
+])
+
+// Mapping SMS-Activate ID numérique → code ISO-2
+// Les country_code stockés dans la DB peuvent être des IDs numériques (ex: "187" pour USA)
+const SMS_ACTIVATE_ID_TO_ISO: Record<string, string> = {
+  '0': 'ru',    // Russia
+  '1': 'ua',    // Ukraine
+  '2': 'kz',    // Kazakhstan
+  '3': 'cn',    // China
+  '4': 'ph',    // Philippines
+  '5': 'mm',    // Myanmar
+  '6': 'id',    // Indonesia
+  '7': 'my',    // Malaysia
+  '8': 'ke',    // Kenya
+  '9': 'tz',    // Tanzania
+  '10': 'vn',   // Vietnam
+  '11': 'kg',   // Kyrgyzstan
+  '12': 'gb',   // UK/England
+  '13': 'il',   // Israel
+  '14': 'hk',   // Hong Kong
+  '15': 'pl',   // Poland
+  '16': 'eg',   // Egypt
+  '17': 'ng',   // Nigeria
+  '18': 'mo',   // Macau
+  '19': 'ma',   // Morocco
+  '20': 'gh',   // Ghana
+  '21': 'ar',   // Argentina
+  '22': 'in',   // India
+  '23': 'uz',   // Uzbekistan
+  '24': 'kh',   // Cambodia
+  '25': 'cm',   // Cameroon
+  '26': 'td',   // Chad
+  '27': 'de',   // Germany
+  '28': 'lt',   // Lithuania
+  '29': 'hr',   // Croatia
+  '30': 'se',   // Sweden
+  '31': 'iq',   // Iraq
+  '32': 'ro',   // Romania
+  '33': 'co',   // Colombia
+  '34': 'at',   // Austria
+  '35': 'by',   // Belarus
+  '36': 'ca',   // Canada
+  '37': 'sa',   // Saudi Arabia
+  '38': 'mx',   // Mexico
+  '39': 'za',   // South Africa
+  '40': 'es',   // Spain
+  '41': 'ir',   // Iran
+  '42': 'dz',   // Algeria
+  '43': 'nl',   // Netherlands
+  '44': 'bd',   // Bangladesh
+  '45': 'br',   // Brazil
+  '46': 'tr',   // Turkey
+  '47': 'jp',   // Japan
+  '48': 'kr',   // South Korea
+  '49': 'tw',   // Taiwan
+  '50': 'sg',   // Singapore
+  '51': 'ae',   // UAE
+  '52': 'th',   // Thailand
+  '53': 'pk',   // Pakistan
+  '54': 'np',   // Nepal
+  '55': 'lk',   // Sri Lanka
+  '56': 'pt',   // Portugal
+  '57': 'nz',   // New Zealand
+  '58': 'it',   // Italy
+  '59': 'be',   // Belgium
+  '60': 'ch',   // Switzerland
+  '61': 'gr',   // Greece
+  '62': 'cz',   // Czech Republic
+  '63': 'hu',   // Hungary
+  '64': 'dk',   // Denmark
+  '65': 'no',   // Norway
+  '66': 'fi',   // Finland
+  '67': 'ie',   // Ireland
+  '68': 'sk',   // Slovakia
+  '69': 'bg',   // Bulgaria
+  '70': 'rs',   // Serbia
+  '71': 'si',   // Slovenia
+  '72': 'mk',   // North Macedonia
+  '73': 'pe',   // Peru
+  '74': 'cl',   // Chile
+  '75': 'ec',   // Ecuador
+  '76': 've',   // Venezuela
+  '77': 'bo',   // Bolivia
+  '78': 'fr',   // France
+  '79': 'py',   // Paraguay
+  '80': 'uy',   // Uruguay
+  '81': 'cr',   // Costa Rica
+  '82': 'pa',   // Panama
+  '83': 'do',   // Dominican Republic
+  '84': 'sv',   // El Salvador
+  '85': 'gt',   // Guatemala
+  '86': 'hn',   // Honduras
+  '87': 'ni',   // Nicaragua
+  '88': 'cu',   // Cuba
+  '89': 'ht',   // Haiti
+  '90': 'jm',   // Jamaica
+  '91': 'tt',   // Trinidad & Tobago
+  '92': 'pr',   // Puerto Rico
+  '93': 'bb',   // Barbados
+  '94': 'bs',   // Bahamas
+  '108': 'af',  // Afghanistan
+  '117': 'la',  // Laos
+  '129': 'sd',  // Sudan
+  '141': 'jo',  // Jordan
+  '163': 'ps',  // Palestine
+  '165': 'bh',  // Bahrain
+  '172': 'et',  // Ethiopia
+  '175': 'au',  // Australia
+  '187': 'us',  // USA
+}
+
+/**
+ * Helper: résoudre un country code en ISO-2
+ * Gère: code ISO, nom de pays, ou ID numérique SMS-Activate
+ */
+const resolveToIso = (countryCode: string): string => {
+  if (!countryCode) return ''
+  let code = countryCode.toLowerCase().replace(/\s+/g, '')
+  
+  // 0. Gérer le préfixe "rent-" (legacy bug: parfois stocké comme "rent-6" au lieu de "6")
+  if (code.startsWith('rent-')) {
+    code = code.replace('rent-', '')
+  }
+  
+  // 1. D'abord vérifier si c'est un ID numérique SMS-Activate
+  if (SMS_ACTIVATE_ID_TO_ISO[code]) {
+    return SMS_ACTIVATE_ID_TO_ISO[code]
+  }
+  
+  // 2. Ensuite vérifier si c'est un nom de pays
+  if (COUNTRY_TO_ISO[code]) {
+    return COUNTRY_TO_ISO[code]
+  }
+  
+  // 3. Si c'est déjà un code ISO de 2 lettres valide, l'utiliser
+  if (code.length === 2 && VALID_ISO_CODES.has(code)) {
+    return code
+  }
+  
+  // 4. Fallback: essayer les 2 premiers caractères (seulement si pas numérique)
+  if (!/^\d+$/.test(code)) {
+    const twoChars = code.substring(0, 2)
+    if (VALID_ISO_CODES.has(twoChars)) {
+      return twoChars
+    }
+  }
+  
+  return ''
 }
 
 /**
  * Obtenir l'URL de l'image du drapeau depuis Flagpedia
  */
 export const getCountryFlag = (countryCode: string): string => {
-  const code = countryCode.toLowerCase().replace(/\s+/g, '')
-  const isoCode = COUNTRY_TO_ISO[code] || code.substring(0, 2)
+  const isoCode = resolveToIso(countryCode)
+  
+  // Validate ISO code - return empty string for invalid codes to prevent 404s
+  if (!isoCode || !VALID_ISO_CODES.has(isoCode)) {
+    return ''
+  }
+  
   return `https://flagcdn.com/w80/${isoCode}.png`
 }
 
@@ -380,7 +853,9 @@ export const getCountryFlag = (countryCode: string): string => {
  * Obtenir l'emoji du drapeau (pour fallback)
  */
 export const getFlagEmoji = (countryCode: string): string => {
-  const code = countryCode.toLowerCase().replace(/\s+/g, '')
-  const isoCode = COUNTRY_TO_ISO[code] || code
+  const isoCode = resolveToIso(countryCode)
+  
+  if (!isoCode) return '🌍'
+  
   return toFlagEmoji(isoCode)
 }

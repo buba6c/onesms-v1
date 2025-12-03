@@ -17,6 +17,7 @@ import {
   X,
   Star,
   Package,
+  Crown,
 } from 'lucide-react';
 
 interface PackageFormData {
@@ -109,7 +110,28 @@ export default function PackagesManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
       queryClient.invalidateQueries({ queryKey: ['activation-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['homepage-packages'] });
       toast({ title: 'Statut mis à jour' });
+    },
+  });
+
+  const setPopularMutation = useMutation({
+    mutationFn: (id: string) => packagesApi.setAsPopular(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['activation-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['homepage-packages'] });
+      toast({ 
+        title: '⭐ Package populaire défini',
+        description: 'Ce package sera mis en avant sur la page d\'accueil'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erreur',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -366,6 +388,28 @@ export default function PackagesManagementPage() {
                 }
               />
             </div>
+
+            {/* Bouton pour définir comme populaire */}
+            {!pkg.is_popular && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mb-3 border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                onClick={() => {
+                  if (confirm('Définir ce package comme le plus populaire ? Les autres packages perdront ce statut.')) {
+                    setPopularMutation.mutate(pkg.id);
+                  }
+                }}
+                disabled={setPopularMutation.isPending}
+              >
+                {setPopularMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Crown className="w-4 h-4 mr-2" />
+                )}
+                Définir comme populaire
+              </Button>
+            )}
 
             <div className="flex gap-2">
               <Button

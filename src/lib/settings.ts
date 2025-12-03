@@ -1,4 +1,4 @@
-// @ts-nocheck
+ 
 import { supabase } from './supabase';
 
 // Cache for settings to avoid too many database calls
@@ -16,7 +16,7 @@ export async function getSetting(key: string): Promise<string> {
   }
 
   // Fetch from database
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .rpc('get_setting', { setting_key: key });
 
   if (error) {

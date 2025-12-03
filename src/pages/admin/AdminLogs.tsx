@@ -196,12 +196,12 @@ export default function AdminLogs() {
             >
               <option value="all">Toutes catégories</option>
               <option value="api">API</option>
-              <option value="payment">Payment</option>
-              <option value="user">User</option>
+              <option value="payment">Paiement</option>
+              <option value="user">Utilisateur</option>
               <option value="sync">Sync</option>
-              <option value="system">System</option>
+              <option value="system">Système</option>
               <option value="sms">SMS</option>
-              <option value="rent">Rent</option>
+              <option value="rent">Location</option>
             </select>
           </div>
         </CardContent>

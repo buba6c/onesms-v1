@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, CheckCircle2, Clock, RefreshCw, TrendingUp, Database, Globe, Package } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RefreshCw, TrendingUp, Database, Globe, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -36,17 +37,8 @@ interface SyncLog {
   error_details: any;
 }
 
-interface SyncStats {
-  hour: string;
-  total_syncs: number;
-  successful_syncs: number;
-  failed_syncs: number;
-  avg_duration: number;
-  total_services_added: number;
-  total_stocks_updated: number;
-}
-
 export default function AdminSyncStatusPage() {
+  const { t } = useTranslation();
   const [isManualSyncing, setIsManualSyncing] = useState(false);
 
   // Dernière synchronisation
@@ -80,21 +72,6 @@ export default function AdminSyncStatusPage() {
       return data as SyncLog[];
     },
     refetchInterval: 30000, // Refresh toutes les 30 secondes
-  });
-
-  // Statistiques agrégées (dernières 24h)
-  const { data: hourlyStats } = useQuery({
-    queryKey: ['sync-stats'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sync_stats')
-        .select('*')
-        .limit(24);
-      
-      if (error) throw error;
-      return data as SyncStats[];
-    },
-    refetchInterval: 60000, // Refresh toutes les 60 secondes
   });
 
   // Déclencher sync manuelle
@@ -160,7 +137,7 @@ export default function AdminSyncStatusPage() {
           className="gap-2"
         >
           <RefreshCw className={`w-4 h-4 ${isManualSyncing ? 'animate-spin' : ''}`} />
-          {isManualSyncing ? 'Synchronisation...' : 'Sync Manuelle'}
+          {isManualSyncing ? t('admin.sync.syncing') : t('admin.sync.manualSync')}
         </Button>
       </div>
 

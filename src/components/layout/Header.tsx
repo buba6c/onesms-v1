@@ -1,14 +1,51 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Menu, User, LogOut, Wallet, MessageSquare, Clock, HelpCircle, Star, X, Sparkles, ChevronRight, Home, Shield, Globe, Zap, ArrowRight } from 'lucide-react'
+import { User, LogOut, Wallet, Clock, HelpCircle, X, Sparkles, ChevronRight, Home, Shield, Globe, Zap, ArrowRight, DollarSign, FileText } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription'
+import { useRealtimeBalance } from '@/hooks/useRealtimeBalance'
 
-// Component to display balance (simplified - no frozen)
-function HeaderBalanceDisplay({ userId, balance, isMobile = false }: { userId: string; balance: number; isMobile?: boolean }) {
+// Hook to get branding settings (logo, colors)
+function useBrandingSettings() {
+  return useQuery({
+    queryKey: ['branding-settings'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['app_logo_url', 'app_favicon_url', 'app_primary_color', 'app_secondary_color', 'app_name']);
+      
+      const settings: Record<string, string> = {};
+      (data as { key: string; value: string }[] | null)?.forEach(s => { settings[s.key] = s.value; });
+      return settings;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+}
+
+// Component to display balance with frozen credits
+// TERMINOLOGIE UNIFIÉE: solde = balance totale, frozen = gelé
+function HeaderBalanceDisplay({ userId, solde, frozen = 0, isMobile = false, onRechargeClick }: { 
+  userId: string; 
+  solde: number;      // Balance totale du compte
+  frozen?: number;    // Montant gelé pour achats en cours
+  isMobile?: boolean; 
+  onRechargeClick?: () => void 
+}) {
+  const { t } = useTranslation();
+  
+  // 🔴 REALTIME: Écoute les activations en temps réel
+  useRealtimeSubscription({
+    table: 'activations',
+    filter: `user_id=eq.${userId}`,
+    enabled: !!userId,
+    queryKeys: [['active-activations', userId]],
+  });
+  
   // Check webhook status (active activations)
   const { data: activeCount = 0 } = useQuery<number>({
     queryKey: ['active-activations', userId],
@@ -22,7 +59,8 @@ function HeaderBalanceDisplay({ userId, balance, isMobile = false }: { userId: s
       return data?.length || 0;
     },
     enabled: !!userId,
-    refetchInterval: 3000,
+    // Polling désactivé - realtime activé
+    refetchInterval: false,
   });
 
   if (isMobile) {
@@ -40,8 +78,13 @@ function HeaderBalanceDisplay({ userId, balance, isMobile = false }: { userId: s
               <Wallet className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white/80">Votre solde</p>
-              <p className="text-2xl font-bold text-white">{Math.floor(balance)} Ⓐ</p>
+              <p className="text-sm font-medium text-white/80">💰 {t('dashboard.balance')}</p>
+              <p className="text-2xl font-bold text-white">{Math.floor(solde - frozen)} Ⓐ</p>
+              {frozen > 0 && (
+                <p className="text-xs text-white/70 mt-0.5">
+                  🔒 {Math.floor(frozen)} Ⓐ gelé • Total: {Math.floor(solde)} Ⓐ
+                </p>
+              )}
             </div>
           </div>
           
@@ -54,11 +97,17 @@ function HeaderBalanceDisplay({ userId, balance, isMobile = false }: { userId: s
         </div>
         
         <Link 
-          to="/top-up" 
-          className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-semibold text-blue-600 transition-all hover:bg-blue-50 active:scale-[0.98]"
+          to="/top-up"
+          onClick={(e) => {
+            // S'assurer que le menu se ferme après le clic
+            if (onRechargeClick) {
+              setTimeout(() => onRechargeClick(), 10);
+            }
+          }}
+          className="relative z-10 mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-white py-2.5 text-sm font-semibold text-blue-600 transition-all hover:bg-blue-50 active:scale-[0.98]"
         >
           <Zap className="h-4 w-4" />
-          Recharger
+          {t('nav.topUp')}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -76,9 +125,19 @@ function HeaderBalanceDisplay({ userId, balance, isMobile = false }: { userId: s
           <div className="h-4 w-px bg-gray-300"></div>
         </>
       )}
-      <div className="flex items-center gap-1.5">
-        <span className="text-sm text-gray-600">Balance:</span>
-        <span className="font-bold text-blue-600">{Math.floor(balance)} Ⓐ</span>
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm text-gray-600">{t('dashboard.balance')}:</span>
+          <span className="font-bold text-blue-600">{Math.floor(solde - frozen)} Ⓐ</span>
+        </div>
+        {frozen > 0 && (
+          <>
+            <div className="h-4 w-px bg-gray-300"></div>
+            <span className="text-xs text-orange-500" title={`Total: ${Math.floor(solde)} Ⓐ`}>
+              🔒 {Math.floor(frozen)} gelé
+            </span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -86,7 +145,6 @@ function HeaderBalanceDisplay({ userId, balance, isMobile = false }: { userId: s
 
 export default function Header() {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -119,27 +177,62 @@ export default function Header() {
 
   const closeMenu = useCallback(() => setMobileMenuOpen(false), [])
 
-  // Fetch user balance
-  const { data: userData } = useQuery<{ balance: number } | null>({
+  // 🔴 REALTIME: Hook dédié pour la balance en temps réel
+  // balance = balance totale du compte (affiché)
+  // frozen = montant gelé (transactions en cours)
+  // disponible = balance - frozen (ce qu'on peut dépenser)
+  const { balance, frozen } = useRealtimeBalance();
+
+  // 🔴 REALTIME: Écoute les changements de la balance utilisateur en temps réel (backup query invalidation)
+  const queryClient = useQueryClient();
+  useRealtimeSubscription({
+    table: 'users',
+    filter: user?.id ? `id=eq.${user.id}` : undefined,
+    enabled: !!user?.id,
+    queryKeys: [['user-balance', user?.id]],
+    onUpdate: () => {
+      // Force refresh du store aussi
+      queryClient.invalidateQueries({ queryKey: ['user-balance', user?.id] });
+    }
+  });
+
+  // Fetch user balance (fallback, sera rafraîchi par realtime)
+  const { data: userData, refetch: refetchBalance } = useQuery<{ balance: number; frozen_balance: number } | null>({
     queryKey: ['user-balance', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       const { data } = await supabase
         .from('users')
-        .select('balance')
+        .select('balance, frozen_balance')
         .eq('id', user.id)
         .single();
-      return data as { balance: number } | null;
+      return data as { balance: number; frozen_balance: number } | null;
     },
     enabled: !!user?.id,
-    refetchInterval: 10000, // Refresh every 10s
+    // Polling plus court pour refresh rapide
+    refetchInterval: 3000,
+    staleTime: 1000,
   });
+
+  // TERMINOLOGIE UNIFIÉE:
+  // - currentBalance = balance totale du compte (affiché en grand)
+  // - currentFrozen = montant gelé (affiché en petit)
+  // - disponible = currentBalance - currentFrozen (ce qu'on peut dépenser, calculé si besoin)
+  const currentBalance = balance ?? (userData?.balance ?? 0);
+  const currentFrozen = frozen ?? (userData?.frozen_balance ?? 0);
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'fr' : 'en'
     i18n.changeLanguage(newLang)
     localStorage.setItem('language', newLang)
   }
+
+  // Get branding settings (logo, colors)
+  const { data: branding } = useBrandingSettings();
+  // Logo par défaut: 4w pour header blanc (après scroll), 4s pour header transparent
+  const defaultLogoLight = '/logos/One SMS 4w png.png'; // Logo pour header blanc (après scroll)
+  const defaultLogoDark = '/logos/One SMS 4s png.png';  // Logo pour header transparent (avant scroll)
+  const appName = branding?.app_name || t('app.name');
 
   // Determine logo destination based on auth state
   const logoDestination = user ? '/dashboard' : '/';
@@ -150,23 +243,34 @@ export default function Header() {
     ? 'fixed top-0 left-0 right-0 z-50 bg-transparent border-b border-white/10 transition-all duration-300'
     : 'border-b bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm transition-all duration-300';
   const textColorClass = isTransparent ? 'text-white' : 'text-gray-900';
+  
+  // Logo dynamique selon le fond
+  const currentLogoUrl = branding?.app_logo_url || (isTransparent ? defaultLogoDark : defaultLogoLight);
 
   return (
     <>
     <header className={headerClasses}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to={logoDestination} className="flex items-center space-x-2 group">
-            <div className={`w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center text-white font-bold text-base md:text-lg shadow-lg transition-transform group-hover:scale-105 ${
+          <Link to={logoDestination} className="flex items-center group ml-4 md:ml-8">
+            <img 
+              src={currentLogoUrl} 
+              alt={appName}
+              className="h-12 md:h-16 w-auto object-contain transition-all duration-300 group-hover:scale-105"
+              onError={(e) => {
+                // Fallback to OS text on error
+                (e.target as HTMLImageElement).style.display = 'none';
+                const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                if (fallback) fallback.classList.remove('hidden');
+              }}
+            />
+            <div className={`hidden w-9 h-9 md:w-11 md:h-11 rounded-xl flex items-center justify-center text-white font-bold text-base md:text-lg shadow-lg transition-transform group-hover:scale-105 ${
               isTransparent 
                 ? 'bg-white/20 backdrop-blur-sm border border-white/30' 
                 : 'bg-gradient-to-br from-blue-600 to-cyan-500'
             }`}>
               <span className="text-white">OS</span>
             </div>
-            <span className={`text-lg md:text-2xl font-bold transition-colors ${textColorClass}`}>
-              {t('app.name')}
-            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -185,17 +289,36 @@ export default function Header() {
                 <Link to="/how-to-use">
                   <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.howToUse')}</Button>
                 </Link>
+                <Link to="/support">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.support', 'Support')}</Button>
+                </Link>
               </>
             ) : !user && (
               <>
-                <a href="#features">
-                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.features')}</Button>
+                <a href="/#pricing">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>
+                    {t('nav.pricing')}
+                  </Button>
                 </a>
-                <a href="#pricing">
-                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.pricing')}</Button>
-                </a>
-                <Link to="/catalog">
-                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.services')}</Button>
+                <Link to="/how-to-use">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>
+                    {t('nav.howToUse')}
+                  </Button>
+                </Link>
+                <Link to="/terms">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>
+                    {t('footer.terms')}
+                  </Button>
+                </Link>
+                <Link to="/privacy">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>
+                    {t('footer.privacy')}
+                  </Button>
+                </Link>
+                <Link to="/support">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>
+                    {t('nav.support', 'Support')}
+                  </Button>
                 </Link>
               </>
             )}
@@ -203,9 +326,9 @@ export default function Header() {
 
           {/* Right Section */}
           <div className="flex items-center gap-2 md:gap-3">
-            {/* User Balance - Desktop only */}
-            {user && userData && (
-              <HeaderBalanceDisplay userId={user.id} balance={userData.balance || 0} />
+            {/* User Balance - Desktop only - Realtime */}
+            {user && (
+              <HeaderBalanceDisplay userId={user.id} solde={currentBalance} frozen={currentFrozen} />
             )}
 
             {/* Language Selector */}
@@ -282,31 +405,34 @@ export default function Header() {
       </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay - Glassmorphism */}
       <div 
-        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
-          mobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        className={`fixed inset-0 z-40 transition-all duration-500 md:hidden ${
+          mobileMenuOpen 
+            ? 'opacity-100 backdrop-blur-xl bg-gradient-to-br from-slate-900/90 via-blue-900/80 to-purple-900/90' 
+            : 'opacity-0 pointer-events-none backdrop-blur-none'
         }`}
         onClick={closeMenu}
       />
 
-      {/* Mobile Menu Panel */}
+      {/* Mobile Menu Panel - Modern Full Screen */}
       <div 
-        className={`fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white shadow-2xl transition-transform duration-300 ease-out md:hidden ${
-          mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed inset-0 z-50 flex flex-col transition-all duration-500 ease-out md:hidden ${
+          mobileMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-8 pointer-events-none'
         }`}
       >
+        {/* Animated Background Orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 -left-20 w-64 h-64 bg-cyan-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-40 -right-20 w-80 h-80 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+        </div>
+
         {/* Menu Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 font-bold text-white shadow-lg">
-              OS
-            </div>
-            <span className="text-lg font-bold text-gray-900">{t('app.name')}</span>
-          </div>
+        <div className="relative flex items-center justify-end px-6 py-5 safe-area-top">
           <button
             onClick={closeMenu}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 text-white transition-all duration-300 hover:bg-white/20 hover:scale-105 active:scale-95"
             aria-label="Fermer le menu"
           >
             <X className="h-6 w-6" />
@@ -314,210 +440,232 @@ export default function Header() {
         </div>
 
         {/* Menu Content */}
-        <div className="flex h-[calc(100%-73px)] flex-col overflow-y-auto">
+        <div className="relative flex-1 flex flex-col overflow-y-auto px-6 py-4">
           {/* Balance Card for logged-in users */}
-          {user && userData && (
-            <div className="p-5">
-              <HeaderBalanceDisplay userId={user.id} balance={userData.balance || 0} isMobile={true} />
+          {user && (
+            <div className="mb-8">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-xl border border-white/20 p-6">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                <HeaderBalanceDisplay userId={user.id} solde={currentBalance} frozen={currentFrozen} isMobile={true} onRechargeClick={closeMenu} />
+              </div>
             </div>
           )}
 
-          {/* Navigation Items */}
-          <nav className="flex-1 px-5 py-2">
-            {user && user.role !== 'admin' ? (
-              <div className="space-y-1">
+          {/* Navigation Grid for Logged Users */}
+          {user && user.role !== 'admin' ? (
+            <>
+              {/* Main Navigation */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
                 <Link 
                   to="/dashboard" 
-                  className={`flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 active:scale-[0.98] ${
-                    location.pathname === '/dashboard' ? 'bg-blue-100 border-2 border-blue-200' : 'hover:bg-gray-50'
+                  className={`group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 active:scale-95 ${
+                    location.pathname === '/dashboard' 
+                      ? 'bg-gradient-to-br from-cyan-500/30 to-blue-500/20 border-2 border-cyan-400/50' 
+                      : 'bg-white/10 backdrop-blur-sm border border-white/10 hover:bg-white/15 hover:border-white/20'
                   }`}
                   onClick={closeMenu}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 shadow-sm">
-                    <Home className="h-5 w-5 text-blue-600" />
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-400/20 rounded-full blur-xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500"></div>
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mb-3 shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform">
+                      <Home className="h-6 w-6 text-white" />
+                    </div>
+                    <span className="font-semibold text-white text-sm">{t('nav.dashboard', 'Dashboard')}</span>
                   </div>
-                  <span className={`font-medium ${location.pathname === '/dashboard' ? 'text-blue-700' : 'text-gray-800'}`}>
-                    {t('nav.dashboard', 'Dashboard')}
-                  </span>
-                  <ChevronRight className={`h-5 w-5 ml-auto ${location.pathname === '/dashboard' ? 'text-blue-400' : 'text-gray-300'}`} />
                 </Link>
-                
+
                 <Link 
                   to="/top-up" 
-                  className={`flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 active:scale-[0.98] ${
-                    location.pathname === '/top-up' ? 'bg-green-100 border-2 border-green-200' : 'hover:bg-gray-50'
+                  className={`group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 active:scale-95 ${
+                    location.pathname === '/top-up' 
+                      ? 'bg-gradient-to-br from-emerald-500/30 to-green-500/20 border-2 border-emerald-400/50' 
+                      : 'bg-white/10 backdrop-blur-sm border border-white/10 hover:bg-white/15 hover:border-white/20'
                   }`}
                   onClick={closeMenu}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 shadow-sm">
-                    <Wallet className="h-5 w-5 text-green-600" />
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-400/20 rounded-full blur-xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500"></div>
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center mb-3 shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform">
+                      <Wallet className="h-6 w-6 text-white" />
+                    </div>
+                    <span className="font-semibold text-white text-sm">{t('nav.topUp')}</span>
                   </div>
-                  <span className={`font-medium ${location.pathname === '/top-up' ? 'text-green-700' : 'text-gray-800'}`}>
-                    {t('nav.topUp')}
-                  </span>
-                  <ChevronRight className={`h-5 w-5 ml-auto ${location.pathname === '/top-up' ? 'text-green-400' : 'text-gray-300'}`} />
                 </Link>
-                
-                <Link 
-                  to="/settings" 
-                  className={`flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 active:scale-[0.98] ${
-                    location.pathname === '/settings' ? 'bg-purple-100 border-2 border-purple-200' : 'hover:bg-gray-50'
-                  }`}
-                  onClick={closeMenu}
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-100 shadow-sm">
-                    <User className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <span className={`font-medium ${location.pathname === '/settings' ? 'text-purple-700' : 'text-gray-800'}`}>
-                    {t('nav.account')}
-                  </span>
-                  <ChevronRight className={`h-5 w-5 ml-auto ${location.pathname === '/settings' ? 'text-purple-400' : 'text-gray-300'}`} />
-                </Link>
-                
+
                 <Link 
                   to="/history" 
-                  className={`flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 active:scale-[0.98] ${
-                    location.pathname === '/history' ? 'bg-orange-100 border-2 border-orange-200' : 'hover:bg-gray-50'
+                  className={`group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 active:scale-95 ${
+                    location.pathname === '/history' 
+                      ? 'bg-gradient-to-br from-amber-500/30 to-orange-500/20 border-2 border-amber-400/50' 
+                      : 'bg-white/10 backdrop-blur-sm border border-white/10 hover:bg-white/15 hover:border-white/20'
                   }`}
                   onClick={closeMenu}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100 shadow-sm">
-                    <Clock className="h-5 w-5 text-orange-600" />
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-amber-400/20 rounded-full blur-xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500"></div>
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-3 shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                      <Clock className="h-6 w-6 text-white" />
+                    </div>
+                    <span className="font-semibold text-white text-sm">{t('nav.history')}</span>
                   </div>
-                  <span className={`font-medium ${location.pathname === '/history' ? 'text-orange-700' : 'text-gray-800'}`}>
-                    {t('nav.history')}
-                  </span>
-                  <ChevronRight className={`h-5 w-5 ml-auto ${location.pathname === '/history' ? 'text-orange-400' : 'text-gray-300'}`} />
                 </Link>
-                
+
+                <Link 
+                  to="/settings" 
+                  className={`group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 active:scale-95 ${
+                    location.pathname === '/settings' 
+                      ? 'bg-gradient-to-br from-violet-500/30 to-purple-500/20 border-2 border-violet-400/50' 
+                      : 'bg-white/10 backdrop-blur-sm border border-white/10 hover:bg-white/15 hover:border-white/20'
+                  }`}
+                  onClick={closeMenu}
+                >
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-violet-400/20 rounded-full blur-xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500"></div>
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center mb-3 shadow-lg shadow-violet-500/30 group-hover:scale-110 transition-transform">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <span className="font-semibold text-white text-sm">{t('nav.account')}</span>
+                  </div>
+                </Link>
+              </div>
+
+              {/* Secondary Links */}
+              <div className="space-y-2 mb-6">
                 <Link 
                   to="/how-to-use" 
-                  className={`flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 active:scale-[0.98] ${
-                    location.pathname === '/how-to-use' ? 'bg-cyan-100 border-2 border-cyan-200' : 'hover:bg-gray-50'
-                  }`}
+                  className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:bg-white/10 active:scale-98"
                   onClick={closeMenu}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100 shadow-sm">
-                    <HelpCircle className="h-5 w-5 text-cyan-600" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-500/20">
+                    <HelpCircle className="h-5 w-5 text-white" />
                   </div>
-                  <span className={`font-medium ${location.pathname === '/how-to-use' ? 'text-cyan-700' : 'text-gray-800'}`}>
-                    {t('nav.howToUse')}
-                  </span>
-                  <ChevronRight className={`h-5 w-5 ml-auto ${location.pathname === '/how-to-use' ? 'text-cyan-400' : 'text-gray-300'}`} />
+                  <span className="font-medium text-white/90">{t('nav.howToUse')}</span>
+                  <ArrowRight className="h-4 w-4 ml-auto text-white/40" />
                 </Link>
-
-                {/* Divider */}
-                <div className="my-4 h-px bg-gray-100"></div>
-
-                {/* Logout */}
-                <button
-                  onClick={() => {
-                    signOut();
-                    closeMenu();
-                  }}
-                  className="flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 text-red-600 transition-all duration-200 hover:bg-red-50 active:scale-[0.98]"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-100 shadow-sm">
-                    <LogOut className="h-5 w-5 text-red-600" />
-                  </div>
-                  <span className="font-medium">{t('nav.logout', 'Déconnexion')}</span>
-                </button>
-              </div>
-            ) : !user && (
-              <div className="space-y-1">
+                
                 <Link 
-                  to="/catalog" 
-                  className="flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 hover:bg-gray-50 active:scale-[0.98]"
+                  to="/support" 
+                  className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:bg-white/10 active:scale-98"
                   onClick={closeMenu}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 shadow-sm">
-                    <MessageSquare className="h-5 w-5 text-blue-600" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <HelpCircle className="h-5 w-5 text-white" />
                   </div>
-                  <span className="font-medium text-gray-800">{t('nav.services')}</span>
-                  <ChevronRight className="h-5 w-5 ml-auto text-gray-300" />
+                  <span className="font-medium text-white/90">{t('nav.support', 'Support')}</span>
+                  <ArrowRight className="h-4 w-4 ml-auto text-white/40" />
                 </Link>
-                
-                <a 
-                  href="#features" 
-                  className="flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 hover:bg-gray-50 active:scale-[0.98]"
-                  onClick={closeMenu}
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-100 shadow-sm">
-                    <Star className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <span className="font-medium text-gray-800">{t('nav.features')}</span>
-                  <ChevronRight className="h-5 w-5 ml-auto text-gray-300" />
-                </a>
-                
-                <a 
-                  href="#pricing" 
-                  className="flex items-center gap-4 py-3.5 px-4 rounded-2xl transition-all duration-200 hover:bg-gray-50 active:scale-[0.98]"
-                  onClick={closeMenu}
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 shadow-sm">
-                    <Wallet className="h-5 w-5 text-green-600" />
-                  </div>
-                  <span className="font-medium text-gray-800">{t('nav.pricing')}</span>
-                  <ChevronRight className="h-5 w-5 ml-auto text-gray-300" />
-                </a>
+              </div>
 
-                {/* Divider */}
-                <div className="my-4 h-px bg-gray-100"></div>
-
-                {/* Language Switch */}
+              {/* Logout Button */}
+              <div className="mt-auto pt-4 border-t border-white/10">
                 <button
-                  onClick={toggleLanguage}
-                  className="flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 transition-all duration-200 hover:bg-gray-50 active:scale-[0.98]"
+                  onClick={() => { signOut(); closeMenu(); }}
+                  className="flex w-full items-center gap-4 px-4 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 transition-all duration-300 hover:bg-red-500/20 active:scale-98"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 shadow-sm">
-                    <Globe className="h-5 w-5 text-gray-600" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/20">
+                    <LogOut className="h-5 w-5 text-white" />
                   </div>
-                  <span className="font-medium text-gray-800">
-                    {i18n.language === 'en' ? 'Français' : 'English'}
-                  </span>
-                  <span className="text-2xl ml-auto">{i18n.language === 'en' ? '🇫🇷' : '🇬🇧'}</span>
+                  <span className="font-medium text-red-300">{t('nav.logout', 'Déconnexion')}</span>
                 </button>
               </div>
-            )}
-          </nav>
-
-          {/* Bottom Auth Buttons for non-logged users */}
-          {!user && (
-            <div className="border-t border-gray-100 p-5">
-              <div className="space-y-3">
-                <Link to="/login" onClick={closeMenu} className="block">
-                  <Button 
-                    variant="outline" 
-                    className="h-12 w-full rounded-xl text-base font-medium"
-                  >
-                    {t('nav.login')}
-                  </Button>
+            </>
+          ) : !user && (
+            <>
+              {/* Guest Navigation */}
+              <div className="space-y-3 mb-8">
+                <Link 
+                  to="/how-to-use" 
+                  className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 transition-all duration-300 hover:bg-white/15 hover:border-white/20 active:scale-98"
+                  onClick={closeMenu}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
+                    <HelpCircle className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white block">{t('nav.howToUse')}</span>
+                    <span className="text-sm text-white/50">Guide d'utilisation</span>
+                  </div>
+                  <ArrowRight className="h-5 w-5 ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
                 </Link>
+
+                <a 
+                  href="/#pricing" 
+                  className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 transition-all duration-300 hover:bg-white/15 hover:border-white/20 active:scale-98"
+                  onClick={closeMenu}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white block">{t('nav.pricing')}</span>
+                    <span className="text-sm text-white/50">Nos tarifs compétitifs</span>
+                  </div>
+                  <ArrowRight className="h-5 w-5 ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+                </a>
+
+                <Link 
+                  to="/terms" 
+                  className="group flex items-center gap-4 px-5 py-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 transition-all duration-300 hover:bg-white/15 hover:border-white/20 active:scale-98"
+                  onClick={closeMenu}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-lg shadow-violet-500/30 group-hover:scale-110 transition-transform">
+                    <FileText className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-white block">{t('footer.terms')}</span>
+                    <span className="text-sm text-white/50">Conditions d'utilisation</span>
+                  </div>
+                  <ArrowRight className="h-5 w-5 ml-auto text-white/40 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+
+              {/* Language Switch */}
+              <button
+                onClick={toggleLanguage}
+                className="flex w-full items-center gap-4 px-5 py-4 rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:bg-white/10 active:scale-98 mb-8"
+              >
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-400 to-gray-500 flex items-center justify-center">
+                  <Globe className="h-5 w-5 text-white" />
+                </div>
+                <span className="font-medium text-white/80">
+                  {i18n.language === 'en' ? 'Français' : 'English'}
+                </span>
+                <span className="text-2xl ml-auto">{i18n.language === 'en' ? '🇫🇷' : '🇬🇧'}</span>
+              </button>
+
+              {/* Auth Buttons */}
+              <div className="mt-auto space-y-3">
                 <Link to="/register" onClick={closeMenu} className="block">
                   <Button 
-                    className="h-12 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-base font-semibold shadow-lg hover:from-blue-700 hover:to-cyan-600"
+                    className="h-14 w-full rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 text-base font-bold shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-300 hover:scale-[1.02] active:scale-98"
                   >
                     <Sparkles className="mr-2 h-5 w-5" />
                     {t('nav.register')}
                   </Button>
                 </Link>
+                <Link to="/login" onClick={closeMenu} className="block">
+                  <Button 
+                    variant="outline" 
+                    className="h-14 w-full rounded-2xl text-base font-semibold border-2 border-white/20 text-white bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/30 transition-all"
+                  >
+                    {t('nav.login')}
+                  </Button>
+                </Link>
               </div>
               
               {/* Trust badges */}
-              <div className="mt-6 flex items-center justify-center gap-4 text-xs text-gray-400">
-                <span className="flex items-center gap-1">
-                  <Shield className="h-3.5 w-3.5" />
+              <div className="mt-8 flex items-center justify-center gap-6 text-xs text-white/40">
+                <span className="flex items-center gap-1.5">
+                  <Shield className="h-4 w-4" />
                   Sécurisé
                 </span>
-                <span>•</span>
-                <span className="flex items-center gap-1">
-                  <Zap className="h-3.5 w-3.5" />
-                  Instant
+                <span className="flex items-center gap-1.5">
+                  <Zap className="h-4 w-4" />
+                  Instantané
                 </span>
-                <span>•</span>
                 <span>24/7</span>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>

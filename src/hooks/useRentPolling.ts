@@ -92,7 +92,7 @@ export function useRentPolling({
 
           // Check if rental is finished or cancelled - stop polling
           if (data?.finished || data?.cancelled) {
-            console.log(`✅ Rental ${rentalId} ${data.finished ? 'finished' : 'cancelled'} - removing from poll`);
+            // console.log(`✅ Rental ${rentalId} ${data.finished ? 'finished' : 'cancelled'} - removing from poll`);
             // Notify parent to refresh
             if (onUpdate) {
               onUpdate();

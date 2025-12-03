@@ -127,17 +127,14 @@ export function useRealtimeSms({ userId, onSmsReceived, onBalanceUpdate }: UseRe
           }
         }
       )
-      .subscribe((status) => {
-        // Handle connection status
+      .subscribe((status, err) => {
+        // Handle connection status - silencieux en production
         if (status === 'SUBSCRIBED') {
           // Successfully connected - silent
-        } else if (status === 'CHANNEL_ERROR') {
-          console.warn('⚠️ [REALTIME] WebSocket error - will auto-reconnect');
-        } else if (status === 'TIMED_OUT') {
-          console.warn('⏰ [REALTIME] WebSocket timeout - will auto-reconnect');
-        } else if (status === 'CLOSED') {
-          console.warn('🔌 [REALTIME] WebSocket closed');
+        } else if (status === 'CHANNEL_ERROR' && import.meta.env.DEV) {
+          console.warn('⚠️ [REALTIME-SMS]:', err?.message || 'WebSocket error');
         }
+        // Auto-reconnect géré par Supabase
       });
     
     channelRef.current = channel;

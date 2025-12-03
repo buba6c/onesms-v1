@@ -38,9 +38,9 @@ export default function SettingsPage() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('email, id, balance')
+        .select('email, id, balance, frozen_balance')
         .eq('id', user.id)
-        .single();
+        .single() as { data: { email: string; id: string; balance: number; frozen_balance: number } | null; error: any };
 
       if (error) throw error;
 
@@ -49,7 +49,7 @@ export default function SettingsPage() {
           email: data.email,
           id: data.id,
           balance: data.balance || 0,
-          frozenBalance: 0,
+          frozenBalance: data.frozen_balance || 0,
         });
       }
     } catch (error) {
@@ -102,16 +102,40 @@ export default function SettingsPage() {
                 <p className="text-lg font-medium">{userData.id}</p>
               </div>
 
-              {/* Current balance */}
-              <div>
-                <label className="text-sm text-gray-500 block mb-2">Current balance</label>
-                <p className="text-2xl font-bold">{Math.floor(userData.balance)}</p>
-              </div>
-
-              {/* Frozen balance */}
-              <div>
-                <label className="text-sm text-gray-500 block mb-2">Frozen balance</label>
-                <p className="text-2xl font-bold">{userData.frozenBalance}</p>
+              {/* Balance display */}
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
+                <div className="space-y-4">
+                  {/* Solde disponible (balance - frozen) */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">💰</span>
+                      <span className="text-gray-700 font-medium">{t('dashboard.balance')}</span>
+                    </div>
+                    <p className="text-3xl font-bold text-blue-600">{Math.floor(userData.balance - userData.frozenBalance)} Ⓐ</p>
+                  </div>
+                  
+                  {/* Frozen - seulement si > 0 */}
+                  {userData.frozenBalance > 0 && (
+                    <div className="flex items-center justify-between pt-3 border-t border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">🔒</span>
+                        <span className="text-gray-700 font-medium">{t('dashboard.frozen')}</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-500">{Math.floor(userData.frozenBalance)} Ⓐ</p>
+                    </div>
+                  )}
+                  
+                  {/* Total - seulement si frozen > 0 */}
+                  {userData.frozenBalance > 0 && (
+                    <div className="flex items-center justify-between pt-3 border-t border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">📊</span>
+                        <span className="text-gray-500 font-medium">Total</span>
+                      </div>
+                      <p className="text-xl font-medium text-gray-500">{Math.floor(userData.balance)} Ⓐ</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Logout Button */}

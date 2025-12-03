@@ -1,5 +1,6 @@
-// @ts-nocheck
+ 
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { getCountries, updateCountry, triggerSync, getLatestSyncLog, type Countr
 import { getCountryFlag, getFlagEmoji } from '@/lib/logo-service'
 
 export default function AdminCountries() {
+  const { t } = useTranslation()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const { toast } = useToast()
@@ -77,10 +79,10 @@ export default function AdminCountries() {
   const premiumCountries = countries.filter(c => Number(c.price_multiplier || 1) >= 1.3).length
 
   const stats = [
-    { label: 'Total Countries', value: totalCountries, icon: Globe },
-    { label: 'Active', value: activeCountries, icon: Eye },
-    { label: 'Inactive', value: totalCountries - activeCountries, icon: Ban },
-    { label: 'Avg Multiplier', value: `x${avgMultiplier}`, icon: Plus },
+    { label: t('admin.stats.totalCountries'), value: totalCountries, icon: Globe },
+    { label: t('admin.active'), value: activeCountries, icon: Eye },
+    { label: t('admin.inactive'), value: totalCountries - activeCountries, icon: Ban },
+    { label: t('admin.stats.avgMultiplier'), value: `x${avgMultiplier}`, icon: Plus },
     { label: 'Premium (≥1.3x)', value: premiumCountries, icon: Plus }
   ]
 
@@ -89,13 +91,13 @@ export default function AdminCountries() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Countries Management</h1>
+          <h1 className="text-3xl font-bold">{t('admin.countries')}</h1>
           <p className="text-gray-500">
-            {activeCountries} actifs / {totalCountries} pays
+            {activeCountries} {t('admin.active').toLowerCase()} / {totalCountries} {t('admin.countries').toLowerCase()}
           </p>
           {latestSync && (
             <p className="text-xs text-gray-400 mt-1">
-              Dernière sync: {new Date(latestSync.started_at).toLocaleString()} - {latestSync.status}
+              {t('admin.lastSync')}: {new Date(latestSync.started_at).toLocaleString()} - {latestSync.status}
             </p>
           )}
         </div>

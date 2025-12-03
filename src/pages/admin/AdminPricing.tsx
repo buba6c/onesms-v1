@@ -1,80 +1,125 @@
-// @ts-nocheck
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
-import { Search, RefreshCw, DollarSign, TrendingUp, Package, Loader2 } from 'lucide-react'
-import { getPricingRules, updatePricingRule, triggerSync, getLatestSyncLog, type PricingRule } from '@/lib/sync-service'
+import { Search, RefreshCw, DollarSign, TrendingUp, Package, Loader2, Globe, AlertCircle, Info } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+
+// Fetch real-time prices from edge function
+const fetchRealTimePrices = async (country: string, service?: string) => {
+  // Build URL with query params
+  let functionUrl = `get-real-time-prices?country=${country}&type=activation`
+  if (service) functionUrl += `&service=${service}`
+  
+  const { data, error } = await supabase.functions.invoke(functionUrl)
+  
+  if (error) throw error
+  return data
+}
+
+// Liste des pays populaires (hardcodé pour éviter les problèmes de DB)
+const POPULAR_COUNTRIES = [
+  { code: 'russia', name: 'Russia', flag_emoji: '🇷🇺' },
+  { code: 'usa', name: 'USA', flag_emoji: '🇺🇸' },
+  { code: 'india', name: 'India', flag_emoji: '🇮🇳' },
+  { code: 'indonesia', name: 'Indonesia', flag_emoji: '🇮🇩' },
+  { code: 'philippines', name: 'Philippines', flag_emoji: '🇵🇭' },
+  { code: 'england', name: 'England', flag_emoji: '🇬🇧' },
+  { code: 'france', name: 'France', flag_emoji: '🇫🇷' },
+  { code: 'germany', name: 'Germany', flag_emoji: '🇩🇪' },
+  { code: 'brazil', name: 'Brazil', flag_emoji: '🇧🇷' },
+  { code: 'canada', name: 'Canada', flag_emoji: '🇨🇦' },
+  { code: 'australia', name: 'Australia', flag_emoji: '🇦🇺' },
+  { code: 'thailand', name: 'Thailand', flag_emoji: '🇹🇭' },
+  { code: 'vietnam', name: 'Vietnam', flag_emoji: '🇻🇳' },
+  { code: 'malaysia', name: 'Malaysia', flag_emoji: '🇲🇾' },
+  { code: 'spain', name: 'Spain', flag_emoji: '🇪🇸' },
+  { code: 'italy', name: 'Italy', flag_emoji: '🇮🇹' },
+  { code: 'netherlands', name: 'Netherlands', flag_emoji: '🇳🇱' },
+  { code: 'mexico', name: 'Mexico', flag_emoji: '🇲🇽' },
+  { code: 'ukraine', name: 'Ukraine', flag_emoji: '🇺🇦' },
+  { code: 'poland', name: 'Poland', flag_emoji: '🇵🇱' },
+]
+
+interface ServiceOption {
+  code: string;
+  name: string;
+}
+
+// Get list of services
+const fetchServices = async (): Promise<ServiceOption[]> => {
+  const { data, error } = await supabase
+    .from('services')
+    .select('code, name')
+    .eq('active', true)
+    .order('name')
+  
+  if (error) throw error
+  return (data || []) as ServiceOption[]
+}
 
 export default function AdminPricing() {
+  const { t } = useTranslation()
   const [searchTerm, setSearchTerm] = useState('')
-  const [serviceFilter, setServiceFilter] = useState('all')
-  const [countryFilter, setCountryFilter] = useState('all')
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
+  const [selectedCountry, setSelectedCountry] = useState('russia')
+  const [selectedService, setSelectedService] = useState('')
 
-  // Queries
-  const { data: pricingRules = [], isLoading } = useQuery({
-    queryKey: ['admin-pricing', serviceFilter, countryFilter],
-    queryFn: () => getPricingRules({
-      service_code: serviceFilter === 'all' ? undefined : serviceFilter,
-      country_code: countryFilter === 'all' ? undefined : countryFilter,
-      active: true
-    })
+  // Use hardcoded countries list
+  const countries = POPULAR_COUNTRIES
+
+  // Fetch services list
+  const { data: services = [] } = useQuery({
+    queryKey: ['admin-services-list'],
+    queryFn: fetchServices
   })
 
-  const { data: latestSync } = useQuery({
-    queryKey: ['latest-sync'],
-    queryFn: getLatestSyncLog,
-    refetchInterval: 5000
+  // Fetch real-time prices
+  const { data: pricesData, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ['real-time-prices', selectedCountry, selectedService],
+    queryFn: () => fetchRealTimePrices(selectedCountry, selectedService || undefined),
+    enabled: !!selectedCountry,
+    staleTime: 30000, // 30 secondes
+    refetchInterval: 60000, // Refresh every minute
   })
 
-  // Mutations
-  const syncMutation = useMutation({
-    mutationFn: triggerSync,
-    onSuccess: (data) => {
-      toast({
-        title: 'Synchronisation réussie',
-        description: `${data.stats?.prices || 0} prix synchronisés`
-      })
-      queryClient.invalidateQueries({ queryKey: ['admin-pricing'] })
-      queryClient.invalidateQueries({ queryKey: ['latest-sync'] })
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Erreur de synchronisation',
-        description: error.message,
-        variant: 'destructive'
-      })
-    }
-  })
+  // Transform prices data for display - format from edge function: { success, data: [...], meta }
+  const pricesList = pricesData?.data 
+    ? pricesData.data.map((item: any) => ({
+        service_code: item.serviceCode,
+        country_code: item.countryCode,
+        cost: item.priceUSD || 0,
+        priceCoins: item.priceCoins || 0,
+        count: item.count || 0,
+        // Selling price is already calculated with margin by the edge function
+        selling_price: item.priceCoins || 0,
+        margin: pricesData.meta?.marginPercentage || 10
+      }))
+    : []
 
-  // Filter data
-  const filteredRules = pricingRules.filter(rule => {
-    const matchSearch = !searchTerm || 
-      rule.service_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rule.country_code.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchSearch
+  // Filter by search
+  const filteredPrices = pricesList.filter((price: any) => {
+    if (!searchTerm) return true
+    return price.service_code.toLowerCase().includes(searchTerm.toLowerCase())
   })
 
   // Stats
-  const totalRules = filteredRules.length
-  const avgMargin = filteredRules.length > 0
-    ? (filteredRules.reduce((sum, r) => sum + Number(r.margin_percentage || 0), 0) / filteredRules.length).toFixed(1)
+  const totalServices = filteredPrices.length
+  const totalNumbers = filteredPrices.reduce((sum, p) => sum + (p.count || 0), 0)
+  const avgCost = filteredPrices.length > 0
+    ? (filteredPrices.reduce((sum, p) => sum + p.cost, 0) / filteredPrices.length).toFixed(2)
     : '0'
-  const avgActivationPrice = filteredRules.length > 0
-    ? (filteredRules.reduce((sum, r) => sum + Number(r.activation_price || 0), 0) / filteredRules.length).toFixed(2)
+  const avgSellingPrice = filteredPrices.length > 0
+    ? (filteredPrices.reduce((sum, p) => sum + parseFloat(p.selling_price), 0) / filteredPrices.length).toFixed(2)
     : '0'
-  const totalAvailable = filteredRules.reduce((sum, r) => sum + Number(r.available_count || 0), 0)
 
   const stats = [
-    { label: 'Total Prices', value: totalRules, icon: Package, color: 'text-blue-600' },
-    { label: 'Avg Margin', value: `${avgMargin}%`, icon: TrendingUp, color: 'text-green-600' },
-    { label: 'Avg Activation', value: `${avgActivationPrice} Ⓐ`, icon: DollarSign, color: 'text-purple-600' },
-    { label: 'Total Available', value: totalAvailable.toLocaleString(), icon: Package, color: 'text-orange-600' }
+    { label: 'Services disponibles', value: totalServices, icon: Package, color: 'text-blue-600' },
+    { label: 'Numéros totaux', value: totalNumbers.toLocaleString(), icon: Globe, color: 'text-green-600' },
+    { label: 'Coût moyen', value: `${avgCost} Ⓐ`, icon: DollarSign, color: 'text-orange-600' },
+    { label: 'Prix vente moyen', value: `${avgSellingPrice} Ⓐ`, icon: TrendingUp, color: 'text-purple-600' }
   ]
 
   return (
@@ -82,59 +127,77 @@ export default function AdminPricing() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Pricing Management</h1>
+          <h1 className="text-3xl font-bold">{t('admin.pricing')}</h1>
           <p className="text-gray-500">
-            {totalRules} règles de tarification
+            Prix en temps réel via SMS-Activate API
           </p>
-          {latestSync && (
-            <p className="text-xs text-gray-400 mt-1">
-              Dernière sync: {new Date(latestSync.started_at).toLocaleString()} - {latestSync.status}
-            </p>
+        </div>
+        <Button 
+          variant="outline"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 mr-2" />
           )}
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="default" 
-            className="bg-purple-600 hover:bg-purple-700"
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || latestSync?.status === 'running'}
-          >
-            {syncMutation.isPending || latestSync?.status === 'running' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Sync avec 5sim
-          </Button>
-        </div>
+          Actualiser
+        </Button>
       </div>
 
-      {/* Search & Filters */}
+      {/* Info Banner */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-blue-900">Prix dynamiques en temps réel</h3>
+              <p className="text-sm text-blue-700 mt-1">
+                Les prix sont récupérés directement depuis l'API SMS-Activate et peuvent varier à tout moment. 
+                Une marge de 30% est automatiquement appliquée aux prix de vente.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
-                placeholder="Rechercher par service ou pays..."
+                placeholder="Rechercher un service..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
             <select
-              value={serviceFilter}
-              onChange={(e) => setServiceFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg"
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="px-4 py-2 border rounded-lg bg-white"
             >
-              <option value="all">Tous les services</option>
+              <option value="">Sélectionner un pays</option>
+              {countries.map(country => (
+                <option key={country.code} value={country.code}>
+                  {country.flag_emoji} {country.name}
+                </option>
+              ))}
             </select>
             <select
-              value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg"
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+              className="px-4 py-2 border rounded-lg bg-white"
             >
-              <option value="all">Tous les pays</option>
+              <option value="">Tous les services</option>
+              {services.map(service => (
+                <option key={service.code} value={service.code}>
+                  {service.name}
+                </option>
+              ))}
             </select>
           </div>
         </CardContent>
@@ -159,18 +222,30 @@ export default function AdminPricing() {
 
       {/* Pricing Table */}
       <Card>
-        {isLoading ? (
+        {error ? (
+          <div className="p-12 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+            <p className="text-red-600 font-medium mb-2">Erreur de chargement</p>
+            <p className="text-gray-500 text-sm mb-4">{(error as Error).message}</p>
+            <Button onClick={() => refetch()} variant="outline">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Réessayer
+            </Button>
+          </div>
+        ) : isLoading ? (
           <div className="p-12 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-500">Chargement des prix...</p>
+            <p className="text-gray-500">Chargement des prix en temps réel...</p>
           </div>
-        ) : filteredRules.length === 0 ? (
+        ) : !selectedCountry ? (
           <div className="p-12 text-center">
-            <p className="text-gray-500 mb-4">Aucun prix trouvé</p>
-            <Button onClick={() => syncMutation.mutate()} className="bg-purple-600">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Sync avec 5sim
-            </Button>
+            <Globe className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-gray-500">Sélectionnez un pays pour voir les prix</p>
+          </div>
+        ) : filteredPrices.length === 0 ? (
+          <div className="p-12 text-center">
+            <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-gray-500">Aucun prix trouvé pour cette combinaison</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -179,50 +254,42 @@ export default function AdminPricing() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pays</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opérateur</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coût</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coût API</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix Vente</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marge</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disponible</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disponibles</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredRules.map(rule => (
-                  <tr key={rule.id} className="hover:bg-gray-50">
+                {filteredPrices.map((price, index) => (
+                  <tr key={`${price.service_code}-${index}`} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      <div className="font-medium capitalize">{rule.service_code}</div>
+                      <div className="font-medium uppercase">{price.service_code}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium uppercase">{rule.country_code}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge className="bg-gray-600">{rule.operator || 'any'}</Badge>
+                      <div className="font-medium uppercase">{price.country_code}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
-                        <span className="font-medium text-gray-600">{Number(rule.activation_cost || 0).toFixed(2)}</span>
-                        <span className="text-xs">Ⓐ</span>
+                        <span className="font-medium text-gray-600">{price.cost.toFixed(2)}</span>
+                        <span className="text-xs text-gray-400">Ⓐ</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
-                        <span className="font-medium text-blue-600">{Number(rule.activation_price || 0).toFixed(2)}</span>
-                        <span className="text-xs">Ⓐ</span>
+                        <span className="font-medium text-blue-600">{price.selling_price}</span>
+                        <span className="text-xs text-blue-400">Ⓐ</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="font-medium text-green-600">
-                        {Number(rule.margin_percentage || 0).toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-gray-600">{rule.available_count || 0}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={rule.active ? 'success' : 'destructive'}>
-                        {rule.active ? 'Actif' : 'Inactif'}
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        +{price.margin}%
                       </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`font-medium ${price.count > 100 ? 'text-green-600' : price.count > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                        {price.count.toLocaleString()}
+                      </span>
                     </td>
                   </tr>
                 ))}
