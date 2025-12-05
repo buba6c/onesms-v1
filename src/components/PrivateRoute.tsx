@@ -3,7 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 
 export default function PrivateRoute() {
-  const { user, loading, checkAuth } = useAuthStore()
+  const { user, loading, checkAuth, setUser } = useAuthStore()
   const [timeoutReached, setTimeoutReached] = useState(false)
 
   // Timeout de sécurité: si loading > 5 secondes, forcer une nouvelle vérification
@@ -13,6 +13,8 @@ export default function PrivateRoute() {
         console.warn('⚠️ [PrivateRoute] Loading timeout reached, forcing checkAuth...')
         setTimeoutReached(true)
         checkAuth()
+        // Fallback: si toujours bloqué, on force l'état "non connecté" pour débloquer la navigation
+        setUser(null)
       }
     }, 5000)
 

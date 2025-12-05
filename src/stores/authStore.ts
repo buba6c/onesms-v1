@@ -18,26 +18,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   checkAuth: async () => {
     try {
-      // Checking authentication silently
+      console.log('[AUTH] Starting checkAuth...')
       
+      // getCurrentUser a maintenant son propre timeout et fallback
       const { user: authUser, error } = await getCurrentUser()
       
       if (error) {
-        // Erreur réseau - ne pas afficher dans la console en production
-        if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
-          console.warn('⚠️ [AUTH] Network error, will retry...')
-        } else {
-          console.error('❌ [AUTH] getCurrentUser error:', error)
-        }
+        console.warn('[AUTH] Error getting current user:', error.message)
         set({ user: null, loading: false })
         return
       }
       
       if (!authUser) {
-        // console.log('⚠️ [AUTH] No authenticated user')
+        console.log('[AUTH] No authenticated user found')
         set({ user: null, loading: false })
         return
       }
+      
+      console.log('[AUTH] User authenticated:', authUser.email)
 
       // User found, fetching profile
 
