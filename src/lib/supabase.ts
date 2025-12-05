@@ -5,8 +5,14 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ Missing Supabase environment variables:', {
+    url: supabaseUrl ? '✓' : '✗',
+    key: supabaseAnonKey ? '✓' : '✗'
+  })
   throw new Error('Missing Supabase environment variables')
 }
+
+console.log('✅ Supabase client initialized:', supabaseUrl)
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -14,11 +20,11 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
   },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
+  global: {
+    headers: {
+      'X-Client-Info': 'onesms-web'
+    }
+  }
 })
 
 // Auth helpers
@@ -28,7 +34,6 @@ export const signUp = async (email: string, password: string, metadata?: any) =>
     password,
     options: {
       data: metadata,
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   })
   return { data, error }
@@ -43,12 +48,12 @@ export const signIn = async (email: string, password: string) => {
 }
 
 export const signInWithGoogle = async () => {
-  // Utiliser l'URL de production sur Netlify, sinon localhost
-  const baseUrl = import.meta.env.PROD 
-    ? 'https://onesms-sn.com' 
-    : window.location.origin;
+  // Détecter l'environnement par l'URL actuelle
+  const baseUrl = window.location.origin.includes('localhost') 
+    ? window.location.origin 
+    : 'https://onesms-sn.com';
   
-  // console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
+  console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
   
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -88,8 +93,30 @@ export const signOut = async () => {
 }
 
 export const getCurrentUser = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser()
-  return { user, error }
+  try {
+    // Essayer getUser avec timeout court
+    const getUserPromise = supabase.auth.getUser()
+    const timeoutPromise = new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
+      setTimeout(() => reject(new Error('getUser timeout')), 5000)
+    )
+    
+    const result = await Promise.race([getUserPromise, timeoutPromise])
+    return { user: result.data.user, error: result.error }
+  } catch (error: any) {
+    console.warn('[SUPABASE] getUser failed, trying getSession:', error.message)
+    
+    // Fallback: utiliser getSession (plus rapide, lecture locale)
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        return { user: null, error: sessionError }
+      }
+      return { user: session?.user || null, error: null }
+    } catch (fallbackError: any) {
+      console.error('[SUPABASE] getSession also failed:', fallbackError)
+      return { user: null, error: fallbackError }
+    }
+  }
 }
 
 export const getSession = async () => {
@@ -97,37 +124,28 @@ export const getSession = async () => {
   return { session, error }
 }
 
-// Password reset
 export const resetPasswordForEmail = async (email: string) => {
-  const baseUrl = import.meta.env.PROD 
-    ? 'https://onesms-sn.com' 
-    : window.location.origin;
-  
+  const baseUrl = window.location.origin.includes('localhost') 
+    ? window.location.origin 
+    : 'https://onesms-sn.com';
+
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${baseUrl}/reset-password`,
   })
   return { data, error }
 }
 
-export const updatePassword = async (newPassword: string) => {
+export const updatePassword = async (password: string) => {
   const { data, error } = await supabase.auth.updateUser({
-    password: newPassword,
+    password
   })
   return { data, error }
 }
 
-// Resend confirmation email
 export const resendConfirmationEmail = async (email: string) => {
-  const baseUrl = import.meta.env.PROD 
-    ? 'https://onesms-sn.com' 
-    : window.location.origin;
-  
   const { data, error } = await supabase.auth.resend({
     type: 'signup',
-    email,
-    options: {
-      emailRedirectTo: `${baseUrl}/login?verified=true`,
-    },
+    email: email,
   })
   return { data, error }
 }
