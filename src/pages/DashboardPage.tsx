@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
@@ -25,7 +26,10 @@ import {
   AlertTriangle,
   Loader2,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  Gift,
+  Link2,
+  Share2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -111,7 +115,71 @@ const SMS_ACTIVATE_ID_TO_NAME: Record<string, string> = {
   'chile': 'Chile', 'venezuela': 'Venezuela', 'ecuador': 'Ecuador', 'bolivia': 'Bolivia',
   'south_africa': 'South Africa', 'new_zealand': 'New Zealand', 'saudi_arabia': 'Saudi Arabia',
   // Codes courts (ex: "hw" pour services)
-  'hw': 'Alipay', 'full': 'Full Rent'
+  'hw': 'Alipay', 'full': 'Location complète'
+};
+
+// ============================================================================
+// 🎯 MAPPING COMPLET DES CODES SERVICES → NOMS
+// Pour éviter d'afficher les codes bruts (wa, tg, fb...) à la place des noms
+// ============================================================================
+const SERVICE_CODE_TO_NAME: Record<string, string> = {
+  // 📱 TOP SOCIAL / MESSAGING
+  'wa': 'WhatsApp', 'tg': 'Telegram', 'ig': 'Instagram', 'fb': 'Facebook',
+  'tw': 'Twitter/X', 'ds': 'Discord', 'fu': 'Snapchat', 'lf': 'TikTok',
+  'vi': 'Viber', 'wb': 'WeChat', 'vk': 'VKontakte', 'ok': 'Odnoklassniki',
+  'tn': 'LinkedIn', 'bnl': 'Reddit', 'me': 'Line', 'kt': 'KakaoTalk',
+  'bw': 'Signal', 'op': 'Imo', 'chy': 'Zalo', 'qq': 'QQ',
+  'sg': 'Signal', 'sk': 'Skype', 'sl': 'Slack', 'zm': 'Zoom',
+  
+  // 🔍 TECH & SERVICES
+  'go': 'Google', 'mm': 'Microsoft', 'wx': 'Apple', 'dr': 'OpenAI/ChatGPT',
+  'mb': 'Yahoo', 'pm': 'AOL', 'nv': 'Naver', 'yw': 'Yandex', 'bd': 'Baidu',
+  
+  // 🛒 SHOPPING
+  'am': 'Amazon', 'ka': 'Shopee', 'dl': 'Lazada', 'ep': 'Temu', 'aez': 'Shein',
+  'hx': 'AliExpress', 'za': 'JD.com', 'xt': 'Flipkart', 'dh': 'eBay',
+  'sn': 'OLX', 'kc': 'Vinted', 'wr': 'Walmart', 'by': 'Mercari',
+  
+  // 💰 FINANCE
+  'ts': 'PayPal', 're': 'Coinbase', 'aon': 'Binance', 'nc': 'Payoneer',
+  'ij': 'Revolut', 'bo': 'Wise', 'ti': 'Crypto.com', 'hw': 'Alipay',
+  'xh': 'OVO', 'fr': 'Dana', 'hy': 'GoPay', 'ev': 'PicPay',
+  'adi': 'Cash App', 'aat': 'Venmo', 'aji': 'Skrill', 'afz': 'Klarna',
+  
+  // 🍕 DELIVERY
+  'ub': 'Uber', 'jg': 'Grab', 'ac': 'DoorDash', 'aq': 'Glovo',
+  'rr': 'Wolt', 'nz': 'Foodpanda', 'ni': 'Gojek', 'xk': 'DiDi',
+  'rl': 'inDriver', 'ki': '99app',
+  
+  // ❤️ DATING
+  'oi': 'Tinder', 'mo': 'Bumble', 'qv': 'Badoo', 'vz': 'Hinge',
+  'df': 'Happn', 'gr': 'Grindr', 'bpd': 'Feeld',
+  
+  // 🎮 GAMING
+  'mt': 'Steam', 'aiw': 'Roblox', 'blm': 'Epic Games', 'bz': 'Blizzard',
+  'ah': 'Escape From Tarkov', 'xo': 'Xbox', 'ps': 'PlayStation',
+  
+  // 🎬 ENTERTAINMENT
+  'nf': 'Netflix', 'alj': 'Spotify', 'hb': 'Twitch', 'yt': 'YouTube',
+  'dp': 'Disney+', 'hbo': 'HBO Max', 'pr': 'Prime Video',
+  
+  // 📞 TELECOM
+  'at': 'AT&T', 've': 'Verizon', 'tmb': 'T-Mobile', 'vo': 'Vodafone',
+  'ora': 'Orange', 'sf': 'SFR', 'bou': 'Bouygues',
+  
+  // 🏦 BANKING
+  'ing': 'ING', 'bnp': 'BNP', 'hsbc': 'HSBC', 'brc': 'Barclays',
+  'dv': 'Monzo', 'dx': 'Monese', 'n26': 'N26',
+  
+  // 🚗 TRANSPORT
+  'ly': 'Lyft', 'bt': 'Bolt', 'cp': 'Cabify', 'fn': 'FreeNow',
+  
+  // 🔧 OTHER
+  'ot': 'Any Other', 'full': 'Full Rent',
+  
+  // 🇨🇳 CHINA SERVICES
+  'dz': 'Douyin', 'xhs': 'Xiaohongshu', 'weibo': 'Weibo',
+  'taobao': 'Taobao', 'pdd': 'Pinduoduo', 'jd': 'JD.com', 'meituan': 'Meituan',
 };
 
 // Helper: Convertir country_code en nom lisible
@@ -142,7 +210,7 @@ const getCountryName = (code: string): string => {
 // ============================================================================
 const SERVICE_PRIORITY: Record<string, number> = {
   // 🔥 TOP SERVICES RENT (ordre SMS-Activate.io/rent)
-  'full': 1000,    // Full rent - toujours en premier
+  'full': 1000,    // Location complète - toujours en premier
   'hw': 980,       // Alipay / Alibaba / 1688
   'go': 960,       // Google, YouTube, Gmail
   'wa': 940,       // WhatsApp
@@ -422,6 +490,68 @@ export default function DashboardPage() {
   // State pour le modal d'attente SMS (activations)
   const [showSmsWaitingModal, setShowSmsWaitingModal] = useState(false);
   const [selectedActivation, setSelectedActivation] = useState<ActiveNumber | null>(null);
+
+  // Référentiel parrainage
+  const referralCode = user?.referral_code as string | undefined;
+  const [referralLinkBase, setReferralLinkBase] = useState<string>('');
+
+  useEffect(() => {
+    const loadReferralBase = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('key, value')
+          .eq('key', 'referral_link_base')
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          setReferralLinkBase(String(data.value));
+        }
+      } catch (err) {
+        console.warn('[REFERRAL] load base failed', err);
+      }
+    };
+    loadReferralBase();
+  }, []);
+
+  const referralLink = useMemo(() => {
+    const base = referralLinkBase || (typeof window !== 'undefined' ? `${window.location.origin}/register` : '');
+    if (!referralCode) return base;
+    return `${base}?ref=${encodeURIComponent(referralCode)}`;
+  }, [referralCode, referralLinkBase]);
+
+  const handleCopyReferral = async () => {
+    if (!referralCode) return;
+    try {
+      await navigator.clipboard.writeText(referralCode);
+      toast({ title: t('referral.copiedCode') });
+    } catch {
+      toast({ title: t('common.error'), description: t('referral.copyFallback'), variant: 'destructive' });
+    }
+  };
+
+  const handleShareReferral = async () => {
+    if (!referralLink) return;
+    const payload = {
+      title: t('referral.shareTitle'),
+      text: t('referral.shareText'),
+      url: referralLink
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(payload);
+        return;
+      }
+    } catch (err) {
+      console.warn('[REFERRAL] native share error', err);
+    }
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      toast({ title: t('referral.linkCopied') });
+    } catch {
+      toast({ title: t('common.error'), description: t('referral.copyFallback'), variant: 'destructive' });
+    }
+  };
   
   // Helper pour ouvrir le modal d'attente SMS
   const openSmsWaitingModal = (num: ActiveNumber) => {
@@ -466,6 +596,8 @@ export default function DashboardPage() {
   
   // State pour la bannière de succès de paiement
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [showReferralBonus, setShowReferralBonus] = useState(false);
+  const [referralBonusAmount, setReferralBonusAmount] = useState(0);
   
   // Timer state to force re-render every second for real-time countdown
   const [, setTimerTick] = useState(0);
@@ -499,6 +631,39 @@ export default function DashboardPage() {
       
       // Refresh user balance
       queryClient.invalidateQueries({ queryKey: ['user-balance'] });
+      
+      // 🎁 Check if user received a referral bonus (within last 60 seconds)
+      const checkReferralBonus = async () => {
+        if (!user?.id) return;
+        
+        const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+        
+        const { data: bonusTx } = await (supabase
+          .from('transactions') as any)
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('type', 'referral_bonus')
+          .eq('status', 'completed')
+          .gte('created_at', oneMinuteAgo)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (bonusTx && bonusTx.length > 0) {
+          const bonusAmount = bonusTx[0].amount as number;
+          setReferralBonusAmount(bonusAmount);
+          setShowReferralBonus(true);
+          
+          // Toast for referral bonus
+          toast({
+            title: `🎁 ${t('toasts.referralBonusReceived')}`,
+            description: t('toasts.referralBonusReceivedDesc', { amount: bonusAmount }),
+            duration: 10000,
+          });
+        }
+      };
+      
+      // Delay slightly to ensure webhook has processed
+      setTimeout(checkReferralBonus, 2000);
       
       // Auto-hide banner after 10 seconds
       setTimeout(() => setShowPaymentSuccess(false), 10000);
@@ -563,7 +728,7 @@ export default function DashboardPage() {
           // { serviceCode: { cost, quant: { current, total }, ... } }
           const rentServices = rentData?.services || {};
           const servicesList = Object.entries(rentServices)
-            .filter(([code]) => code !== 'full') // Exclure "full" car il y a déjà le bouton Full Rent
+            .filter(([code]) => code !== 'full' && code !== 'ot' && code !== 'any') // Exclure full et "Any other"
             .map(([code, data]: [string, any]) => ({
               code,
               quantity: data.quant?.current || data.quant?.total || 0
@@ -660,8 +825,8 @@ export default function DashboardPage() {
         ? dbServices 
         : dbServices.filter(s => s.category === selectedCategory);
       
-      // 🚫 En mode ACTIVATION, masquer "Any other" (code: ot, any)
-      if (mode === 'activation') {
+      // 🚫 Masquer "Any other" (code: ot, any) en activation et rent
+      if (mode === 'activation' || mode === 'rent') {
         filtered = filtered.filter(s => s.code !== 'ot' && s.code !== 'any');
       }
       
@@ -813,13 +978,13 @@ export default function DashboardPage() {
       // Mapper les rentals DB vers le format ActiveNumber
       return (data || []).map((rent: DBRental) => {
         // Support both column naming conventions
-        // order_id is the SMS-Activate rental ID
+        // rental_id / rent_id = SMS-Activate rental ID
         const expiresAt = new Date(rent.expires_at || rent.end_date || '').getTime();
         const now = Date.now();
         const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
         
-        // order_id = SMS-Activate rental ID (number)
-        const smsActivateRentId = rent.order_id || rent.rental_id || rent.rent_id;
+        // SMS-Activate rental ID (stored in rental_id and rent_id)
+        const smsActivateRentId = rent.rental_id || rent.rent_id;
 
         return {
           id: rent.id,
@@ -855,6 +1020,7 @@ export default function DashboardPage() {
   // Auto-masquer les numéros qui ont reçu un SMS après 20 secondes
   const [hiddenNumbers, setHiddenNumbers] = useState<Set<string>>(new Set());
   const [smsReceivedTimestamps, setSmsReceivedTimestamps] = useState<Map<string, number>>(new Map());
+  const hiddenStorageKey = user?.id ? `hiddenNumbers:${user.id}` : null;
   
   // Flag pour savoir si le chargement initial est terminé
   // isPending = true seulement au TOUT PREMIER fetch (pas de données en cache)
@@ -950,6 +1116,29 @@ export default function DashboardPage() {
     // Filter result log disabled
     setActiveNumbers(visibleNumbers);
   }, [dbActivations, dbRentals, hiddenNumbers, hasInitiallyLoaded]);
+
+  // Persister le masquage par utilisateur
+  useEffect(() => {
+    if (!hiddenStorageKey) return;
+    try {
+      const raw = localStorage.getItem(hiddenStorageKey);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setHiddenNumbers(new Set(arr));
+      }
+    } catch (e) {
+      console.warn('[DASHBOARD] load hiddenNumbers failed', e);
+    }
+  }, [hiddenStorageKey]);
+
+  useEffect(() => {
+    if (!hiddenStorageKey) return;
+    try {
+      localStorage.setItem(hiddenStorageKey, JSON.stringify(Array.from(hiddenNumbers)));
+    } catch (e) {
+      console.warn('[DASHBOARD] persist hiddenNumbers failed', e);
+    }
+  }, [hiddenStorageKey, hiddenNumbers]);
 
   // Auto-masquer les numéros 20 secondes après réception du SMS
   useEffect(() => {
@@ -1069,85 +1258,79 @@ export default function DashboardPage() {
       
       // ✅ En mode RENT, utiliser getRentServicesAndCountries (API différente)
       if (mode === 'rent') {
+        // Convertir rentDuration en rentTime pour l'API
+        const rentTimeMap: Record<string, string> = {
+          '4hours': '4',
+          '1day': '24', 
+          '1week': '168',
+          '1month': '720'
+        };
+        const rentTime = rentTimeMap[rentDuration];
         
-        try {
-          // Convertir rentDuration en rentTime pour l'API
-          const rentTimeMap: Record<string, string> = {
-            '4hours': '4',
-            '1day': '24', 
-            '1week': '168',
-            '1month': '720'
-          };
-          const rentTime = rentTimeMap[rentDuration];
-          
-          // Récupérer les infos des pays depuis notre DB
-          const { data: dbCountries } = await supabase
-            .from('countries')
-            .select('id, code, name, success_rate')
-            .eq('active', true) as { data: DBCountry[] | null; error: any };
-          
-          // Mapper par NOM du pays (case insensitive) car les codes sont inconsistants
-          const dbCountriesMap = new Map(
-            dbCountries?.map((c: DBCountry) => [c.name.toLowerCase(), c]) || []
-          );
-          
-          // 1️⃣ D'abord, obtenir la liste des pays disponibles (avec getCountries: true)
-          // 🔑 Pour Full Rent ou services spécifiques, passer le serviceCode pour obtenir les quantités
-          const serviceCode = selectedService.code;
-          const { data: rentData, error } = await supabase.functions.invoke('get-rent-services', {
-            body: { 
-              rentTime, 
-              getCountries: true,
-              serviceCode: serviceCode // ✅ Retourne tous les pays avec quantités pour ce service
-            }
-          });
-          
-          if (error) {
-            throw error;
+        // Récupérer les infos des pays depuis notre DB
+        const { data: dbCountries } = await supabase
+          .from('countries')
+          .select('id, code, name, success_rate')
+          .eq('active', true) as { data: DBCountry[] | null; error: any };
+        
+        // Mapper par NOM du pays (case insensitive) car les codes sont inconsistants
+        const dbCountriesMap = new Map(
+          dbCountries?.map((c: DBCountry) => [c.name.toLowerCase(), c]) || []
+        );
+        
+        // 1️⃣ D'abord, obtenir la liste des pays disponibles (avec getCountries: true)
+        // 🔑 Pour Full Rent ou services spécifiques, passer le serviceCode pour obtenir les quantités
+        const serviceCode = selectedService.code;
+        const { data: rentData, error } = await supabase.functions.invoke('get-rent-services', {
+          body: { 
+            rentTime, 
+            getCountries: true,
+            serviceCode: serviceCode // ✅ Retourne tous les pays avec quantités pour ce service
           }
-          
-          // L'API retourne maintenant countries: [{ id, code, name, available, quantity, cost, sellingPrice, activationPrice }]
-          // Tous les pays sont inclus, avec quantity=0 si pas de stock
-          const countriesArray = rentData?.countries || [];
-          
-          // 💰 L'API calcule maintenant le sellingPrice côté serveur
-          // avec la garantie que sellingPrice >= activationPrice
-          const MIN_PRICE_COINS = 5; // Prix minimum 5 Ⓐ
-          
-          // Convertir directement les données de l'API en format Country
-          const availableCountries: Country[] = countriesArray.map((c: any) => {
-            // Utiliser le sellingPrice de l'API (déjà calculé avec marge et >= activation)
-            const sellingPrice = c.sellingPrice || MIN_PRICE_COINS;
-            
-            return {
-              id: `rent-${c.id}`,
-              name: c.name,
-              code: c.code,
-              flag: getFlagEmoji(c.code) || '🌍',
-              successRate: 85,
-              count: c.quantity || 0,
-              price: sellingPrice, // Prix garanti >= activation
-              compositeScore: (c.quantity || 0) * 85 / 100,
-              rank: c.id,
-              share: 0,
-              _smsActivateId: c.id,
-              _service: serviceCode
-            } as Country;
-          });
-          
-          // Tri: pays avec stock en premier (par quantité décroissante), puis les autres
-          availableCountries.sort((a, b) => {
-            if ((a.count || 0) > 0 && (b.count || 0) === 0) return -1;
-            if ((a.count || 0) === 0 && (b.count || 0) > 0) return 1;
-            if ((a.count || 0) > 0 && (b.count || 0) > 0) return (b.count || 0) - (a.count || 0);
-            return a.name.localeCompare(b.name);
-          });
-          
-          return availableCountries;
-          
-        } catch (error) {
+        });
+        
+        if (error) {
           throw error;
         }
+        
+        // L'API retourne maintenant countries: [{ id, code, name, available, quantity, cost, sellingPrice, activationPrice }]
+        // Tous les pays sont inclus, avec quantity=0 si pas de stock
+        const countriesArray = rentData?.countries || [];
+        
+        // 💰 L'API calcule maintenant le sellingPrice côté serveur
+        // avec la garantie que sellingPrice >= activationPrice
+        const MIN_PRICE_COINS = 5; // Prix minimum 5 Ⓐ
+        
+        // Convertir directement les données de l'API en format Country
+        const availableCountries: Country[] = countriesArray.map((c: any) => {
+          // Utiliser le sellingPrice de l'API (déjà calculé avec marge et >= activation)
+          const sellingPrice = c.sellingPrice || MIN_PRICE_COINS;
+          
+          return {
+            id: `rent-${c.id}`,
+            name: c.name,
+            code: c.code,
+            flag: getFlagEmoji(c.code) || '🌍',
+            successRate: 85,
+            count: c.quantity || 0,
+            price: sellingPrice, // Prix garanti >= activation
+            compositeScore: (c.quantity || 0) * 85 / 100,
+            rank: c.id,
+            share: 0,
+            _smsActivateId: c.id,
+            _service: serviceCode
+          } as Country;
+        });
+        
+        // Tri: pays avec stock en premier (par quantité décroissante), puis les autres
+        availableCountries.sort((a, b) => {
+          if ((a.count || 0) > 0 && (b.count || 0) === 0) return -1;
+          if ((a.count || 0) === 0 && (b.count || 0) > 0) return 1;
+          if ((a.count || 0) > 0 && (b.count || 0) > 0) return (b.count || 0) - (a.count || 0);
+          return a.name.localeCompare(b.name);
+        });
+        
+        return availableCountries;
       }
       
       // ✅ MODE ACTIVATION (code existant)
@@ -1312,6 +1495,8 @@ export default function DashboardPage() {
     c.name.toLowerCase().includes(searchCountry.toLowerCase())
   );
 
+  const [purchaseLock, setPurchaseLock] = useState(false); // Prevent double-click
+
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
     setCurrentStep('country');
@@ -1326,6 +1511,9 @@ export default function DashboardPage() {
 
   const handleActivate = async () => {
     if (!selectedService || !selectedCountry || !user?.id) return;
+
+    if (purchaseLock) return;
+    setPurchaseLock(true);
 
     try {
       const isRent = mode === 'rent';
@@ -1378,6 +1566,7 @@ export default function DashboardPage() {
       // Préparer le body selon le mode
       // ✅ Envoyer l'ID numérique du pays pour le mapping SMS-Activate
       // ✅ Envoyer le prix affiché au frontend pour garantir la cohérence
+        setPurchaseLock(false);
       // Pour rent: utiliser _smsActivateId (l'ID est préfixé "rent-" dans selectedCountry.id)
       // Pour activation: utiliser directement selectedCountry.id
       const countryId = isRent 
@@ -1490,9 +1679,23 @@ export default function DashboardPage() {
 
   // Helper: Get full service name from code (wa -> WhatsApp)
   const getServiceName = (code: string): string => {
+    if (!code) return 'Unknown';
+    const lowerCode = code.toLowerCase();
+    
+    // 1. D'abord chercher dans le mapping statique (plus rapide et plus fiable)
+    if (SERVICE_CODE_TO_NAME[lowerCode]) {
+      return SERVICE_CODE_TO_NAME[lowerCode];
+    }
+    
+    // 2. Sinon chercher dans getAllServices()
     const allServices = getAllServices();
-    const found = allServices.find(s => s.code.toLowerCase() === code.toLowerCase());
-    return found?.name || code.toUpperCase();
+    const found = allServices.find(s => s.code.toLowerCase() === lowerCode);
+    if (found?.name) return found.name;
+    
+    // 3. Fallback: formater le code (remplacer _ par espace, capitaliser)
+    return code.length <= 4 
+      ? code.toUpperCase() 
+      : code.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const cancelActivation = async (activationId: string, orderId: string) => {
@@ -1597,6 +1800,39 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* 🎁 Bannière de bonus de parrainage (après première recharge) */}
+      {showReferralBonus && (
+        <div className="fixed top-16 left-0 right-0 z-50 mx-4 animate-in slide-in-from-top duration-300" style={{ top: showPaymentSuccess ? '140px' : '64px' }}>
+          <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white rounded-2xl p-4 shadow-2xl shadow-purple-500/30">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Gift className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-lg">{t('toasts.referralBonusReceived')}</h3>
+                <p className="text-sm text-white/90 mt-0.5">{t('toasts.referralBonusReceivedDesc', { amount: referralBonusAmount })}</p>
+                <button 
+                  onClick={() => {
+                    setShowReferralBonus(false);
+                    navigate('/referral');
+                  }}
+                  className="mt-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  {t('toasts.referralBonusCta')}
+                </button>
+              </div>
+              <button 
+                onClick={() => setShowReferralBonus(false)}
+                className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile: Bouton flottant pour ouvrir le panneau de commande */}
       <button
         onClick={() => setMobileOrderPanelOpen(true)}
@@ -1691,16 +1927,16 @@ export default function DashboardPage() {
                     {t('dashboard.universalService')}
                   </p>
                   <div className="space-y-2 mb-4">
-                    {/* Full rent - Universal service */}
+                    {/* Location complète - service universel */}
                     <div
-                      onClick={() => handleServiceSelect({ id: 'full', name: 'Full rent', code: 'full', count: 597, icon: 'home' })}
+                      onClick={() => handleServiceSelect({ id: 'full', name: t('dashboard.fullRent'), code: 'full', count: 597, icon: 'home' })}
                       className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-purple-400 hover:shadow-lg hover:shadow-purple-100 transition-all duration-300 group"
                     >
                       <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
                         <Home className="w-7 h-7 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-base text-gray-900">Full rent</p>
+                        <p className="font-bold text-base text-gray-900">{t('dashboard.fullRent')}</p>
                         <p className="text-xs text-purple-600">{t('dashboard.receiveFromAny')}</p>
                       </div>
                       <div className="text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1721,30 +1957,30 @@ export default function DashboardPage() {
                 </span>
               </div>
 
-              <div className="space-y-2.5 max-h-[calc(100vh-320px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+              <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                 {filteredServices.map((service) => (
                   <div
                     key={service.id}
                     onClick={() => handleServiceSelect(service)}
-                    className="group bg-white border-2 border-gray-100 rounded-xl p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-blue-400 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-300 hover:scale-[1.01]"
+                    className="group bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-400 hover:shadow-md hover:shadow-blue-100/50 transition-all duration-300"
                   >
-                    <div className="w-12 h-12 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm group-hover:shadow-md group-hover:border-blue-200 transition-all">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm group-hover:shadow-md group-hover:border-blue-200 transition-all">
                       <img 
                         src={getServiceLogo(service.code || service.name)} 
                         alt={service.name}
-                        className="w-8 h-8 object-contain"
+                        className="w-7 h-7 object-contain"
                         onError={(e) => handleLogoError(e, service.code || service.name)}
                       />
-                      <span className="text-xl hidden items-center justify-center">{getServiceIcon(service.code || service.name)}</span>
+                      <span className="text-lg hidden items-center justify-center">{getServiceIcon(service.code || service.name)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-gray-900 truncate group-hover:text-blue-600 transition-colors">{service.name}</p>
-                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <p className="font-semibold text-sm text-gray-900 truncate group-hover:text-blue-600 transition-colors">{service.name}</p>
+                      <p className="text-[11px] text-gray-500 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                         {service.count >= 0 ? `${service.count.toLocaleString()} ${t('dashboard.numbersAvailable')}` : t('dashboard.available')}
                       </p>
                     </div>
-                    <div className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all">
+                    <div className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all text-sm">
                       →
                     </div>
                   </div>
@@ -2257,6 +2493,10 @@ export default function DashboardPage() {
                                 const mins = Math.floor((remainingSeconds % 3600) / 60);
                                 return mins > 0 ? `${hours}h${mins.toString().padStart(2, '0')}` : `${hours}h`;
                               }
+                              // Afficher en secondes si moins d'une minute
+                              if (remainingMinutes < 1) {
+                                return `${remainingSeconds}s`;
+                              }
                               return `${remainingMinutes} min`;
                             })()}
                           </span>
@@ -2282,7 +2522,8 @@ export default function DashboardPage() {
                             {/* Bouton conditionnel Annuler/Terminer selon l'âge du rental */}
                             {(() => {
                               const minutesElapsed = calculateMinutesElapsed(num.createdAt);
-                              const canRefund = minutesElapsed <= 20;
+                              // Si un SMS est arrivé avant 20 minutes, on force le bouton Terminer
+                              const canRefund = minutesElapsed <= 20 && !hasMessages;
                               
                               return canRefund ? (
                                 <DropdownMenuItem

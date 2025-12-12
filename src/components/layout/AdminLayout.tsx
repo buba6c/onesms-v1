@@ -2,7 +2,7 @@ import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { LogOut, User } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 interface AdminLayoutProps {
@@ -36,6 +36,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { path: '/admin/analytics', label: t('admin.analytics') },
     { path: '/admin/logs', label: t('admin.logs') },
     { path: '/admin/contact-settings', label: t('contact.title', 'Contact') },
+    { path: '/admin/contact-messages', label: t('admin.contactMessages', 'Messages') },
+    { path: '/admin/referrals', label: t('admin.referrals', 'Parrainage') },
+    { path: '/admin/emails', label: t('admin.emails', 'Emails') },
+    { path: '/admin/promo-codes', label: t('admin.promoCodes', 'Codes Promo') },
+    { path: '/admin/payment-providers', label: t('admin.paymentProviders', 'Fournisseurs Paiement') },
+    { path: '/admin/wave-payments', label: '🌊 Paiements Wave' },
     { path: '/admin/settings', label: t('admin.settings') },
   ]
 
