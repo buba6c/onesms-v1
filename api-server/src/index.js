@@ -65,11 +65,23 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
   try {
     const user = await getUser(req.headers.authorization);
     if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: 'Unauthorized', success: false });
     }
 
-    const { serviceCode, countryCode, operator } = req.body;
-    console.log('📥 Request:', { serviceCode, countryCode, operator, userId: user.id });
+    // Accept multiple parameter names for compatibility
+    const serviceCode = req.body.serviceCode || req.body.product || req.body.service;
+    const countryCode = req.body.countryCode || req.body.country;
+    const operator = req.body.operator || 'any';
+    const expectedPrice = req.body.expectedPrice;
+    
+    console.log('📥 Request:', { serviceCode, countryCode, operator, expectedPrice, userId: user.id });
+
+    if (!serviceCode || !countryCode) {
+      return res.status(400).json({ 
+        error: 'serviceCode and countryCode are required',
+        success: false 
+      });
+    }
 
     // Get user balance
     const { data: userData, error: userError } = await supabase
@@ -79,32 +91,40 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
       .single();
 
     if (userError || !userData) {
-      return res.status(400).json({ error: 'User not found' });
+      return res.status(400).json({ error: 'User not found', success: false });
     }
 
-    // Get price from SMS-Activate
-    const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryCode}`;
-    const priceData = await fetchSmsActivate(priceUrl);
+    // Use expectedPrice from frontend if available, otherwise calculate
+    let finalPrice = expectedPrice;
+    
+    if (!finalPrice) {
+      // Fallback: Get price from SMS-Activate
+      const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryCode}`;
+      const priceData = await fetchSmsActivate(priceUrl);
 
-    let basePrice = 0;
-    if (priceData[countryCode] && priceData[countryCode][serviceCode]) {
-      basePrice = parseFloat(priceData[countryCode][serviceCode].cost);
+      let basePrice = 0;
+      if (priceData[countryCode] && priceData[countryCode][serviceCode]) {
+        basePrice = parseFloat(priceData[countryCode][serviceCode].cost);
+      }
+
+      // Apply margin (30%)
+      const margin = 1.3;
+      finalPrice = Math.ceil(basePrice * margin * 100); // In CFA cents
     }
-
-    // Apply margin (50%)
-    const margin = 1.5;
-    const finalPrice = Math.ceil(basePrice * margin * 100); // In CFA cents
+    
+    console.log('💰 Final price:', finalPrice, 'User balance:', userData.balance);
 
     if (userData.balance < finalPrice) {
       return res.status(400).json({ 
-        error: 'Insufficient balance',
+        error: 'Solde insuffisant',
         required: finalPrice,
-        available: userData.balance
+        available: userData.balance,
+        success: false
       });
     }
 
     // Buy number from SMS-Activate
-    const buyUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumber&service=${serviceCode}&country=${countryCode}${operator ? `&operator=${operator}` : ''}`;
+    const buyUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumber&service=${serviceCode}&country=${countryCode}${operator && operator !== 'any' ? `&operator=${operator}` : ''}`;
     console.log('📞 Buying number from SMS-Activate...');
     
     const buyResponse = await fetch(buyUrl);
@@ -158,24 +178,24 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
       console.log('✅ Number purchased successfully:', { phone, activationId });
       return res.json({
         success: true,
-        activation: {
-          id: activation.id,
+        data: {
+          activation_id: activation.id,
           phone: phone,
-          activationId: activationId,
+          order_id: activationId,
           cost: finalPrice,
           expiresAt: activation.expires_at
         }
       });
     } else if (buyText === 'NO_NUMBERS') {
-      return res.status(400).json({ error: 'No numbers available for this service/country' });
+      return res.status(400).json({ error: 'No numbers available for this service/country', success: false });
     } else if (buyText === 'NO_BALANCE') {
-      return res.status(500).json({ error: 'Provider balance insufficient' });
+      return res.status(500).json({ error: 'Provider balance insufficient', success: false });
     } else {
-      return res.status(400).json({ error: buyText });
+      return res.status(400).json({ error: buyText, success: false });
     }
   } catch (error) {
     console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message, success: false });
   }
 });
 
