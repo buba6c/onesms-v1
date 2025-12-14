@@ -1,51 +1,115 @@
+// ONE SMS API Server - Node.js/Express version of Supabase Edge Functions
+// Based exactly on the original Edge Functions that work on Supabase Cloud
+
 import express from 'express';
 import cors from 'cors';
-import cron from 'node-cron';
 import { createClient } from '@supabase/supabase-js';
-
-// Load env
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SMS_ACTIVATE_API_KEY = process.env.SMS_ACTIVATE_API_KEY;
-const PORT = process.env.PORT || 3001;
-
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php';
-
-// Supabase client with service role
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-// Helper to safely fetch from SMS-Activate (handles text/JSON responses)
-async function fetchSmsActivate(url) {
-  const response = await fetch(url);
-  const text = await response.text();
-  
-  // Check for error responses (plain text)
-  const errorCodes = ['BAD_KEY', 'BAD_SERVICE', 'BAD_ACTION', 'NO_NUMBERS', 'NO_BALANCE', 'WRONG_SERVICE', 'NO_ACTIVATION'];
-  if (errorCodes.some(code => text.startsWith(code))) {
-    throw new Error(text);
-  }
-  
-  // Try to parse as JSON
-  try {
-    return JSON.parse(text);
-  } catch {
-    // Return as-is if not JSON (like ACCESS_BALANCE:123)
-    return text;
-  }
-}
+import cron from 'node-cron';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Helper to get user from Authorization header
-async function getUser(authHeader) {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
+const PORT = process.env.PORT || 3000;
+
+// Environment variables
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SMS_ACTIVATE_API_KEY = process.env.SMS_ACTIVATE_API_KEY;
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php';
+const MONEYFUSION_API_URL = process.env.MONEYFUSION_API_URL;
+
+// Supabase admin client (bypasses RLS)
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+
+// ============================================================================
+// SERVICE CODE MAPPING (from original Edge Functions)
+// ============================================================================
+const SERVICE_CODE_MAP = {
+  'google': 'go', 'whatsapp': 'wa', 'telegram': 'tg', 'facebook': 'fb',
+  'instagram': 'ig', 'twitter': 'tw', 'discord': 'ds', 'microsoft': 'mm',
+  'yahoo': 'mb', 'amazon': 'am', 'netflix': 'nf', 'uber': 'ub',
+  'tiktok': 'tk', 'snapchat': 'sn', 'linkedin': 'ld', 'viber': 'vi',
+  'paypal': 'ts', 'steam': 'st', 'alipay': 'hw', 'alibaba': 'hw', 'huawei': 'hw',
+  'wechat': 'wb', 'line': 'la', 'kakao': 'kt', 'apple': 'wx', 'samsung': 'qi',
+  'shopee': 'jt', 'grab': 'hx', 'lazada': 'lz', 'tinder': 'oi',
+  'bumble': 'fr', 'badoo': 'qq', 'olx': 'qe', 'avito': 'av', 'didi': 'dd',
+  'bolt': 'bz', 'yandex': 'ya', 'mailru': 'ml', 'vk': 'vk', 'odnoklassniki': 'ok',
+  'weibo': 'wb', 'baidu': 'bd', 'jd': 'jd', 'taobao': 'tb', 'pinduoduo': 'pd'
+};
+
+// COUNTRY CODE MAPPING (from original Edge Functions)
+const COUNTRY_CODE_MAP = {
+  'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
+  'myanmar': 5, 'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'tanzania': 9,
+  'vietnam': 10, 'kyrgyzstan': 11, 'england': 12, 'israel': 13, 'hongkong': 14,
+  'poland': 15, 'egypt': 16, 'nigeria': 17, 'morocco': 19, 'ghana': 20,
+  'argentina': 21, 'india': 22, 'uzbekistan': 23, 'cambodia': 24, 'germany': 27,
+  'romania': 32, 'colombia': 33, 'canada': 36, 'mexico': 38, 'spain': 40,
+  'thailand': 52, 'portugal': 56, 'italy': 58, 'brazil': 45, 'france': 78,
+  'australia': 175, 'usa': 187,
+  // ISO 2-letter codes
+  'ru': 0, 'ua': 1, 'kz': 2, 'cn': 3, 'ph': 4, 'mm': 5, 'id': 6, 'my': 7,
+  'ke': 8, 'tz': 9, 'vn': 10, 'kg': 11, 'gb': 12, 'uk': 12, 'il': 13, 'hk': 14,
+  'pl': 15, 'eg': 16, 'ng': 17, 'mo': 18, 'ma': 19, 'gh': 20, 'ar': 21,
+  'in': 22, 'uz': 23, 'kh': 24, 'cm': 25, 'td': 26, 'de': 27, 'lt': 28,
+  'hr': 29, 'se': 30, 'iq': 31, 'ro': 32, 'co': 33, 'at': 34, 'by': 35,
+  'ca': 36, 'sa': 37, 'mx': 38, 'za': 39, 'es': 40, 'ir': 41, 'dz': 42,
+  'nl': 43, 'bd': 44, 'br': 45, 'tr': 46, 'jp': 47, 'kr': 48, 'tw': 49,
+  'sg': 50, 'ae': 51, 'th': 52, 'pk': 53, 'np': 54, 'lk': 55, 'pt': 56,
+  'nz': 57, 'it': 58, 'be': 59, 'ch': 60, 'gr': 61, 'cz': 62, 'hu': 63,
+  'dk': 64, 'no': 65, 'fi': 66, 'ie': 67, 'sk': 68, 'bg': 69, 'rs': 70,
+  'si': 71, 'mk': 72, 'pe': 73, 'cl': 74, 'ec': 75, 've': 76, 'bo': 77,
+  'fr': 78, 'py': 79, 'uy': 80, 'cr': 81, 'pa': 82, 'do': 83, 'sv': 84,
+  'gt': 85, 'hn': 86, 'ni': 87, 'cu': 88, 'ht': 89, 'jm': 90, 'tt': 91,
+  'pr': 92, 'bb': 93, 'bs': 94, 'af': 108, 'la': 117, 'sd': 129, 'jo': 141,
+  'ps': 163, 'bh': 165, 'et': 172, 'au': 175, 'us': 187
+};
+
+// RENT DURATIONS
+const RENT_DURATIONS = {
+  '4hours': 4, '1day': 24, '1week': 168, '1month': 720
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+const mapServiceCode = (code) => {
+  if (!code) return code;
+  return SERVICE_CODE_MAP[code.toLowerCase()] || code;
+};
+
+const mapCountryCode = (country) => {
+  if (typeof country === 'number') return country;
+  const trimmed = (country || '').toString().trim().toLowerCase();
+  if (!trimmed) return 0;
+  const maybeNum = Number(trimmed);
+  if (!Number.isNaN(maybeNum)) return maybeNum;
+  return COUNTRY_CODE_MAP[trimmed] ?? 0;
+};
+
+async function fetchSmsActivate(url) {
+  try {
+    const response = await fetch(url);
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { raw: text };
+    }
+  } catch (error) {
+    console.error('❌ SMS-Activate API error:', error);
+    throw error;
   }
+}
+
+async function getUser(authHeader) {
+  if (!authHeader) return null;
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error) return null;
+  if (error || !user) return null;
   return user;
 }
 
@@ -57,7 +121,7 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================================
-// BUY SMS-ACTIVATE NUMBER
+// BUY SMS-ACTIVATE NUMBER (from original Edge Function)
 // ============================================================================
 app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
   console.log('🚀 [BUY-SMS-ACTIVATE] Function called');
@@ -65,1665 +129,394 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
   try {
     const user = await getUser(req.headers.authorization);
     if (!user) {
-      return res.status(401).json({ error: 'Unauthorized', success: false });
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
-    // Accept multiple parameter names for compatibility
-    let serviceCode = req.body.serviceCode || req.body.product || req.body.service;
-    let countryCode = req.body.countryCode || req.body.country;
-    const operator = req.body.operator || 'any';
-    const expectedPrice = req.body.expectedPrice;
+    const { country, operator, product, userId, expectedPrice } = req.body;
+    console.log('📞 [BUY-SMS-ACTIVATE] Request:', { country, operator, product, userId, expectedPrice });
+
+    // Map service and country codes
+    const smsActivateService = mapServiceCode(product);
+    const smsActivateCountry = mapCountryCode(country);
     
-    console.log('📥 Request (raw):', { serviceCode, countryCode, operator, expectedPrice, userId: user.id });
+    console.log('📍 [BUY-SMS-ACTIVATE] Mapped:', { smsActivateService, smsActivateCountry });
 
-    if (!serviceCode || !countryCode) {
-      return res.status(400).json({ 
-        error: 'serviceCode and countryCode are required',
-        success: false 
-      });
-    }
-
-    // Map service code if needed (frontend sends names like 'alipay', API needs 'hw')
-    const SERVICE_CODE_MAPPING = {
-      'google': 'go', 'whatsapp': 'wa', 'telegram': 'tg', 'facebook': 'fb',
-      'instagram': 'ig', 'twitter': 'tw', 'discord': 'ds', 'microsoft': 'mm',
-      'yahoo': 'mb', 'amazon': 'am', 'netflix': 'nf', 'uber': 'ub',
-      'tiktok': 'tk', 'snapchat': 'sn', 'linkedin': 'ld', 'viber': 'vi',
-      'paypal': 'ts', 'steam': 'st', 'alipay': 'hw', 'alibaba': 'hw', 'huawei': 'hw',
-      'wechat': 'wb', 'line': 'la', 'kakao': 'kt', 'apple': 'wx', 'samsung': 'qi',
-      'shopee': 'jt', 'grab': 'hx', 'gojek': 'go', 'lazada': 'lz', 'tinder': 'oi',
-      'bumble': 'fr', 'badoo': 'qq', 'olx': 'qe', 'avito': 'av', 'didi': 'dd',
-      'bolt': 'bz', 'yandex': 'ya', 'mailru': 'ml', 'vk': 'vk', 'odnoklassniki': 'ok',
-      'weibo': 'wb', 'baidu': 'bd', 'jd': 'jd', 'taobao': 'tb', 'pinduoduo': 'pd'
-    };
+    // Get real-time price from SMS-Activate
+    let price = 0.5; // Fallback
+    const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${smsActivateService}&country=${smsActivateCountry}`;
     
-    const originalServiceCode = serviceCode;
-    if (SERVICE_CODE_MAPPING[serviceCode.toLowerCase()]) {
-      serviceCode = SERVICE_CODE_MAPPING[serviceCode.toLowerCase()];
-      console.log(`📍 Mapped service code: ${originalServiceCode} -> ${serviceCode}`);
+    try {
+      const priceData = await fetchSmsActivate(priceUrl);
+      if (priceData && priceData[smsActivateCountry.toString()]) {
+        const countryData = priceData[smsActivateCountry.toString()];
+        if (countryData[smsActivateService]?.cost) {
+          price = parseFloat(countryData[smsActivateService].cost);
+        } else if (countryData.cost) {
+          price = parseFloat(countryData.cost);
+        }
+      }
+    } catch (e) {
+      console.error('⚠️ [BUY-SMS-ACTIVATE] Price fetch failed:', e);
     }
 
-    // Map country code if it's a name instead of ID
-    const COUNTRY_CODE_MAPPING = {
-      'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
-      'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'vietnam': 10, 'england': 12,
-      'india': 22, 'germany': 27, 'romania': 32, 'colombia': 33, 'canada': 36,
-      'mexico': 38, 'spain': 40, 'thailand': 52, 'brazil': 45, 'france': 78,
-      'usa': 187, 'australia': 175,
-      'ru': 0, 'ua': 1, 'kz': 2, 'cn': 3, 'ph': 4, 'id': 6, 'my': 7,
-      'vn': 10, 'gb': 12, 'uk': 12, 'in': 22, 'de': 27, 'ro': 32, 'co': 33,
-      'ca': 36, 'mx': 38, 'es': 40, 'th': 52, 'br': 45, 'fr': 78, 'us': 187, 'au': 175
-    };
-    
-    const originalCountryCode = countryCode;
-    if (typeof countryCode === 'string' && COUNTRY_CODE_MAPPING[countryCode.toLowerCase()] !== undefined) {
-      countryCode = COUNTRY_CODE_MAPPING[countryCode.toLowerCase()];
-      console.log(`📍 Mapped country code: ${originalCountryCode} -> ${countryCode}`);
+    // Use expectedPrice from frontend if provided
+    if (expectedPrice && expectedPrice > 0) {
+      console.log(`💰 Using expectedPrice: ${expectedPrice} (API was: ${price})`);
+      price = expectedPrice;
     }
 
-    console.log('📥 Request (mapped):', { serviceCode, countryCode, operator });
-
-    // Get user balance
-    const { data: userData, error: userError } = await supabase
+    // Check user balance
+    const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('balance, frozen_balance')
-      .eq('id', user.id)
+      .eq('id', userId || user.id)
       .single();
 
-    if (userError || !userData) {
-      return res.status(400).json({ error: 'User not found', success: false });
+    if (profileError || !userProfile) {
+      return res.status(400).json({ success: false, error: 'User profile not found' });
     }
 
-    // Use expectedPrice from frontend if available, otherwise calculate
-    let finalPrice = expectedPrice;
-    
-    if (!finalPrice) {
-      // Fallback: Get price from SMS-Activate
-      const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryCode}`;
-      const priceData = await fetchSmsActivate(priceUrl);
+    const frozenBalance = userProfile.frozen_balance || 0;
+    const availableBalance = userProfile.balance - frozenBalance;
 
-      let basePrice = 0;
-      if (priceData[countryCode] && priceData[countryCode][serviceCode]) {
-        basePrice = parseFloat(priceData[countryCode][serviceCode].cost);
-      }
-
-      // Apply margin (30%)
-      const margin = 1.3;
-      finalPrice = Math.ceil(basePrice * margin * 100); // In CFA cents
-    }
-    
-    console.log('💰 Final price:', finalPrice, 'User balance:', userData.balance);
-
-    if (userData.balance < finalPrice) {
+    if (availableBalance < price) {
       return res.status(400).json({ 
-        error: 'Solde insuffisant',
-        required: finalPrice,
-        available: userData.balance,
-        success: false
+        success: false, 
+        error: `Insufficient balance. Required: ${price}, Available: ${availableBalance}` 
       });
     }
 
-    // Buy number from SMS-Activate
-    const buyUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumber&service=${serviceCode}&country=${countryCode}${operator && operator !== 'any' ? `&operator=${operator}` : ''}`;
-    console.log('📞 Buying number from SMS-Activate...');
-    
-    const buyResponse = await fetch(buyUrl);
-    const buyText = await buyResponse.text();
-    console.log('📞 SMS-Activate response:', buyText);
+    // Create pending transaction BEFORE API call
+    const { data: pendingTransaction, error: txnError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId || user.id,
+        type: 'purchase',
+        amount: -price,
+        balance_before: userProfile.balance,
+        balance_after: userProfile.balance,
+        status: 'pending',
+        description: `Purchase SMS activation for ${product} (${country})`
+      })
+      .select()
+      .single();
 
-    if (buyText.startsWith('ACCESS_NUMBER')) {
-      const parts = buyText.split(':');
-      const activationId = parts[1];
-      const phone = parts[2];
-
-      // Freeze funds
-      const { error: freezeError } = await supabase
-        .from('users')
-        .update({
-          balance: userData.balance - finalPrice,
-          frozen_balance: (userData.frozen_balance || 0) + finalPrice
-        })
-        .eq('id', user.id);
-
-      if (freezeError) {
-        console.error('❌ Failed to freeze funds:', freezeError);
-        // Cancel the activation
-        await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&status=8&id=${activationId}`);
-        return res.status(500).json({ error: 'Failed to freeze funds' });
-      }
-
-      // Create activation record - using correct column names from database
-      const { data: activation, error: activationError } = await supabase
-        .from('activations')
-        .insert({
-          user_id: user.id,
-          external_id: activationId,
-          order_id: activationId,
-          phone: phone,
-          service_code: serviceCode,
-          country_code: countryCode.toString(),
-          status: 'pending',
-          price: finalPrice,
-          frozen_amount: finalPrice,
-          provider: 'sms-activate',
-          operator: operator || null,
-          expires_at: new Date(Date.now() + 20 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single();
-
-      if (activationError) {
-        console.error('❌ Failed to create activation:', activationError);
-        // Rollback: restore balance and cancel on SMS-Activate
-        await supabase
-          .from('users')
-          .update({
-            balance: userData.balance,
-            frozen_balance: userData.frozen_balance || 0
-          })
-          .eq('id', user.id);
-        await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&status=8&id=${activationId}`);
-        return res.status(500).json({ error: 'Failed to create activation record', details: activationError.message });
-      }
-
-      console.log('✅ Number purchased successfully:', { phone, activationId });
-      return res.json({
-        success: true,
-        data: {
-          activation_id: activation.id,
-          phone: phone,
-          order_id: activationId,
-          cost: finalPrice,
-          expiresAt: activation.expires_at
-        }
-      });
-    } else if (buyText === 'NO_NUMBERS') {
-      return res.status(400).json({ error: 'No numbers available for this service/country', success: false });
-    } else if (buyText === 'NO_BALANCE') {
-      return res.status(500).json({ error: 'Provider balance insufficient', success: false });
-    } else {
-      return res.status(400).json({ error: buyText, success: false });
+    if (txnError) {
+      return res.status(500).json({ success: false, error: 'Failed to create transaction' });
     }
+
+    // FREEZE credits BEFORE API call
+    const { error: freezeError } = await supabase
+      .from('users')
+      .update({ frozen_balance: frozenBalance + price })
+      .eq('id', userId || user.id);
+
+    if (freezeError) {
+      await supabase.from('transactions').update({ status: 'failed' }).eq('id', pendingTransaction.id);
+      return res.status(500).json({ success: false, error: 'Failed to freeze balance' });
+    }
+
+    console.log('🔒 [BUY-SMS-ACTIVATE] Credits frozen:', price);
+
+    // Buy number from SMS-Activate using getNumberV2
+    const orderId = `${userId || user.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const params = new URLSearchParams({
+      api_key: SMS_ACTIVATE_API_KEY,
+      action: 'getNumberV2',
+      service: smsActivateService,
+      country: smsActivateCountry.toString(),
+      orderId: orderId
+    });
+    if (operator && operator !== 'any') {
+      params.append('operator', operator);
+    }
+
+    const apiUrl = `${SMS_ACTIVATE_BASE_URL}?${params.toString()}`;
+    console.log('🌐 [BUY-SMS-ACTIVATE] API Call:', apiUrl.replace(SMS_ACTIVATE_API_KEY, 'KEY_HIDDEN'));
+
+    const response = await fetch(apiUrl);
+    const responseText = await response.text();
+    console.log('📥 [BUY-SMS-ACTIVATE] Response:', responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      // Fallback for text format ACCESS_NUMBER:id:phone
+      if (responseText.startsWith('ACCESS_NUMBER:')) {
+        const [, activationId, phone] = responseText.split(':');
+        data = { activationId, phoneNumber: phone };
+      } else {
+        // ROLLBACK
+        await supabase.from('users').update({ frozen_balance: frozenBalance }).eq('id', userId || user.id);
+        await supabase.from('transactions').update({ status: 'failed' }).eq('id', pendingTransaction.id);
+        return res.status(400).json({ success: false, error: `SMS-Activate error: ${responseText}` });
+      }
+    }
+
+    if (data.status === 'error' || data.error) {
+      // ROLLBACK
+      await supabase.from('users').update({ frozen_balance: frozenBalance }).eq('id', userId || user.id);
+      await supabase.from('transactions').update({ status: 'failed' }).eq('id', pendingTransaction.id);
+      return res.status(400).json({ success: false, error: data.message || data.error });
+    }
+
+    const { activationId, phoneNumber: phone } = data;
+    if (!activationId || !phone) {
+      return res.status(400).json({ success: false, error: 'Invalid response from SMS-Activate' });
+    }
+
+    console.log('📞 [BUY-SMS-ACTIVATE] Number purchased:', { activationId, phone, price });
+
+    // Create activation record
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
+    const { data: activation, error: activationError } = await supabase
+      .from('activations')
+      .insert({
+        user_id: userId || user.id,
+        order_id: activationId,
+        phone: phone,
+        service_code: product,
+        country_code: country,
+        operator: operator || 'any',
+        price: price,
+        frozen_amount: price,
+        status: 'pending',
+        expires_at: expiresAt.toISOString(),
+        provider: 'sms-activate'
+      })
+      .select()
+      .single();
+
+    if (activationError) {
+      console.error('❌ [BUY-SMS-ACTIVATE] Failed to create activation:', activationError);
+      // ROLLBACK
+      await supabase.from('users').update({ frozen_balance: frozenBalance }).eq('id', userId || user.id);
+      await supabase.from('transactions').update({ status: 'failed' }).eq('id', pendingTransaction.id);
+      await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activationId}&status=8`);
+      return res.status(500).json({ success: false, error: 'Failed to create activation record' });
+    }
+
+    // Link transaction to activation
+    await supabase.from('transactions').update({ related_activation_id: activation.id }).eq('id', pendingTransaction.id);
+
+    console.log('✅ [BUY-SMS-ACTIVATE] Success:', { id: activation.id, phone, price });
+
+    return res.json({
+      success: true,
+      data: {
+        id: activation.id,
+        activation_id: activationId,
+        phone: phone,
+        service: product,
+        country: country,
+        operator: operator || 'any',
+        price: price,
+        status: 'pending',
+        expires: expiresAt.toISOString()
+      }
+    });
   } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message, success: false });
+    console.error('❌ [BUY-SMS-ACTIVATE] Error:', error);
+    return res.status(400).json({ success: false, error: error.message });
   }
 });
 
 // ============================================================================
-// CHECK SMS-ACTIVATE STATUS
+// CHECK SMS-ACTIVATE STATUS (from original Edge Function)
 // ============================================================================
 app.post('/functions/v1/check-sms-activate-status', async (req, res) => {
   console.log('🔍 [CHECK-STATUS] Function called');
   
   try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    const { activationId } = req.body;
+    if (!activationId) {
+      return res.status(400).json({ success: false, error: 'Missing activationId' });
     }
 
-    const { activationId } = req.body;
-    
-    // Get activation from DB
+    // Get activation from database
     const { data: activation, error: activationError } = await supabase
       .from('activations')
       .select('*')
       .eq('id', activationId)
-      .eq('user_id', user.id)
       .single();
 
     if (activationError || !activation) {
-      return res.status(404).json({ error: 'Activation not found' });
+      return res.status(404).json({ success: false, error: 'Activation not found' });
     }
 
-    // Check status at SMS-Activate
-    const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.external_id}`;
-    const statusResponse = await fetch(statusUrl);
-    const statusText = await statusResponse.text();
-    
-    console.log('📞 SMS-Activate status:', statusText);
+    console.log('📋 [CHECK-STATUS] Activation:', { id: activation.id, order_id: activation.order_id, status: activation.status });
+
+    // If already charged and received, return cached
+    if (activation.charged && activation.status === 'received') {
+      return res.json({
+        success: true,
+        data: {
+          status: 'received',
+          sms_code: activation.sms_code,
+          sms_text: activation.sms_text,
+          charged: true
+        }
+      });
+    }
+
+    // Check SMS-Activate API
+    const apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatusV2&id=${activation.order_id}`;
+    console.log('🌐 [CHECK-STATUS] API Call:', apiUrl.replace(SMS_ACTIVATE_API_KEY, 'KEY_HIDDEN'));
+
+    const response = await fetch(apiUrl);
+    const responseText = await response.text();
+    console.log('📥 [CHECK-STATUS] Response:', responseText);
 
     let smsCode = null;
+    let smsText = null;
     let newStatus = activation.status;
 
-    if (statusText.startsWith('STATUS_OK')) {
-      // SMS received!
-      smsCode = statusText.split(':')[1];
-      newStatus = 'completed';
-      
-      // Update activation
+    // Parse response
+    try {
+      const jsonResponse = JSON.parse(responseText);
+      if (jsonResponse.sms && jsonResponse.sms.code) {
+        smsCode = jsonResponse.sms.code;
+        smsText = jsonResponse.sms.text || `Your verification code is: ${smsCode}`;
+        newStatus = 'received';
+      }
+    } catch (e) {
+      if (responseText.startsWith('STATUS_OK:')) {
+        smsCode = responseText.split(':')[1]?.trim();
+        smsText = `Your verification code is: ${smsCode}`;
+        newStatus = 'received';
+      } else if (responseText === 'STATUS_CANCEL') {
+        newStatus = 'cancelled';
+      } else if (responseText === 'STATUS_WAIT_CODE') {
+        newStatus = 'pending';
+      }
+    }
+
+    // If SMS received, update and charge
+    if (smsCode && smsText) {
       await supabase
         .from('activations')
-        .update({ 
-          status: 'completed', 
+        .update({
+          status: 'received',
           sms_code: smsCode,
-          completed_at: new Date().toISOString()
+          sms_text: smsText,
+          sms_received_at: new Date().toISOString()
         })
         .eq('id', activationId);
 
-      // Deduct from frozen, add to transaction
-      const { data: userData } = await supabase
-        .from('users')
-        .select('frozen_balance')
-        .eq('id', user.id)
-        .single();
+      // Commit via atomic_commit RPC
+      const { data: commitResult, error: commitError } = await supabase.rpc('atomic_commit', {
+        p_user_id: activation.user_id,
+        p_activation_id: activationId,
+        p_rental_id: null,
+        p_transaction_id: null,
+        p_reason: 'SMS received'
+      });
 
-      await supabase
-        .from('users')
-        .update({
-          frozen_balance: Math.max(0, (userData?.frozen_balance || 0) - activation.cost)
-        })
-        .eq('id', user.id);
+      if (commitError) {
+        console.error('❌ [CHECK-STATUS] atomic_commit failed:', commitError);
+      } else {
+        console.log('✅ [CHECK-STATUS] atomic_commit success:', commitResult);
+      }
 
-      // Create transaction
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          type: 'activation',
-          amount: -activation.cost,
-          description: `SMS activation - ${activation.service}`,
-          status: 'completed',
-          reference: activation.id
-        });
-
-    } else if (statusText === 'STATUS_WAIT_CODE') {
-      newStatus = 'pending';
-    } else if (statusText === 'STATUS_CANCEL') {
-      newStatus = 'cancelled';
-      
-      // Refund frozen funds
-      const { data: userData } = await supabase
-        .from('users')
-        .select('balance, frozen_balance')
-        .eq('id', user.id)
-        .single();
-
-      await supabase
-        .from('users')
-        .update({
-          balance: userData.balance + activation.cost,
-          frozen_balance: Math.max(0, (userData?.frozen_balance || 0) - activation.cost)
-        })
-        .eq('id', user.id);
-
-      await supabase
-        .from('activations')
-        .update({ status: 'cancelled' })
-        .eq('id', activationId);
+      // Mark complete on provider
+      await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=6`);
     }
 
     return res.json({
       success: true,
-      status: newStatus,
-      smsCode: smsCode,
-      activation: activation
+      data: {
+        status: newStatus,
+        sms_code: smsCode,
+        sms_text: smsText,
+        charged: smsCode ? true : false
+      }
     });
   } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('❌ [CHECK-STATUS] Error:', error);
+    return res.status(400).json({ success: false, error: error.message });
   }
 });
 
 // ============================================================================
-// CANCEL SMS-ACTIVATE ORDER
+// CANCEL SMS-ACTIVATE ORDER (from original Edge Function)
 // ============================================================================
 app.post('/functions/v1/cancel-sms-activate-order', async (req, res) => {
-  console.log('❌ [CANCEL-ORDER] Function called');
+  console.log('❌ [CANCEL] Function called');
   
   try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    const { orderId, activationId, userId } = req.body;
+
+    // Find activation
+    let activation = null;
+    if (orderId) {
+      const { data } = await supabase.from('activations').select('*').eq('order_id', orderId.toString()).single();
+      if (data) activation = data;
+    }
+    if (!activation && activationId) {
+      const { data } = await supabase.from('activations').select('*').eq('id', activationId).single();
+      if (data) activation = data;
     }
 
-    const { activationId } = req.body;
-    
-    // Get activation
-    const { data: activation, error } = await supabase
+    if (!activation) {
+      return res.status(404).json({ success: false, error: 'Activation not found' });
+    }
+
+    console.log('📋 [CANCEL] Activation:', { id: activation.id, status: activation.status });
+
+    if (!['pending', 'waiting', 'active'].includes(activation.status)) {
+      return res.json({ success: true, message: 'Already processed', alreadyProcessed: true });
+    }
+
+    // Lock activation
+    const { data: lockedActivation, error: lockError } = await supabase
       .from('activations')
-      .select('*')
-      .eq('id', activationId)
-      .eq('user_id', user.id)
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+      .eq('id', activation.id)
+      .in('status', ['pending', 'waiting', 'active'])
+      .select()
       .single();
 
-    if (error || !activation) {
-      return res.status(404).json({ error: 'Activation not found' });
+    if (lockError || !lockedActivation) {
+      return res.json({ success: true, message: 'Already processed', alreadyProcessed: true });
     }
 
-    if (activation.status !== 'pending') {
-      return res.status(400).json({ error: 'Cannot cancel non-pending activation' });
+    // Cancel on SMS-Activate
+    await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`);
+
+    // Find related transaction
+    const { data: txn } = await supabase.from('transactions').select('id').eq('related_activation_id', activation.id).single();
+
+    // ATOMIC REFUND via RPC
+    const { data: refundResult, error: refundError } = await supabase.rpc('atomic_refund', {
+      p_user_id: activation.user_id,
+      p_activation_id: activation.id,
+      p_transaction_id: txn?.id || null,
+      p_reason: 'Cancelled by user'
+    });
+
+    if (refundError) {
+      console.error('❌ [CANCEL] atomic_refund failed:', refundError);
+      return res.status(400).json({ success: false, error: 'Refund failed' });
     }
 
-    // Cancel at SMS-Activate (status=8 = cancel)
-    const cancelUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&status=8&id=${activation.external_id}`;
-    await fetch(cancelUrl);
-
-    // Refund frozen funds
-    const { data: userData } = await supabase
-      .from('users')
-      .select('balance, frozen_balance')
-      .eq('id', user.id)
-      .single();
-
-    await supabase
-      .from('users')
-      .update({
-        balance: userData.balance + activation.cost,
-        frozen_balance: Math.max(0, (userData?.frozen_balance || 0) - activation.cost)
-      })
-      .eq('id', user.id);
-
-    // Update activation status
-    await supabase
-      .from('activations')
-      .update({ status: 'cancelled' })
-      .eq('id', activationId);
-
-    console.log('✅ Activation cancelled and refunded');
-    return res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET RENT SERVICES
-// ============================================================================
-app.post('/functions/v1/get-rent-services', async (req, res) => {
-  console.log('📋 [GET-RENT-SERVICES] Function called');
-  
-  try {
-    const { countryId = 2, rentTime = 4 } = req.body;
-    
-    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${countryId}&rent_time=${rentTime}`;
-    const data = await fetchSmsActivate(url);
-
-    if (data.services) {
-      // Apply margin
-      const margin = 1.5;
-      const services = {};
-      
-      for (const [code, service] of Object.entries(data.services)) {
-        services[code] = {
-          ...service,
-          code: code,
-          retailCost: service.cost * margin,
-          sellingPrice: Math.ceil(service.cost * margin * 100)
-        };
-      }
-
-      return res.json({
-        success: true,
-        countryId,
-        rentTime,
-        operators: data.operators || {},
-        services
-      });
-    }
-
-    return res.json({ success: true, services: {} });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET RENT STATUS
-// ============================================================================
-app.post('/functions/v1/get-rent-status', async (req, res) => {
-  console.log('🔍 [GET-RENT-STATUS] Function called');
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { rentalId } = req.body;
-    
-    const { data: rental, error } = await supabase
-      .from('rentals')
-      .select('*')
-      .eq('id', rentalId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !rental) {
-      return res.status(404).json({ error: 'Rental not found' });
-    }
-
-    // Check status at SMS-Activate
-    const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentStatus&id=${rental.external_id}`;
-    const data = await fetchSmsActivate(statusUrl);
+    console.log('✅ [CANCEL] Success:', refundResult);
 
     return res.json({
       success: true,
-      rental,
-      smsActivateStatus: data
+      message: 'Activation cancelled and refunded',
+      refunded: refundResult?.refunded || activation.frozen_amount || 0,
+      newBalance: refundResult?.balance_after || 0
     });
   } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('❌ [CANCEL] Error:', error);
+    return res.status(400).json({ success: false, error: error.message });
   }
 });
 
 // ============================================================================
-// SET RENT STATUS
+// BUY SMS-ACTIVATE RENT (from original Edge Function)
 // ============================================================================
-app.post('/functions/v1/set-rent-status', async (req, res) => {
-  console.log('⚙️ [SET-RENT-STATUS] Function called');
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { rentalId, status } = req.body;
-    
-    const { data: rental, error } = await supabase
-      .from('rentals')
-      .select('*')
-      .eq('id', rentalId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !rental) {
-      return res.status(404).json({ error: 'Rental not found' });
-    }
-
-    // Update at SMS-Activate
-    const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rental.external_id}&status=${status}`;
-    const response = await fetch(statusUrl);
-    const data = await response.text();
-
-    // Update in DB
-    await supabase
-      .from('rentals')
-      .update({ status: status === 2 ? 'cancelled' : status === 1 ? 'completed' : rental.status })
-      .eq('id', rentalId);
-
-    return res.json({ success: true, result: data });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET REAL-TIME PRICES
-// ============================================================================
-app.post('/functions/v1/get-real-time-prices', async (req, res) => {
-  console.log('💰 [GET-REAL-TIME-PRICES] Function called', req.body);
-  
-  try {
-    // Accept both 'service' and 'serviceCode' for compatibility
-    const serviceCode = req.body.serviceCode || req.body.service;
-    const { countries = [] } = req.body;
-    
-    if (!serviceCode) {
-      return res.status(400).json({ error: 'serviceCode is required' });
-    }
-    
-    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}`;
-    const data = await fetchSmsActivate(url);
-
-    const margin = 1.5;
-    const prices = {};
-
-    for (const [countryId, services] of Object.entries(data)) {
-      if (services[serviceCode]) {
-        prices[countryId] = {
-          cost: services[serviceCode].cost,
-          retailCost: services[serviceCode].cost * margin,
-          count: services[serviceCode].count,
-          sellingPrice: Math.ceil(services[serviceCode].cost * margin * 100)
-        };
-      }
-    }
-
-    return res.json({ success: true, prices });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET TOP COUNTRIES BY SERVICE
-// ============================================================================
-app.post('/functions/v1/get-top-countries-by-service', async (req, res) => {
-  console.log('🌍 [GET-TOP-COUNTRIES] Function called', req.body);
-  
-  try {
-    // Accept both 'service' and 'serviceCode' for compatibility
-    const serviceCode = req.body.serviceCode || req.body.service;
-    
-    if (!serviceCode) {
-      return res.status(400).json({ error: 'serviceCode is required' });
-    }
-    
-    // Get margin from system_settings
-    const { data: marginSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'pricing_margin_percentage')
-      .single();
-    
-    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30;
-    console.log(`💰 [GET-TOP-COUNTRIES] Margin: ${marginPercentage}%`);
-    
-    // 1️⃣ Get ranked countries with prices from SMS-Activate
-    const rankUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getTopCountriesByServiceRank&service=${serviceCode}&freePrice=true`;
-    const rankData = await fetchSmsActivate(rankUrl);
-    
-    if (!rankData || Object.keys(rankData).length === 0) {
-      return res.json({ success: true, service: serviceCode, countries: [] });
-    }
-    
-    console.log(`✅ [GET-TOP-COUNTRIES] Found ${Object.keys(rankData).length} ranked countries`);
-    
-    // 2️⃣ Get country names mapping
-    const countriesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getCountries`;
-    const allCountriesData = await fetchSmsActivate(countriesUrl);
-    
-    const countryMap = {};
-    Object.entries(allCountriesData).forEach(([id, country]) => {
-      countryMap[parseInt(id)] = {
-        code: country.eng.toLowerCase().replace(/\s+/g, '_'),
-        name: country.eng
-      };
-    });
-    
-    // 3️⃣ Transform data with price conversion
-    const MIN_PRICE_COINS = 5;
-    const USD_TO_FCFA = 600;
-    const FCFA_TO_COINS = 100;
-    const marginMultiplier = 1 + marginPercentage / 100;
-    
-    const topCountries = [];
-    
-    Object.entries(rankData).forEach(([index, countryData]) => {
-      const countryId = countryData.country;
-      const countryInfo = countryMap[countryId];
-      
-      if (!countryInfo) return;
-      
-      const rank = parseInt(index) + 1;
-      const count = countryData.count || 0;
-      const priceUSD = countryData.price || 0;
-      
-      // Price conversion: USD → FCFA → Coins (Ⓐ)
-      const priceFCFA = priceUSD * USD_TO_FCFA;
-      const priceCoins = (priceFCFA / FCFA_TO_COINS) * marginMultiplier;
-      const price = Math.max(MIN_PRICE_COINS, Math.ceil(priceCoins));
-      
-      // Composite score calculation
-      const rankingScore = Math.max(0, 100 - rank);
-      const availabilityBonus = count > 1000 ? 20 : count > 100 ? 10 : count > 0 ? 5 : 0;
-      const priceBonus = price > 0 ? Math.max(0, 10 - (price * 2)) : 0;
-      const compositeScore = rankingScore + availabilityBonus + priceBonus;
-      
-      topCountries.push({
-        countryId,
-        countryCode: countryInfo.code,
-        countryName: countryInfo.name,
-        count,
-        price,
-        retailPrice: price,
-        share: 0,
-        successRate: null,
-        rank,
-        compositeScore
-      });
-    });
-    
-    // Sort by composite score
-    topCountries.sort((a, b) => b.compositeScore - a.compositeScore);
-    
-    console.log(`🏆 [GET-TOP-COUNTRIES] Returning ${topCountries.length} countries`);
-    
-    return res.json({ 
-      success: true, 
-      service: serviceCode,
-      countries: topCountries,
-      stats: {
-        totalCountries: topCountries.length,
-        totalAvailable: topCountries.reduce((sum, c) => sum + c.count, 0)
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET SERVICES COUNTS
-// ============================================================================
-app.post('/functions/v1/get-services-counts', async (req, res) => {
-  console.log('📊 [GET-SERVICES-COUNTS] Function called');
-  
-  try {
-    const { countryCode = 0 } = req.body;
-    
-    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=${countryCode}`;
-    const data = await fetchSmsActivate(url);
-
-    return res.json({ success: true, services: data });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET PROVIDERS STATUS
-// ============================================================================
-app.post('/functions/v1/get-providers-status', async (req, res) => {
-  console.log('🔌 [GET-PROVIDERS-STATUS] Function called');
-  
-  try {
-    // Check SMS-Activate balance
-    const balanceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getBalance`;
-    const response = await fetch(balanceUrl);
-    const balanceText = await response.text();
-    
-    let balance = 0;
-    if (balanceText.startsWith('ACCESS_BALANCE')) {
-      balance = parseFloat(balanceText.split(':')[1]);
-    }
-
-    return res.json({
-      success: true,
-      providers: {
-        'sms-activate': {
-          status: balance > 0 ? 'active' : 'low_balance',
-          balance: balance
-        }
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// LINK REFERRAL
-// ============================================================================
-app.post('/functions/v1/link-referral', async (req, res) => {
-  console.log('🔗 [LINK-REFERRAL] Function called');
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { referralCode } = req.body;
-    
-    // Find referrer
-    const { data: referrer, error: referrerError } = await supabase
-      .from('users')
-      .select('id, referral_code')
-      .eq('referral_code', referralCode)
-      .single();
-
-    if (referrerError || !referrer) {
-      return res.status(404).json({ error: 'Referral code not found' });
-    }
-
-    if (referrer.id === user.id) {
-      return res.status(400).json({ error: 'Cannot refer yourself' });
-    }
-
-    // Update user's referred_by
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ referred_by: referrer.id })
-      .eq('id', user.id);
-
-    if (updateError) {
-      return res.status(500).json({ error: 'Failed to link referral' });
-    }
-
-    // Create referral record
-    await supabase
-      .from('referrals')
-      .insert({
-        referrer_id: referrer.id,
-        referred_id: user.id,
-        status: 'pending'
-      });
-
-    return res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// INIT MONEYFUSION PAYMENT
-// ============================================================================
-app.post('/functions/v1/init-moneyfusion-payment', async (req, res) => {
-  console.log('💳 [INIT-MONEYFUSION] Function called', req.body);
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { amount, currency, description, return_url, customer = {}, metadata = {} } = req.body;
-    
-    // Validate required fields
-    if (!amount) {
-      return res.status(400).json({ error: 'Missing required field: amount' });
-    }
-
-    // Get MoneyFusion URL from env
-    const MONEYFUSION_API_URL = process.env.MONEYFUSION_API_URL;
-    if (!MONEYFUSION_API_URL) {
-      console.error('❌ [MONEYFUSION] MONEYFUSION_API_URL not configured');
-      return res.status(500).json({ error: 'MoneyFusion non configuré' });
-    }
-
-    // Check if MoneyFusion is active
-    const { data: moneyfusionConfig, error: configError } = await supabase
-      .from('payment_providers')
-      .select('is_active')
-      .eq('provider_code', 'moneyfusion')
-      .single();
-
-    if (configError || !moneyfusionConfig) {
-      console.log('⚠️ [MONEYFUSION] Config not found, proceeding anyway');
-    } else if (!moneyfusionConfig.is_active) {
-      return res.status(403).json({ error: 'MoneyFusion est désactivé' });
-    }
-
-    // Extract customer info
-    const phone = customer.phone || '00000000';
-    const clientName = `${customer.first_name || 'Client'} ${customer.last_name || 'ONESMS'}`;
-
-    // Generate unique reference
-    const paymentRef = `ONESMS_${user.id.substring(0, 8)}_${Date.now()}`;
-
-    // Webhook URL
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/moneyfusion-webhook`;
-
-    // Prepare MoneyFusion payload
-    const moneyfusionPayload = {
-      totalPrice: Math.round(amount),
-      article: [{ "Rechargement ONE SMS": Math.round(amount) }],
-      numeroSend: phone.replace(/\s/g, ''),
-      nomclient: clientName || user.email?.split('@')[0] || 'Client',
-      personal_Info: [{
-        userId: user.id,
-        paymentRef: paymentRef,
-        activations: metadata.activations || 0,
-        type: 'recharge',
-        source: 'onesms'
-      }],
-      return_url: return_url || 'http://onesms.46.202.171.108.sslip.io/dashboard?payment=success',
-      webhook_url: webhookUrl
-    };
-
-    console.log('📤 [MONEYFUSION] Sending request to:', MONEYFUSION_API_URL);
-
-    // Call MoneyFusion API
-    const mfResponse = await fetch(MONEYFUSION_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(moneyfusionPayload)
-    });
-
-    const mfData = await mfResponse.json();
-
-    console.log('📥 [MONEYFUSION] Response:', {
-      statut: mfData.statut,
-      token: mfData.token,
-      message: mfData.message
-    });
-
-    if (!mfData.statut || !mfData.url) {
-      console.error('❌ [MONEYFUSION] API Error:', mfData);
-      return res.status(400).json({ 
-        error: mfData.message || 'Failed to initialize payment'
-      });
-    }
-
-    // Get current user balance
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('balance')
-      .eq('id', user.id)
-      .single();
-
-    const currentBalance = userProfile?.balance || 0;
-    const activationsToAdd = metadata.activations || 0;
-
-    // Create pending transaction
-    const { error: txError } = await supabase
-      .from('transactions')
-      .insert({
-        user_id: user.id,
-        type: 'deposit',
-        amount: activationsToAdd,
-        balance_before: currentBalance,
-        balance_after: currentBalance + activationsToAdd,
-        status: 'pending',
-        reference: paymentRef,
-        external_id: mfData.token,
-        description: description || `Rechargement via MoneyFusion`,
-        metadata: {
-          moneyfusion_token: mfData.token,
-          checkout_url: mfData.url,
-          phone: phone,
-          amount_xof: amount,
-          payment_provider: 'moneyfusion',
-          ...metadata
-        }
-      });
-
-    if (txError) {
-      console.error('❌ [MONEYFUSION] Failed to create transaction:', txError);
-    }
-
-    console.log('✅ [MONEYFUSION] Payment initialized:', mfData.token);
-
-    return res.json({
-      success: true,
-      message: mfData.message,
-      data: {
-        token: mfData.token,
-        checkout_url: mfData.url,
-        payment_ref: paymentRef
-      }
-    });
-  } catch (error) {
-    console.error('❌ [MONEYFUSION] Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// RENT SMS-ACTIVATE NUMBER
-// ============================================================================
-app.post('/functions/v1/rent-sms-activate-number', async (req, res) => {
-  console.log('📱 [RENT-NUMBER] Function called');
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { serviceCode, countryId, rentTime = 4, operator } = req.body;
-
-    // Get user balance
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('balance, frozen_balance')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userData) {
-      return res.status(400).json({ error: 'User not found' });
-    }
-
-    // Get rent price
-    const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${countryId}&rent_time=${rentTime}`;
-    const priceData = await fetchSmsActivate(priceUrl);
-
-    let basePrice = 0;
-    if (priceData.services && priceData.services[serviceCode]) {
-      basePrice = parseFloat(priceData.services[serviceCode].cost);
-    }
-
-    const margin = 1.5;
-    const finalPrice = Math.ceil(basePrice * margin * 100);
-
-    if (userData.balance < finalPrice) {
-      return res.status(400).json({ 
-        error: 'Insufficient balance',
-        required: finalPrice,
-        available: userData.balance
-      });
-    }
-
-    // Rent number
-    const rentUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentNumber&service=${serviceCode}&country=${countryId}&rent_time=${rentTime}${operator ? `&operator=${operator}` : ''}`;
-    const rentData = await fetchSmsActivate(rentUrl);
-
-    if (rentData.status === 'success' && rentData.phone) {
-      // Deduct balance
-      await supabase
-        .from('users')
-        .update({
-          balance: userData.balance - finalPrice
-        })
-        .eq('id', user.id);
-
-      // Create rental record
-      const { data: rental, error: rentalError } = await supabase
-        .from('rentals')
-        .insert({
-          user_id: user.id,
-          external_id: rentData.phone.id,
-          phone_number: rentData.phone.number,
-          service: serviceCode,
-          country_code: countryId.toString(),
-          status: 'active',
-          cost: finalPrice,
-          provider: 'sms-activate',
-          rent_time: rentTime,
-          expires_at: new Date(Date.now() + rentTime * 60 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single();
-
-      if (rentalError) {
-        return res.status(500).json({ error: 'Failed to create rental record' });
-      }
-
-      // Create transaction
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          type: 'rental',
-          amount: -finalPrice,
-          description: `Rent number - ${serviceCode}`,
-          status: 'completed',
-          reference: rental.id
-        });
-
-      return res.json({
-        success: true,
-        rental: {
-          id: rental.id,
-          phone: rentData.phone.number,
-          externalId: rentData.phone.id,
-          cost: finalPrice,
-          expiresAt: rental.expires_at
-        }
-      });
-    } else {
-      return res.status(400).json({ error: rentData.message || 'Failed to rent number' });
-    }
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// CONTINUE SMS-ACTIVATE RENT
-// ============================================================================
-app.post('/functions/v1/continue-sms-activate-rent', async (req, res) => {
-  console.log('🔄 [CONTINUE-RENT] Function called');
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { rentalId } = req.body;
-    
-    const { data: rental, error } = await supabase
-      .from('rentals')
-      .select('*')
-      .eq('id', rentalId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !rental) {
-      return res.status(404).json({ error: 'Rental not found' });
-    }
-
-    // Continue at SMS-Activate
-    const continueUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=continueRentNumber&id=${rental.external_id}&rent_time=1`;
-    const data = await fetchSmsActivate(continueUrl);
-
-    if (data.status === 'success') {
-      // Extend expiration
-      const newExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();
-      await supabase
-        .from('rentals')
-        .update({ expires_at: newExpiry })
-        .eq('id', rentalId);
-
-      return res.json({ success: true, newExpiresAt: newExpiry });
-    } else {
-      return res.status(400).json({ error: data.message || 'Failed to continue rent' });
-    }
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// GET SMS-ACTIVATE INBOX
-// ============================================================================
-app.post('/functions/v1/get-sms-activate-inbox', async (req, res) => {
-  console.log('📬 [GET-INBOX] Function called');
-  
-  try {
-    const user = await getUser(req.headers.authorization);
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const { rentalId } = req.body;
-    
-    const { data: rental, error } = await supabase
-      .from('rentals')
-      .select('*')
-      .eq('id', rentalId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !rental) {
-      return res.status(404).json({ error: 'Rental not found' });
-    }
-
-    // Get SMS from SMS-Activate
-    const inboxUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentStatus&id=${rental.external_id}`;
-    const data = await fetchSmsActivate(inboxUrl);
-
-    return res.json({
-      success: true,
-      messages: data.values || [],
-      status: data.status
-    });
-  } catch (error) {
-    console.error('❌ Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// SYNC SMS-ACTIVATE (Countries + Services + Prices)
-// ============================================================================
-app.post('/functions/v1/sync-sms-activate', async (req, res) => {
-  console.log('🔄 [SYNC-SMS-ACTIVATE] Starting synchronization...');
-  
-  try {
-    const startTime = Date.now();
-    const results = { countries: 0, services: 0, prices: 0, errors: [] };
-
-    // 1. Get margin from system_settings
-    const { data: marginSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'pricing_margin_percentage')
-      .single();
-    
-    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30;
-    console.log(`💰 System margin: ${marginPercentage}%`);
-
-    // 2. Fetch countries from SMS-Activate
-    console.log('🌍 Fetching countries...');
-    const countriesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getCountries`;
-    const countriesData = await fetchSmsActivate(countriesUrl);
-    
-    // Country ID to code mapping for SMS-Activate
-    const countryMapping = {
-      0: 'russia', 1: 'ukraine', 2: 'kazakhstan', 3: 'china', 4: 'philippines',
-      5: 'myanmar', 6: 'indonesia', 7: 'malaysia', 8: 'kenya', 9: 'tanzania',
-      10: 'vietnam', 11: 'kyrgyzstan', 12: 'england', 13: 'china', 14: 'israel',
-      15: 'poland', 16: 'hk', 17: 'morocco', 18: 'egypt', 19: 'nigeria',
-      20: 'macao', 21: 'india', 22: 'ireland', 32: 'romania', 33: 'colombia',
-      36: 'canada', 39: 'argentina', 43: 'germany', 52: 'thailand', 56: 'spain',
-      58: 'italy', 62: 'southafrica', 73: 'brazil', 78: 'france', 79: 'netherlands',
-      80: 'ghana', 82: 'mexico', 88: 'bangladesh', 90: 'pakistan', 94: 'turkey',
-      108: 'philippines', 109: 'nigeria', 115: 'egypt', 132: 'uae', 135: 'iraq',
-      168: 'chile', 174: 'singapore', 175: 'australia', 177: 'newzealand', 187: 'usa'
-    };
-
-    // 3. Fetch prices for top countries
-    const topCountryIds = [187, 0, 6, 21, 73, 82, 4, 3, 22, 12, 175, 78, 43];
-    let allPrices = {};
-    
-    for (const countryId of topCountryIds) {
-      try {
-        const pricesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&country=${countryId}`;
-        const priceData = await fetchSmsActivate(pricesUrl);
-        if (priceData && priceData[countryId]) {
-          allPrices[countryId] = priceData[countryId];
-          
-          // Update country available_numbers
-          const countryCode = countryMapping[countryId];
-          if (countryCode) {
-            let totalNumbers = 0;
-            for (const svc of Object.values(priceData[countryId])) {
-              totalNumbers += (svc.count || 0);
-            }
-            
-            await supabase
-              .from('countries')
-              .update({ available_numbers: totalNumbers, updated_at: new Date().toISOString() })
-              .eq('code', countryCode);
-            
-            results.countries++;
-          }
-        }
-      } catch (err) {
-        results.errors.push(`Country ${countryId}: ${err.message}`);
-      }
-    }
-    
-    console.log(`📊 Fetched prices for ${Object.keys(allPrices).length} countries`);
-
-    // 4. Update services with prices
-    const { data: services } = await supabase.from('services').select('id, code');
-    
-    for (const [countryId, servicesPrices] of Object.entries(allPrices)) {
-      for (const [serviceCode, priceInfo] of Object.entries(servicesPrices)) {
-        const service = services?.find(s => s.code === serviceCode);
-        if (service && priceInfo.cost) {
-          const basePrice = parseFloat(priceInfo.cost);
-          const ourPrice = Math.ceil(basePrice * (1 + marginPercentage / 100) * 100); // CFA
-          
-          // Update pricing_rules
-          await supabase
-            .from('pricing_rules')
-            .upsert({
-              service_id: service.id,
-              country_code: countryMapping[countryId] || `country_${countryId}`,
-              base_price: basePrice,
-              our_price: ourPrice,
-              margin_percentage: marginPercentage,
-              available_count: priceInfo.count || 0,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'service_id,country_code' });
-          
-          results.prices++;
-        }
-      }
-    }
-
-    // 5. Fetch service list
-    console.log('📋 Fetching service list...');
-    const servicesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getServicesList`;
-    const servicesData = await fetchSmsActivate(servicesUrl);
-    
-    if (servicesData?.status === 'success' && Array.isArray(servicesData.services)) {
-      for (const [index, svc] of servicesData.services.entries()) {
-        await supabase
-          .from('services')
-          .upsert({
-            code: svc.code,
-            name: svc.name,
-            popularity_score: 1000 - index,
-            is_active: true,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'code' });
-        
-        results.services++;
-      }
-    }
-
-    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`✅ Sync complete in ${duration}s: ${results.countries} countries, ${results.services} services, ${results.prices} prices`);
-
-    // Log sync
-    await supabase.from('sync_logs').insert({
-      sync_type: 'full',
-      provider: 'sms-activate',
-      services_synced: results.services,
-      countries_synced: results.countries,
-      pricing_rules_synced: results.prices,
-      duration_seconds: parseFloat(duration),
-      status: 'success'
-    });
-
-    return res.json({
-      success: true,
-      results,
-      duration: `${duration}s`
-    });
-  } catch (error) {
-    console.error('❌ Sync error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// MONEYFUSION WEBHOOK
-// ============================================================================
-app.post('/functions/v1/moneyfusion-webhook', async (req, res) => {
-  console.log('📥 [MONEYFUSION-WEBHOOK] Received:', JSON.stringify(req.body).substring(0, 500));
-  
-  try {
-    const { event, tokenPay, personal_Info, Montant, statut, numeroTransaction } = req.body;
-    
-    if (!tokenPay) {
-      return res.status(400).json({ error: 'Missing tokenPay' });
-    }
-
-    // Find transaction by token
-    const { data: transaction, error: txError } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('external_id', tokenPay)
-      .single();
-
-    if (txError || !transaction) {
-      console.log('⚠️ Transaction not found for token:', tokenPay);
-      return res.status(404).json({ error: 'Transaction not found' });
-    }
-
-    // Determine status based on event
-    let newStatus = transaction.status;
-    if (event === 'payin.session.completed' || statut === 'paid') {
-      newStatus = 'completed';
-    } else if (event === 'payin.session.cancelled' || statut === 'failure' || statut === 'no paid') {
-      newStatus = 'failed';
-    }
-
-    // Only process if status changed
-    if (newStatus !== transaction.status) {
-      console.log(`📊 Updating transaction ${transaction.id}: ${transaction.status} → ${newStatus}`);
-      
-      if (newStatus === 'completed' && transaction.status === 'pending') {
-        // Credit user balance
-        const activations = transaction.metadata?.activations || transaction.amount || 0;
-        
-        const { data: user } = await supabase
-          .from('users')
-          .select('balance')
-          .eq('id', transaction.user_id)
-          .single();
-
-        const newBalance = (user?.balance || 0) + activations;
-
-        await supabase
-          .from('users')
-          .update({ balance: newBalance })
-          .eq('id', transaction.user_id);
-
-        await supabase
-          .from('transactions')
-          .update({
-            status: 'completed',
-            balance_after: newBalance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', transaction.id);
-
-        console.log(`✅ User ${transaction.user_id} credited ${activations} activations`);
-      } else {
-        await supabase
-          .from('transactions')
-          .update({ status: newStatus, updated_at: new Date().toISOString() })
-          .eq('id', transaction.id);
-      }
-    }
-
-    return res.json({ success: true, status: newStatus });
-  } catch (error) {
-    console.error('❌ Webhook error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================================================
-// CLEANUP EXPIRED ACTIVATIONS
-// ============================================================================
-async function cleanupExpiredActivations() {
-  console.log('🧹 [CLEANUP-ACTIVATIONS] Starting cleanup...');
-  
-  try {
-    // Find expired pending activations
-    const { data: expiredActivations, error: fetchError } = await supabase
-      .from('activations')
-      .select('*')
-      .eq('status', 'pending')
-      .lt('expires_at', new Date().toISOString());
-
-    if (fetchError) {
-      console.error('❌ [CLEANUP-ACTIVATIONS] Fetch error:', fetchError.message);
-      return { success: false, error: fetchError.message };
-    }
-
-    console.log(`📊 [CLEANUP-ACTIVATIONS] Found ${expiredActivations?.length || 0} expired activations`);
-
-    const results = [];
-    for (const activation of (expiredActivations || [])) {
-      try {
-        // Cancel on SMS-Activate
-        const cancelUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`;
-        let apiResult = 'N/A';
-        try {
-          const response = await fetch(cancelUrl);
-          apiResult = await response.text();
-        } catch (e) {
-          console.log('⚠️ SMS-Activate cancel error (continuing):', e.message);
-        }
-
-        // Update status
-        await supabase
-          .from('activations')
-          .update({ status: 'expired', updated_at: new Date().toISOString() })
-          .eq('id', activation.id);
-
-        // Call atomic_refund (use 4-param version with explicit nulls)
-        const { data: refundResult, error: refundError } = await supabase
-          .rpc('atomic_refund', {
-            p_user_id: activation.user_id,
-            p_activation_id: activation.id,
-            p_rental_id: null,
-            p_transaction_id: null,
-            p_reason: 'Cron cleanup expired'
-          });
-
-        if (refundError) {
-          console.error(`⚠️ Refund error for ${activation.id}:`, refundError.message);
-        } else {
-          console.log(`✅ Refunded ${refundResult?.refunded || activation.price}Ⓐ for ${activation.user_id}`);
-        }
-
-        results.push({ id: activation.id, status: 'cleaned', refunded: refundResult?.refunded || 0 });
-      } catch (err) {
-        results.push({ id: activation.id, status: 'error', error: err.message });
-      }
-    }
-
-    console.log(`✅ [CLEANUP-ACTIVATIONS] Completed: ${results.length} processed`);
-    return { success: true, processed: results.length, results };
-  } catch (error) {
-    console.error('❌ [CLEANUP-ACTIVATIONS] Error:', error.message);
-    return { success: false, error: error.message };
-  }
-}
-
-app.post('/functions/v1/cleanup-expired-activations', async (req, res) => {
-  const result = await cleanupExpiredActivations();
-  return res.json(result);
-});
-
-// ============================================================================
-// CLEANUP EXPIRED RENTALS
-// ============================================================================
-async function cleanupExpiredRentals() {
-  console.log('🧹 [CLEANUP-RENTALS] Starting cleanup...');
-  
-  try {
-    // Find expired active rentals
-    const { data: expiredRentals, error: fetchError } = await supabase
-      .from('rentals')
-      .select('*')
-      .eq('status', 'active')
-      .lt('end_date', new Date().toISOString());
-
-    if (fetchError) {
-      console.error('❌ [CLEANUP-RENTALS] Fetch error:', fetchError.message);
-      return { success: false, error: fetchError.message };
-    }
-
-    console.log(`📊 [CLEANUP-RENTALS] Found ${expiredRentals?.length || 0} expired rentals`);
-
-    const results = [];
-    for (const rental of (expiredRentals || [])) {
-      try {
-        // Finish on SMS-Activate
-        const finishUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rental.rent_id}&status=1`;
-        try {
-          await fetch(finishUrl);
-        } catch (e) {
-          console.log('⚠️ SMS-Activate finish error (continuing):', e.message);
-        }
-
-        // Unfreeze balance (consume, no refund for rentals)
-        if (rental.frozen_amount > 0) {
-          const { error: unfreezeError } = await supabase.rpc('secure_unfreeze_balance', {
-            p_user_id: rental.user_id,
-            p_rental_id: rental.id,
-            p_refund_to_balance: false,
-            p_refund_reason: 'Rental expired - consumed'
-          });
-          if (unfreezeError) {
-            console.error(`⚠️ Unfreeze error for ${rental.id}:`, unfreezeError.message);
-          }
-        }
-
-        // Update status
-        await supabase
-          .from('rentals')
-          .update({ status: 'expired', frozen_amount: 0, updated_at: new Date().toISOString() })
-          .eq('id', rental.id)
-          .eq('status', 'active');
-
-        results.push({ id: rental.id, status: 'cleaned' });
-      } catch (err) {
-        results.push({ id: rental.id, status: 'error', error: err.message });
-      }
-    }
-
-    console.log(`✅ [CLEANUP-RENTALS] Completed: ${results.length} processed`);
-    return { success: true, processed: results.length, results };
-  } catch (error) {
-    console.error('❌ [CLEANUP-RENTALS] Error:', error.message);
-    return { success: false, error: error.message };
-  }
-}
-
-app.post('/functions/v1/cleanup-expired-rentals', async (req, res) => {
-  const result = await cleanupExpiredRentals();
-  return res.json(result);
-});
-
-// ============================================================================
-// CRON CHECK PENDING SMS
-// ============================================================================
-async function cronCheckPendingSms() {
-  console.log('🔄 [CRON-CHECK-SMS] Starting periodic SMS check...');
-  
-  try {
-    // Find pending activations
-    const { data: activations, error } = await supabase
-      .from('activations')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
-      .limit(20);
-
-    if (error) {
-      console.error('❌ [CRON-CHECK-SMS] Fetch error:', error.message);
-      return { success: false, error: error.message };
-    }
-
-    console.log(`📊 [CRON-CHECK-SMS] Found ${activations?.length || 0} pending activations`);
-
-    const results = { checked: 0, sms_received: 0, expired: 0, cancelled: 0 };
-    
-    for (const activation of (activations || [])) {
-      results.checked++;
-      
-      // Check if expired
-      if (new Date(activation.expires_at) < new Date()) {
-        results.expired++;
-        continue; // Let cleanup handle it
-      }
-
-      // Check SMS status on SMS-Activate
-      const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.order_id}`;
-      try {
-        const response = await fetch(statusUrl);
-        const v1Text = await response.text();
-        console.log(`📥 [CRON-CHECK-SMS] ${activation.order_id}: ${v1Text}`);
-
-        if (v1Text.startsWith('STATUS_OK:')) {
-          // SMS received!
-          const smsCode = v1Text.split(':')[1];
-          results.sms_received++;
-          
-          // Process via RPC
-          await supabase.rpc('process_sms_received', {
-            p_activation_id: activation.id,
-            p_sms_code: smsCode,
-            p_full_sms: smsCode,
-            p_source: 'cron'
-          });
-          
-          console.log(`✅ [CRON-CHECK-SMS] SMS received for ${activation.order_id}: ${smsCode}`);
-        } else if (v1Text === 'STATUS_CANCEL') {
-          results.cancelled++;
-          
-          // Refund (use 4-param version)
-          await supabase.rpc('atomic_refund', {
-            p_user_id: activation.user_id,
-            p_activation_id: activation.id,
-            p_rental_id: null,
-            p_transaction_id: null,
-            p_reason: 'Cron cancelled (STATUS_CANCEL)'
-          });
-          
-          console.log(`⚠️ [CRON-CHECK-SMS] Cancelled ${activation.order_id}`);
-        }
-      } catch (err) {
-        console.error(`⚠️ [CRON-CHECK-SMS] Error checking ${activation.order_id}:`, err.message);
-      }
-    }
-
-    console.log(`✅ [CRON-CHECK-SMS] Completed:`, results);
-    return { success: true, ...results };
-  } catch (error) {
-    console.error('❌ [CRON-CHECK-SMS] Error:', error.message);
-    return { success: false, error: error.message };
-  }
-}
-
-app.post('/functions/v1/cron-check-pending-sms', async (req, res) => {
-  const result = await cronCheckPendingSms();
-  return res.json(result);
-});
-
-// ============================================================================
-// BUY SMS-ACTIVATE RENT (Location de numéro)
-// ============================================================================
-const SERVICE_CODE_MAP = {
-  'google': 'go',
-  'whatsapp': 'wa',
-  'telegram': 'tg',
-  'facebook': 'fb',
-  'instagram': 'ig',
-  'twitter': 'tw',
-  'discord': 'ds',
-  'microsoft': 'mm',
-  'yahoo': 'mb',
-  'amazon': 'am',
-  'netflix': 'nf',
-  'uber': 'ub',
-  'tiktok': 'tk',
-  'snapchat': 'sn',
-  'linkedin': 'ld',
-  'viber': 'vi',
-  'paypal': 'ts',
-  'steam': 'st',
-  'alipay': 'hw',
-  'alibaba': 'hw',
-  'huawei': 'hw'
-};
-
-const COUNTRY_CODE_MAP = {
-  'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
-  'myanmar': 5, 'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'tanzania': 9,
-  'vietnam': 10, 'kyrgyzstan': 11, 'england': 12, 'israel': 13, 'hongkong': 14,
-  'poland': 15, 'egypt': 16, 'nigeria': 17, 'morocco': 19, 'ghana': 20,
-  'argentina': 21, 'india': 22, 'uzbekistan': 23, 'cambodia': 24, 'germany': 27,
-  'romania': 32, 'colombia': 33, 'canada': 36, 'mexico': 38, 'spain': 40,
-  'thailand': 52, 'portugal': 56, 'italy': 58, 'brazil': 45, 'france': 78,
-  'australia': 175, 'usa': 187,
-  'ru': 0, 'ua': 1, 'kz': 2, 'cn': 3, 'ph': 4,
-  'mm': 5, 'id': 6, 'my': 7, 'ke': 8, 'tz': 9,
-  'vn': 10, 'kg': 11, 'gb': 12, 'uk': 12, 'il': 13, 'hk': 14,
-  'pl': 15, 'eg': 16, 'ng': 17, 'mo': 18, 'ma': 19,
-  'gh': 20, 'ar': 21, 'in': 22, 'uz': 23, 'kh': 24,
-  'cm': 25, 'td': 26, 'de': 27, 'lt': 28, 'hr': 29,
-  'se': 30, 'iq': 31, 'ro': 32, 'co': 33, 'at': 34,
-  'by': 35, 'ca': 36, 'sa': 37, 'mx': 38, 'za': 39,
-  'es': 40, 'ir': 41, 'dz': 42, 'nl': 43, 'bd': 44,
-  'br': 45, 'tr': 46, 'jp': 47, 'kr': 48, 'tw': 49,
-  'sg': 50, 'ae': 51, 'th': 52, 'pk': 53, 'np': 54,
-  'lk': 55, 'pt': 56, 'nz': 57, 'it': 58, 'be': 59,
-  'ch': 60, 'gr': 61, 'cz': 62, 'hu': 63, 'dk': 64,
-  'no': 65, 'fi': 66, 'ie': 67, 'sk': 68, 'bg': 69,
-  'rs': 70, 'si': 71, 'mk': 72, 'pe': 73, 'cl': 74,
-  'ec': 75, 've': 76, 'bo': 77, 'fr': 78, 'py': 79, 'uy': 80,
-  'cr': 81, 'pa': 82, 'do': 83, 'sv': 84, 'gt': 85,
-  'hn': 86, 'ni': 87, 'cu': 88, 'ht': 89, 'jm': 90,
-  'tt': 91, 'pr': 92, 'bb': 93, 'bs': 94,
-  'af': 108, 'la': 117, 'sd': 129, 'jo': 141, 'ps': 163,
-  'bh': 165, 'et': 172, 'au': 175, 'us': 187
-};
-
-const RENT_DURATIONS = {
-  '4hours': 4,
-  '1day': 24,
-  '1week': 168,
-  '1month': 720
-};
-
-const mapServiceCode = (code) => {
-  if (!code) return code;
-  return SERVICE_CODE_MAP[code.toLowerCase()] || code;
-};
-
-const mapCountryCode = (country) => {
-  if (typeof country === 'number') {
-    return Number.isFinite(country) ? country : 2;
-  }
-  const trimmed = (country || '').toString().trim().toLowerCase();
-  if (!trimmed) return 2;
-  const maybeNum = Number(trimmed);
-  if (!Number.isNaN(maybeNum)) return maybeNum;
-  return COUNTRY_CODE_MAP[trimmed] ?? 2;
-};
-
-const normalizeEndDate = (raw, rentTimeHours) => {
-  const now = Date.now();
-  const expectedMs = rentTimeHours * 3600 * 1000;
-  const fallback = () => new Date(now + expectedMs).toISOString();
-
-  const coerce = (val) => {
-    if (typeof val === 'number') {
-      const ts = val < 1e12 ? val * 1000 : val;
-      return Number.isFinite(ts) ? ts : null;
-    }
-    if (typeof val === 'string') {
-      const trimmed = val.trim();
-      const isoish = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
-      const parsedLocal = Date.parse(isoish);
-      if (!Number.isNaN(parsedLocal)) return parsedLocal;
-      const num = Number(trimmed);
-      if (!Number.isNaN(num)) {
-        const ts = num < 1e12 ? num * 1000 : num;
-        return Number.isFinite(ts) ? ts : null;
-      }
-    }
-    return null;
-  };
-
-  const parsed = coerce(raw);
-  if (parsed === null) return fallback();
-
-  const delta = parsed - now;
-  if (Math.abs(delta - expectedMs) > 45 * 60 * 1000) {
-    return fallback();
-  }
-
-  return new Date(parsed).toISOString();
-};
-
 app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
   console.log('🚀 [BUY-RENT] Function called');
   
@@ -1736,47 +529,33 @@ app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
     const { country, product, userId, duration = '4hours', expectedPrice } = req.body;
     console.log('📞 [BUY-RENT] Request:', { country, product, userId, duration, expectedPrice });
 
-    // Map service and country codes
     const smsActivateService = product === 'full' ? product : mapServiceCode(product);
     const smsActivateCountry = mapCountryCode(country);
     const rentTime = RENT_DURATIONS[duration] || 4;
 
-    console.log('📞 [BUY-RENT] Mapped:', { smsActivateService, smsActivateCountry, rentTime });
+    console.log('📍 [BUY-RENT] Mapped:', { smsActivateService, smsActivateCountry, rentTime });
 
-    // Get available rent services and find price
+    // Get rent price
     const servicesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${smsActivateCountry}&rent_time=${rentTime}`;
     const servicesData = await fetchSmsActivate(servicesUrl);
-    
+
     let price = 0;
     let actualService = smsActivateService;
-    
+
     if (servicesData.services && servicesData.services[smsActivateService]) {
       price = servicesData.services[smsActivateService].cost || 0;
-      console.log(`✅ [BUY-RENT] Service ${smsActivateService} found: ${price}`);
-    } else {
-      // Fallback to 'full' universal service
-      console.warn(`⚠️ [BUY-RENT] Service ${smsActivateService} not available, trying 'full'...`);
-      if (servicesData.services && servicesData.services['full']) {
-        price = servicesData.services['full'].cost || 0;
-        actualService = 'full';
-        console.log(`🔄 [BUY-RENT] Fallback to 'full' service: ${price}`);
-      }
-    }
-    
-    // Use expectedPrice from frontend if provided
-    if (expectedPrice && expectedPrice > 0) {
-      console.log(`💰 [BUY-RENT] Using expectedPrice: ${expectedPrice} (API was: ${price})`);
-      price = expectedPrice;
-    }
-    
-    if (!price || price <= 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Rent not available for ${product} in ${country} for ${duration}` 
-      });
+    } else if (servicesData.services && servicesData.services['full']) {
+      price = servicesData.services['full'].cost || 0;
+      actualService = 'full';
     }
 
-    console.log(`💰 [BUY-RENT] Final price: ${price} for ${rentTime} hours using service: ${actualService}`);
+    if (expectedPrice && expectedPrice > 0) {
+      price = expectedPrice;
+    }
+
+    if (!price || price <= 0) {
+      return res.status(400).json({ success: false, error: `Rent not available for ${product} in ${country}` });
+    }
 
     // Check user balance
     const { data: userProfile, error: profileError } = await supabase
@@ -1790,32 +569,22 @@ app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
     }
 
     if (userProfile.balance < price) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Insufficient balance. Required: ${price}Ⓐ, Available: ${userProfile.balance}Ⓐ` 
-      });
+      return res.status(400).json({ success: false, error: `Insufficient balance. Required: ${price}, Available: ${userProfile.balance}` });
     }
 
-    // Rent number from SMS-Activate
+    // Rent number
     const rentUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentNumber&service=${actualService}&country=${smsActivateCountry}&rent_time=${rentTime}`;
     console.log('🌐 [BUY-RENT] API Call:', rentUrl.replace(SMS_ACTIVATE_API_KEY, 'KEY_HIDDEN'));
 
     const rentData = await fetchSmsActivate(rentUrl);
-    console.log('📥 [BUY-RENT] API Response:', rentData);
+    console.log('📥 [BUY-RENT] Response:', rentData);
 
     if (rentData.status !== 'success' || !rentData.phone) {
-      if (rentData.message === 'NO_BALANCE') {
-        return res.status(400).json({ success: false, error: 'Solde insuffisant sur SMS-Activate' });
-      } else if (rentData.message === 'NO_NUMBERS') {
-        return res.status(400).json({ success: false, error: `Aucun numéro disponible pour ${product} dans ce pays` });
-      }
       return res.status(400).json({ success: false, error: rentData.message || 'Failed to rent number' });
     }
 
     const { id: rentId, number: phone, endDate } = rentData.phone;
-    const normalizedEndDate = normalizeEndDate(endDate, rentTime);
-
-    console.log('📞 [BUY-RENT] Number rented:', { rentId, phone, endDate, price });
+    const expiresAt = new Date(Date.now() + rentTime * 60 * 60 * 1000).toISOString();
 
     // Create rental record
     const { data: rental, error: rentalError } = await supabase
@@ -1831,8 +600,8 @@ app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
         total_cost: price,
         hourly_rate: price / rentTime,
         status: 'active',
-        end_date: normalizedEndDate,
-        expires_at: normalizedEndDate,
+        end_date: expiresAt,
+        expires_at: expiresAt,
         rent_hours: rentTime,
         duration_hours: rentTime,
         provider: 'sms-activate',
@@ -1844,50 +613,25 @@ app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
 
     if (rentalError) {
       console.error('❌ [BUY-RENT] Failed to create rental:', rentalError);
-      // Try to cancel on SMS-Activate
-      try {
-        await fetchSmsActivate(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rentId}&status=2`);
-      } catch (e) {
-        console.error('Failed to cancel rent:', e);
-      }
-      return res.status(500).json({ success: false, error: `Failed to create rental: ${rentalError.message}` });
+      await fetchSmsActivate(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rentId}&status=2`);
+      return res.status(500).json({ success: false, error: 'Failed to create rental' });
     }
 
-    console.log('✅ [BUY-RENT] Rental created:', rental.id);
-
-    // Freeze balance using RPC
-    const { data: freezeResult, error: freezeError } = await supabase.rpc('secure_freeze_balance', {
+    // Freeze balance
+    const { error: freezeError } = await supabase.rpc('secure_freeze_balance', {
       p_user_id: userId || user.id,
       p_amount: price,
       p_rental_id: rental.id,
-      p_reason: `Freeze for rent ${product} ${country} (${duration})`
+      p_reason: `Rent ${product} ${country} (${duration})`
     });
 
-    if (freezeError || !freezeResult?.success) {
-      console.error('❌ [BUY-RENT] Freeze failed:', freezeError);
-      // Fallback: direct balance update
-      await supabase
-        .from('users')
-        .update({
-          balance: userProfile.balance - price,
-          frozen_balance: (userProfile.frozen_balance || 0) + price
-        })
-        .eq('id', userId || user.id);
+    if (freezeError) {
+      // Fallback
+      await supabase.from('users').update({
+        balance: userProfile.balance - price,
+        frozen_balance: (userProfile.frozen_balance || 0) + price
+      }).eq('id', userId || user.id);
     }
-
-    // Create transaction
-    await supabase
-      .from('transactions')
-      .insert({
-        user_id: userId || user.id,
-        type: 'rental',
-        amount: -price,
-        description: `Rent ${product} in ${country} for ${duration}`,
-        status: 'pending',
-        related_rental_id: rental.id,
-        balance_before: userProfile.balance,
-        balance_after: userProfile.balance
-      });
 
     console.log('✅ [BUY-RENT] Success:', { id: rental.id, phone, price });
 
@@ -1896,21 +640,517 @@ app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
       data: {
         id: rental.id,
         rental_id: rentId,
-        rent_id: rentId,
         phone: phone,
         service: product,
         country: country,
         price: price,
-        total_cost: price,
         status: 'active',
-        expires: normalizedEndDate,
-        end_date: normalizedEndDate,
-        duration_hours: rentTime,
-        rent_hours: rentTime
+        expires: expiresAt,
+        duration_hours: rentTime
       }
     });
   } catch (error) {
     console.error('❌ [BUY-RENT] Error:', error);
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET RENT SERVICES
+// ============================================================================
+app.post('/functions/v1/get-rent-services', async (req, res) => {
+  console.log('📋 [RENT-SERVICES] Function called');
+  try {
+    const { countryId = 0, rentTime = 4 } = req.body;
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${countryId}&rent_time=${rentTime}`;
+    const data = await fetchSmsActivate(url);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET RENT STATUS
+// ============================================================================
+app.post('/functions/v1/get-rent-status', async (req, res) => {
+  console.log('🔍 [RENT-STATUS] Function called');
+  try {
+    const { rentId } = req.body;
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentStatus&id=${rentId}`;
+    const data = await fetchSmsActivate(url);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// SET RENT STATUS
+// ============================================================================
+app.post('/functions/v1/set-rent-status', async (req, res) => {
+  console.log('⚙️ [SET-RENT-STATUS] Function called');
+  try {
+    const { rentId, status } = req.body;
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rentId}&status=${status}`;
+    const data = await fetchSmsActivate(url);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET REAL-TIME PRICES
+// ============================================================================
+app.post('/functions/v1/get-real-time-prices', async (req, res) => {
+  console.log('💰 [REAL-TIME-PRICES] Function called');
+  try {
+    const { service, country } = req.body;
+    const smsService = mapServiceCode(service);
+    const smsCountry = mapCountryCode(country);
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${smsService}&country=${smsCountry}`;
+    const data = await fetchSmsActivate(url);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET TOP COUNTRIES BY SERVICE (with proper country name mapping)
+// ============================================================================
+const COUNTRY_ID_TO_INFO = {
+  0: { code: 'RU', name: 'Russia' }, 1: { code: 'UA', name: 'Ukraine' },
+  2: { code: 'KZ', name: 'Kazakhstan' }, 3: { code: 'CN', name: 'China' },
+  4: { code: 'PH', name: 'Philippines' }, 5: { code: 'MM', name: 'Myanmar' },
+  6: { code: 'ID', name: 'Indonesia' }, 7: { code: 'MY', name: 'Malaysia' },
+  8: { code: 'KE', name: 'Kenya' }, 9: { code: 'TZ', name: 'Tanzania' },
+  10: { code: 'VN', name: 'Vietnam' }, 11: { code: 'KG', name: 'Kyrgyzstan' },
+  12: { code: 'GB', name: 'United Kingdom' }, 13: { code: 'IL', name: 'Israel' },
+  14: { code: 'HK', name: 'Hong Kong' }, 15: { code: 'PL', name: 'Poland' },
+  16: { code: 'EG', name: 'Egypt' }, 17: { code: 'NG', name: 'Nigeria' },
+  19: { code: 'MA', name: 'Morocco' }, 20: { code: 'GH', name: 'Ghana' },
+  21: { code: 'AR', name: 'Argentina' }, 22: { code: 'IN', name: 'India' },
+  23: { code: 'UZ', name: 'Uzbekistan' }, 24: { code: 'KH', name: 'Cambodia' },
+  27: { code: 'DE', name: 'Germany' }, 32: { code: 'RO', name: 'Romania' },
+  33: { code: 'CO', name: 'Colombia' }, 36: { code: 'CA', name: 'Canada' },
+  38: { code: 'MX', name: 'Mexico' }, 40: { code: 'ES', name: 'Spain' },
+  45: { code: 'BR', name: 'Brazil' }, 46: { code: 'TR', name: 'Turkey' },
+  52: { code: 'TH', name: 'Thailand' }, 56: { code: 'PT', name: 'Portugal' },
+  58: { code: 'IT', name: 'Italy' }, 78: { code: 'FR', name: 'France' },
+  175: { code: 'AU', name: 'Australia' }, 187: { code: 'US', name: 'United States' }
+};
+
+app.post('/functions/v1/get-top-countries-by-service', async (req, res) => {
+  console.log('🌍 [TOP-COUNTRIES] Function called');
+  try {
+    const { service } = req.body;
+    const smsService = mapServiceCode(service);
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getTopCountriesByService&service=${smsService}`;
+    const data = await fetchSmsActivate(url);
+    
+    // Transform to proper format with country names
+    let countries = [];
+    if (Array.isArray(data)) {
+      countries = data.map(item => {
+        const countryId = parseInt(item.country);
+        const info = COUNTRY_ID_TO_INFO[countryId] || { code: String(countryId), name: `Country ${countryId}` };
+        return {
+          countryId,
+          countryCode: info.code,
+          countryName: info.name,
+          count: parseInt(item.count) || 0,
+          price: parseFloat(item.price) || 0,
+          retail_price: parseFloat(item.retail_price) || parseFloat(item.price) || 0
+        };
+      });
+    }
+    
+    return res.json({ success: true, data: countries });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET SERVICES COUNTS
+// ============================================================================
+app.post('/functions/v1/get-services-counts', async (req, res) => {
+  console.log('📊 [SERVICES-COUNTS] Function called');
+  try {
+    const { country } = req.body;
+    const smsCountry = mapCountryCode(country);
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=${smsCountry}`;
+    const data = await fetchSmsActivate(url);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET PROVIDERS STATUS
+// ============================================================================
+app.post('/functions/v1/get-providers-status', async (req, res) => {
+  console.log('🔌 [PROVIDERS-STATUS] Function called');
+  try {
+    const balanceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getBalance`;
+    const balanceData = await fetchSmsActivate(balanceUrl);
+    
+    let balance = 0;
+    if (balanceData.raw && balanceData.raw.startsWith('ACCESS_BALANCE:')) {
+      balance = parseFloat(balanceData.raw.split(':')[1]);
+    } else if (balanceData.balance) {
+      balance = parseFloat(balanceData.balance);
+    }
+    
+    return res.json({
+      success: true,
+      data: {
+        'sms-activate': {
+          status: balance > 0 ? 'active' : 'low_balance',
+          balance: balance
+        }
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// LINK REFERRAL
+// ============================================================================
+app.post('/functions/v1/link-referral', async (req, res) => {
+  console.log('🔗 [LINK-REFERRAL] Function called');
+  try {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const { referralCode } = req.body;
+    
+    // Find referrer
+    const { data: referrer } = await supabase
+      .from('users')
+      .select('id')
+      .eq('referral_code', referralCode)
+      .single();
+
+    if (!referrer) {
+      return res.status(404).json({ success: false, error: 'Referral code not found' });
+    }
+
+    // Update user
+    await supabase.from('users').update({ referred_by: referrer.id }).eq('id', user.id);
+    
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// INIT MONEYFUSION PAYMENT
+// ============================================================================
+app.post('/functions/v1/init-moneyfusion-payment', async (req, res) => {
+  console.log('💳 [MONEYFUSION] Function called');
+  try {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    if (!MONEYFUSION_API_URL) {
+      return res.status(500).json({ success: false, error: 'MoneyFusion non configuré' });
+    }
+
+    const { amount, phone, description, metadata } = req.body;
+    const paymentRef = `ONESMS_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const webhookUrl = `${process.env.API_URL || SUPABASE_URL}/functions/v1/moneyfusion-webhook`;
+
+    const payload = {
+      amount,
+      phone,
+      description: description || 'Rechargement ONE SMS',
+      reference: paymentRef,
+      callback_url: webhookUrl,
+      metadata: { ...metadata, user_id: user.id }
+    };
+
+    const response = await fetch(MONEYFUSION_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const mfData = await response.json();
+
+    if (!mfData.success && !mfData.token) {
+      return res.status(400).json({ success: false, error: mfData.message || 'Payment init failed' });
+    }
+
+    // Create pending transaction
+    await supabase.from('transactions').insert({
+      user_id: user.id,
+      type: 'deposit',
+      amount: metadata?.activations || 0,
+      status: 'pending',
+      reference: paymentRef,
+      external_id: mfData.token,
+      description: description || 'Rechargement via MoneyFusion',
+      metadata: { moneyfusion_token: mfData.token, phone, amount_xof: amount }
+    });
+
+    return res.json({
+      success: true,
+      data: { token: mfData.token, checkout_url: mfData.url, payment_ref: paymentRef }
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// MONEYFUSION WEBHOOK
+// ============================================================================
+app.post('/functions/v1/moneyfusion-webhook', async (req, res) => {
+  console.log('🔔 [MONEYFUSION-WEBHOOK] Received');
+  try {
+    const { token, status, reference } = req.body;
+    console.log('📥 Webhook data:', { token, status, reference });
+
+    // Find transaction
+    const { data: transaction } = await supabase
+      .from('transactions')
+      .select('*')
+      .or(`external_id.eq.${token},reference.eq.${reference}`)
+      .single();
+
+    if (!transaction) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    if (transaction.status === 'completed') {
+      return res.json({ success: true, message: 'Already processed' });
+    }
+
+    if (status === 'success' || status === 'completed') {
+      // Credit user
+      const { data: userData } = await supabase.from('users').select('balance').eq('id', transaction.user_id).single();
+      const newBalance = (userData?.balance || 0) + transaction.amount;
+      
+      await supabase.from('users').update({ balance: newBalance }).eq('id', transaction.user_id);
+      await supabase.from('transactions').update({
+        status: 'completed',
+        balance_after: newBalance
+      }).eq('id', transaction.id);
+    } else {
+      await supabase.from('transactions').update({ status: 'failed' }).eq('id', transaction.id);
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// GET SMS-ACTIVATE INBOX
+// ============================================================================
+app.post('/functions/v1/get-sms-activate-inbox', async (req, res) => {
+  console.log('📬 [INBOX] Function called');
+  try {
+    const { rentId } = req.body;
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentStatus&id=${rentId}`;
+    const data = await fetchSmsActivate(url);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// CONTINUE SMS-ACTIVATE RENT
+// ============================================================================
+app.post('/functions/v1/continue-sms-activate-rent', async (req, res) => {
+  console.log('🔄 [CONTINUE-RENT] Function called');
+  try {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { rentalId, rentId } = req.body;
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=continueRentNumber&id=${rentId}&rent_time=1`;
+    const data = await fetchSmsActivate(url);
+
+    if (data.status === 'success') {
+      const newExpiry = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();
+      await supabase.from('rentals').update({ expires_at: newExpiry }).eq('id', rentalId);
+    }
+
+    return res.json({ success: data.status === 'success', data });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// SYNC SMS-ACTIVATE (countries and services)
+// ============================================================================
+app.post('/functions/v1/sync-sms-activate', async (req, res) => {
+  console.log('🔄 [SYNC] Starting sync...');
+  try {
+    // Get countries
+    const countriesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getCountries`;
+    const countriesData = await fetchSmsActivate(countriesUrl);
+
+    // Get number status for all countries
+    const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=-1`;
+    const statusData = await fetchSmsActivate(statusUrl);
+
+    let syncedCount = 0;
+    const countries = Object.entries(countriesData).filter(([key]) => !isNaN(parseInt(key)));
+
+    for (const [id, info] of countries) {
+      const countryId = parseInt(id);
+      const countryName = info.eng || info.rus || `Country ${id}`;
+      const countryCode = info.iso || id;
+      const visible = info.visible === 1 || info.visible === true;
+      
+      // Get available numbers for this country
+      const numbers = statusData[countryId] || {};
+      const totalNumbers = Object.values(numbers).reduce((sum, n) => sum + (parseInt(n) || 0), 0);
+
+      await supabase.from('countries').upsert({
+        id: countryId,
+        name: countryName,
+        code: countryCode.toUpperCase(),
+        is_active: visible && totalNumbers > 0,
+        available_numbers: totalNumbers,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+
+      syncedCount++;
+    }
+
+    console.log(`✅ [SYNC] Synced ${syncedCount} countries`);
+    return res.json({ success: true, synced: syncedCount });
+  } catch (error) {
+    console.error('❌ [SYNC] Error:', error);
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// CLEANUP EXPIRED ACTIVATIONS
+// ============================================================================
+app.post('/functions/v1/cleanup-expired-activations', async (req, res) => {
+  console.log('🧹 [CLEANUP-ACTIVATIONS] Starting...');
+  try {
+    const now = new Date().toISOString();
+    const { data: expiredActivations } = await supabase
+      .from('activations')
+      .select('*')
+      .in('status', ['pending', 'waiting'])
+      .lt('expires_at', now)
+      .limit(50);
+
+    let cleaned = 0;
+    for (const activation of (expiredActivations || [])) {
+      // Cancel on provider
+      await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`);
+
+      // Refund via RPC
+      await supabase.rpc('atomic_refund', {
+        p_user_id: activation.user_id,
+        p_activation_id: activation.id,
+        p_transaction_id: null,
+        p_reason: 'Expired - auto cleanup'
+      });
+
+      await supabase.from('activations').update({ status: 'expired' }).eq('id', activation.id);
+      cleaned++;
+    }
+
+    console.log(`✅ [CLEANUP-ACTIVATIONS] Cleaned ${cleaned} expired activations`);
+    return res.json({ success: true, cleaned });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// CLEANUP EXPIRED RENTALS
+// ============================================================================
+app.post('/functions/v1/cleanup-expired-rentals', async (req, res) => {
+  console.log('🧹 [CLEANUP-RENTALS] Starting...');
+  try {
+    const now = new Date().toISOString();
+    const { data: expiredRentals } = await supabase
+      .from('rentals')
+      .select('*')
+      .eq('status', 'active')
+      .lt('expires_at', now)
+      .limit(50);
+
+    let cleaned = 0;
+    for (const rental of (expiredRentals || [])) {
+      await supabase.from('rentals').update({ status: 'expired' }).eq('id', rental.id);
+      cleaned++;
+    }
+
+    console.log(`✅ [CLEANUP-RENTALS] Cleaned ${cleaned} expired rentals`);
+    return res.json({ success: true, cleaned });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// CRON CHECK PENDING SMS
+// ============================================================================
+app.post('/functions/v1/cron-check-pending-sms', async (req, res) => {
+  console.log('⏰ [CRON-CHECK-SMS] Starting...');
+  try {
+    const { data: pendingActivations } = await supabase
+      .from('activations')
+      .select('*')
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .limit(20);
+
+    let checked = 0;
+    for (const activation of (pendingActivations || [])) {
+      const apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.order_id}`;
+      const response = await fetch(apiUrl);
+      const text = await response.text();
+
+      if (text.startsWith('STATUS_OK:')) {
+        const smsCode = text.split(':')[1]?.trim();
+        await supabase.from('activations').update({
+          status: 'received',
+          sms_code: smsCode,
+          sms_text: `Code: ${smsCode}`,
+          sms_received_at: new Date().toISOString()
+        }).eq('id', activation.id);
+
+        await supabase.rpc('atomic_commit', {
+          p_user_id: activation.user_id,
+          p_activation_id: activation.id,
+          p_rental_id: null,
+          p_transaction_id: null,
+          p_reason: 'SMS received via cron'
+        });
+      }
+      checked++;
+    }
+
+    console.log(`✅ [CRON-CHECK-SMS] Checked ${checked} activations`);
+    return res.json({ success: true, checked });
+  } catch (error) {
     return res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -1921,44 +1161,27 @@ app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
 function setupCronJobs() {
   console.log('⏰ Setting up cron jobs...');
 
-  // Cron 1: Cleanup expired activations - every 3 minutes
   cron.schedule('*/3 * * * *', async () => {
-    console.log('⏰ [CRON] Running cleanup-expired-activations...');
-    await cleanupExpiredActivations();
+    console.log('⏰ [CRON] cleanup-expired-activations');
+    try { await fetch(`http://localhost:${PORT}/functions/v1/cleanup-expired-activations`, { method: 'POST' }); } catch (e) {}
   });
 
-  // Cron 2: Cleanup expired rentals - every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
-    console.log('⏰ [CRON] Running cleanup-expired-rentals...');
-    await cleanupExpiredRentals();
+    console.log('⏰ [CRON] cleanup-expired-rentals');
+    try { await fetch(`http://localhost:${PORT}/functions/v1/cleanup-expired-rentals`, { method: 'POST' }); } catch (e) {}
   });
 
-  // Cron 3: Check pending SMS - every 2 minutes
   cron.schedule('*/2 * * * *', async () => {
-    console.log('⏰ [CRON] Running cron-check-pending-sms...');
-    await cronCheckPendingSms();
+    console.log('⏰ [CRON] cron-check-pending-sms');
+    try { await fetch(`http://localhost:${PORT}/functions/v1/cron-check-pending-sms`, { method: 'POST' }); } catch (e) {}
   });
 
-  // Cron 4: Sync SMS-Activate data - every 30 minutes
   cron.schedule('*/30 * * * *', async () => {
-    console.log('⏰ [CRON] Running sync-sms-activate...');
-    try {
-      // Call our own sync endpoint
-      const response = await fetch(`http://localhost:${PORT}/functions/v1/sync-sms-activate`, {
-        method: 'POST'
-      });
-      const result = await response.json();
-      console.log('✅ [CRON] Sync completed:', result);
-    } catch (err) {
-      console.error('❌ [CRON] Sync error:', err.message);
-    }
+    console.log('⏰ [CRON] sync-sms-activate');
+    try { await fetch(`http://localhost:${PORT}/functions/v1/sync-sms-activate`, { method: 'POST' }); } catch (e) {}
   });
 
-  console.log('✅ Cron jobs configured:');
-  console.log('   - cleanup-expired-activations: */3 * * * *');
-  console.log('   - cleanup-expired-rentals: */5 * * * *');
-  console.log('   - cron-check-pending-sms: */2 * * * *');
-  console.log('   - sync-sms-activate: */30 * * * *');
+  console.log('✅ Cron jobs configured');
 }
 
 // ============================================================================
@@ -1968,7 +1191,5 @@ app.listen(PORT, () => {
   console.log(`🚀 ONE SMS API Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 Supabase URL: ${SUPABASE_URL}`);
-  
-  // Start cron jobs
   setupCronJobs();
 });
