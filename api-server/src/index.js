@@ -1259,11 +1259,13 @@ async function cleanupExpiredActivations() {
           .update({ status: 'expired', updated_at: new Date().toISOString() })
           .eq('id', activation.id);
 
-        // Call atomic_refund
+        // Call atomic_refund (use 4-param version with explicit nulls)
         const { data: refundResult, error: refundError } = await supabase
           .rpc('atomic_refund', {
             p_user_id: activation.user_id,
             p_activation_id: activation.id,
+            p_rental_id: null,
+            p_transaction_id: null,
             p_reason: 'Cron cleanup expired'
           });
 
@@ -1420,10 +1422,12 @@ async function cronCheckPendingSms() {
         } else if (v1Text === 'STATUS_CANCEL') {
           results.cancelled++;
           
-          // Refund
+          // Refund (use 4-param version)
           await supabase.rpc('atomic_refund', {
             p_user_id: activation.user_id,
             p_activation_id: activation.id,
+            p_rental_id: null,
+            p_transaction_id: null,
             p_reason: 'Cron cancelled (STATUS_CANCEL)'
           });
           
