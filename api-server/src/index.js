@@ -192,17 +192,19 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
         return res.status(500).json({ error: 'Failed to freeze funds' });
       }
 
-      // Create activation record
+      // Create activation record - using correct column names from database
       const { data: activation, error: activationError } = await supabase
         .from('activations')
         .insert({
           user_id: user.id,
           external_id: activationId,
-          phone_number: phone,
-          service: serviceCode,
-          country_code: countryCode,
+          order_id: activationId,
+          phone: phone,
+          service_code: serviceCode,
+          country_code: countryCode.toString(),
           status: 'pending',
-          cost: finalPrice,
+          price: finalPrice,
+          frozen_amount: finalPrice,
           provider: 'sms-activate',
           operator: operator || null,
           expires_at: new Date(Date.now() + 20 * 60 * 1000).toISOString()
@@ -212,7 +214,16 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
 
       if (activationError) {
         console.error('❌ Failed to create activation:', activationError);
-        return res.status(500).json({ error: 'Failed to create activation record' });
+        // Rollback: restore balance and cancel on SMS-Activate
+        await supabase
+          .from('users')
+          .update({
+            balance: userData.balance,
+            frozen_balance: userData.frozen_balance || 0
+          })
+          .eq('id', user.id);
+        await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&status=8&id=${activationId}`);
+        return res.status(500).json({ error: 'Failed to create activation record', details: activationError.message });
       }
 
       console.log('✅ Number purchased successfully:', { phone, activationId });
