@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, cloudFunctions } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -44,7 +44,7 @@ const RentPage = () => {
   const { data: countries = [], isLoading: countriesLoading } = useQuery({
     queryKey: ['rent-countries-api'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('get-rent-services', {
+      const { data, error } = await cloudFunctions.invoke('get-rent-services', {
         body: { getCountries: true, rentTime: '4' }
       })
       if (error || !data?.success) throw new Error(data?.error || 'Failed to fetch rent countries')
@@ -60,7 +60,7 @@ const RentPage = () => {
     queryKey: ['rent-services-api', selectedCountry?.id],
     queryFn: async () => {
       if (!selectedCountry) return { services: [], availableServices: [] }
-      const { data, error } = await supabase.functions.invoke('get-rent-services', {
+      const { data, error } = await cloudFunctions.invoke('get-rent-services', {
         body: { country: selectedCountry.id.toString(), rentTime: '4' }
       })
       if (error || !data?.success) throw new Error(data?.error || 'Failed to fetch rent services')
@@ -96,7 +96,7 @@ const RentPage = () => {
       // Récupérer les prix pour toutes les durées en parallèle
       await Promise.all(BASE_RENT_DURATIONS.map(async (duration) => {
         try {
-          const { data } = await supabase.functions.invoke('get-rent-services', {
+          const { data } = await cloudFunctions.invoke('get-rent-services', {
             body: { 
               rentTime: duration.hours.toString(),
               country: selectedCountry.id.toString()
@@ -142,7 +142,7 @@ const RentPage = () => {
 
   const fetchRentalInbox = async (rentalId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-sms-activate-inbox', { body: { rentalId, userId: user?.id } })
+      const { data, error } = await cloudFunctions.invoke('get-sms-activate-inbox', { body: { rentalId, userId: user?.id } })
       if (error || !data?.success) throw new Error(data?.error || 'Failed to fetch inbox')
       return data.data.messages as Message[]
     } catch (error: any) {
@@ -157,7 +157,7 @@ const RentPage = () => {
     if (!selectedService || !selectedCountry || !selectedDuration) return
     setIsRenting(true)
     try {
-      const { data, error } = await supabase.functions.invoke('rent-sms-activate-number', {
+      const { data, error } = await cloudFunctions.invoke('rent-sms-activate-number', {
         body: { service: selectedService.code, country: selectedCountry.id.toString(), rentHours: selectedDuration.hours, userId: user?.id }
       })
       if (error || !data?.success) throw new Error(data?.error || 'Rental failed')
@@ -176,7 +176,7 @@ const RentPage = () => {
 
   const handleExtendRental = async (rentalId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('continue-sms-activate-rent', { body: { rentalId, userId: user?.id } })
+      const { data, error } = await cloudFunctions.invoke('continue-sms-activate-rent', { body: { rentalId, userId: user?.id } })
       if (error || !data?.success) throw new Error(data?.error || 'Extension failed')
       toast.success('Rental extended!', { description: `New end: ${new Date(data.data.end_date).toLocaleString()}` })
       refetchRentals()

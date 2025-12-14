@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase, getCurrentUser, signOut as supabaseSignOut } from '@/lib/supabase'
+import { supabase, cloudFunctions, getCurrentUser, signOut as supabaseSignOut } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
 interface AuthState {
@@ -114,7 +114,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           : null
 
         if (pendingCode) {
-          const { data, error } = await supabase.functions.invoke('link-referral', {
+          const { data, error } = await cloudFunctions.invoke('link-referral', {
             body: { referral_code: pendingCode },
           })
 

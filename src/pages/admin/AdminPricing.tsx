@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, RefreshCw, DollarSign, TrendingUp, Package, Loader2, Globe, AlertCircle, Info } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, cloudFunctions } from '@/lib/supabase'
 
 // Fetch real-time prices from edge function
 const fetchRealTimePrices = async (country: string, service?: string) => {
@@ -14,7 +14,7 @@ const fetchRealTimePrices = async (country: string, service?: string) => {
   let functionUrl = `get-real-time-prices?country=${country}&type=activation`
   if (service) functionUrl += `&service=${service}`
   
-  const { data, error } = await supabase.functions.invoke(functionUrl)
+  const { data, error } = await cloudFunctions.invoke(functionUrl)
   
   if (error) throw error
   return data

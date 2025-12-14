@@ -4,6 +4,10 @@ import type { Database } from '@/types/database'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+// URL pour les Edge Functions (Supabase Cloud car Coolify ne supporte pas Deno Edge Functions)
+const supabaseFunctionsUrl = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL || 'https://htfqmamvmhdoixqcbbbw.supabase.co'
+const supabaseFunctionsKey = import.meta.env.VITE_SUPABASE_FUNCTIONS_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MjQ4MjgsImV4cCI6MjA3OTIwMDgyOH0.dDH8hHF2BNHqhJ2RTHi3J0DSCPc1OD_QOHy7G2bNLOs'
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Missing Supabase environment variables:', {
     url: supabaseUrl ? '✓' : '✗',
@@ -13,7 +17,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 console.log('✅ Supabase client initialized:', supabaseUrl)
+console.log('✅ Edge Functions URL:', supabaseFunctionsUrl)
 
+// Client principal pour DB/Auth (Coolify)
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -48,10 +54,8 @@ export const signIn = async (email: string, password: string) => {
 }
 
 export const signInWithGoogle = async () => {
-  // Détecter l'environnement par l'URL actuelle
-  const baseUrl = window.location.origin.includes('localhost') 
-    ? window.location.origin 
-    : 'https://onesms-sn.com';
+  // Utiliser l'URL actuelle pour le redirect
+  const baseUrl = window.location.origin;
   
   console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
   
@@ -141,9 +145,7 @@ export const resetPasswordForEmail = async (email: string) => {
     }
   }
 
-  const baseUrl = window.location.origin.includes('localhost') 
-    ? window.location.origin 
-    : 'https://onesms-sn.com';
+  const baseUrl = window.location.origin;
 
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${baseUrl}/reset-password`,
@@ -165,3 +167,44 @@ export const resendConfirmationEmail = async (email: string) => {
   })
   return { data, error }
 }
+
+// ============================================================================
+// EDGE FUNCTIONS CLIENT (utilise Supabase Cloud car Coolify ne supporte pas Deno)
+// ============================================================================
+
+// Client séparé pour les Edge Functions (Supabase Cloud)
+const supabaseCloudForFunctions = createClient(supabaseFunctionsUrl, supabaseFunctionsKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  }
+})
+
+/**
+ * Wrapper pour appeler les Edge Functions sur Supabase Cloud
+ * Utilisez cette fonction au lieu de supabase.functions.invoke()
+ */
+export const invokeEdgeFunction = async <T = any>(
+  functionName: string, 
+  options?: { body?: any; headers?: Record<string, string> }
+): Promise<{ data: T | null; error: any }> => {
+  try {
+    const { data, error } = await supabaseCloudForFunctions.functions.invoke(functionName, {
+      body: options?.body,
+      headers: options?.headers,
+    })
+    
+    if (error) {
+      console.error(`❌ [EDGE FUNCTION] ${functionName}:`, error)
+      return { data: null, error }
+    }
+    
+    return { data: data as T, error: null }
+  } catch (err: any) {
+    console.error(`❌ [EDGE FUNCTION] ${functionName} exception:`, err)
+    return { data: null, error: err }
+  }
+}
+
+// Alias pour compatibilité avec le code existant
+export const cloudFunctions = supabaseCloudForFunctions.functions

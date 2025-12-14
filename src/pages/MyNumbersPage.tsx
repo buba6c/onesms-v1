@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +107,7 @@ export default function MyNumbersPage() {
       // Cancel via SMS-Activate Edge Function if still active
       if (number.status === 'active' || number.status === 'pending') {
         try {
-          await supabase.functions.invoke('cancel-sms-activate-order', {
+          await cloudFunctions.invoke('cancel-sms-activate-order', {
             body: { activationId: number.id, userId: user?.id }
           });
         } catch (error) {

@@ -6,7 +6,7 @@
  * principalement en Afrique avec une seule intégration.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 
 // Types
 export interface MonerooCustomer {
@@ -137,7 +137,7 @@ export const ALL_MONEROO_METHODS = [
 export const initializePayment = async (
   payment: MonerooPaymentRequest
 ): Promise<MonerooPaymentResponse> => {
-  const { data, error } = await supabase.functions.invoke('init-moneroo-payment', {
+  const { data, error } = await cloudFunctions.invoke('init-moneroo-payment', {
     body: payment
   });
 
@@ -158,7 +158,7 @@ export const initializePayment = async (
 export const verifyPayment = async (
   paymentId: string
 ): Promise<MonerooVerifyResponse> => {
-  const { data, error } = await supabase.functions.invoke('verify-moneroo-payment', {
+  const { data, error } = await cloudFunctions.invoke('verify-moneroo-payment', {
     body: { paymentId }
   });
 

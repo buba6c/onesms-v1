@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -567,7 +567,7 @@ export default function DashboardPage() {
     // Charger les messages depuis l'API
     setIsLoadingRentMessages(true);
     try {
-      const { data, error } = await supabase.functions.invoke('get-rent-status', {
+      const { data, error } = await cloudFunctions.invoke('get-rent-status', {
         body: { rentId: rentalId, userId: user?.id }
       });
       
@@ -705,7 +705,7 @@ export default function DashboardPage() {
           const rentTime = rentTimeMap[rentDuration];
           
           // Appeler l'API pour obtenir les services rent avec quantités agrégées
-          const { data: rentData, error } = await supabase.functions.invoke('get-rent-services', {
+          const { data: rentData, error } = await cloudFunctions.invoke('get-rent-services', {
             body: { rentTime, getServices: true }
           });
           
@@ -791,7 +791,7 @@ export default function DashboardPage() {
         console.warn('⚠️ [SERVICES] Aucun service disponible');        
         // Fallback: utiliser get-services-counts si DB est vide
         console.error('⚠️ [SERVICES] Fallback vers API Edge function...');
-        const { data: fallbackData } = await supabase.functions.invoke('get-services-counts', {
+        const { data: fallbackData } = await cloudFunctions.invoke('get-services-counts', {
           body: { countries: [187, 4, 6] }
         });
         
@@ -1281,7 +1281,7 @@ export default function DashboardPage() {
         // 1️⃣ D'abord, obtenir la liste des pays disponibles (avec getCountries: true)
         // 🔑 Pour Full Rent ou services spécifiques, passer le serviceCode pour obtenir les quantités
         const serviceCode = selectedService.code;
-        const { data: rentData, error } = await supabase.functions.invoke('get-rent-services', {
+        const { data: rentData, error } = await cloudFunctions.invoke('get-rent-services', {
           body: { 
             rentTime, 
             getCountries: true,
@@ -1350,7 +1350,7 @@ export default function DashboardPage() {
       // ✅ Utilise getTopCountriesByServiceRank de SMS-Activate (tri par performance + popularité)
       
       try {
-        const { data: availabilityData, error } = await supabase.functions.invoke('get-top-countries-by-service', {
+        const { data: availabilityData, error } = await cloudFunctions.invoke('get-top-countries-by-service', {
           body: { 
             service: apiServiceCode // ✅ Tri intelligent: success rate + popularity + availability
           }
@@ -1402,7 +1402,7 @@ export default function DashboardPage() {
         // Fallback: récupérer prix en temps réel via get-real-time-prices
         try {
           
-          const { data: pricesData, error: pricesError } = await supabase.functions.invoke('get-real-time-prices', {
+          const { data: pricesData, error: pricesError } = await cloudFunctions.invoke('get-real-time-prices', {
             body: { 
               type: 'activation',
               service: apiServiceCode
@@ -1584,7 +1584,7 @@ export default function DashboardPage() {
       
       const functionName = isRent ? 'buy-sms-activate-rent' : 'buy-sms-activate-number';
       
-      const { data: buyData, error: buyError } = await supabase.functions.invoke(functionName, {
+      const { data: buyData, error: buyError } = await cloudFunctions.invoke(functionName, {
         body: requestBody
       });
 
@@ -1626,7 +1626,7 @@ export default function DashboardPage() {
         // Pour activation: Vérifier IMMÉDIATEMENT si le SMS est déjà arrivé
         setTimeout(async () => {
           try {
-            await supabase.functions.invoke('check-sms-activate-status', {
+            await cloudFunctions.invoke('check-sms-activate-status', {
               body: {
                 activationId: buyData.data.activation_id,
                 userId: user?.id
@@ -1701,7 +1701,7 @@ export default function DashboardPage() {
   const cancelActivation = async (activationId: string, orderId: string) => {
     try {
       // Cancel via Edge Function - orderId is SMS-Activate ID, activationId is Supabase UUID
-      const { data, error } = await supabase.functions.invoke('cancel-sms-activate-order', {
+      const { data, error } = await cloudFunctions.invoke('cancel-sms-activate-order', {
         body: { 
           orderId: orderId,
           activationId: activationId,
@@ -2568,7 +2568,7 @@ export default function DashboardPage() {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const { data, error } = await supabase.functions.invoke('check-sms-activate-status', {
+                                    const { data, error } = await cloudFunctions.invoke('check-sms-activate-status', {
                                       body: { activationId: num.id, userId: user?.id }
                                     });
                                     if (error) throw error;
@@ -2599,7 +2599,7 @@ export default function DashboardPage() {
                               <DropdownMenuItem
                                 onClick={async () => {
                                   try {
-                                    const { data, error } = await supabase.functions.invoke('cancel-sms-activate-order', {
+                                    const { data, error } = await cloudFunctions.invoke('cancel-sms-activate-order', {
                                       body: { activationId: num.id, orderId: num.orderId, userId: user?.id }
                                     });
                                     if (error || !data?.success) throw new Error(data?.error || error?.message);
@@ -2845,7 +2845,7 @@ export default function DashboardPage() {
               onClick={async () => {
                 if (!selectedRentalForMessages?.rentalId) return;
                 try {
-                  const { data, error } = await supabase.functions.invoke('get-rent-status', {
+                  const { data, error } = await cloudFunctions.invoke('get-rent-status', {
                     body: { rentId: selectedRentalForMessages.rentalId, userId: user?.id }
                   });
                   if (error || !data?.success) throw new Error(data?.error || error?.message);
@@ -2965,7 +2965,7 @@ export default function DashboardPage() {
                 if (!rentalToFinish) return;
                 setIsFinishingRental(true);
                 try {
-                  const { data, error } = await supabase.functions.invoke('set-rent-status', {
+                  const { data, error } = await cloudFunctions.invoke('set-rent-status', {
                     body: { rentId: rentalToFinish.rentalId, action: 'finish', userId: user?.id }
                   });
                   if (error || !data?.success) throw new Error(data?.error || error?.message);
@@ -3054,7 +3054,7 @@ export default function DashboardPage() {
                 if (!rentalToCancel) return;
                 setIsCancellingRental(true);
                 try {
-                  const { data, error } = await supabase.functions.invoke('set-rent-status', {
+                  const { data, error } = await cloudFunctions.invoke('set-rent-status', {
                     body: { rentId: rentalToCancel.rentalId, action: 'cancel', userId: user?.id }
                   });
                   if (error || !data?.success) throw new Error(data?.error || error?.message);

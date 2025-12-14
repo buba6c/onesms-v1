@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -300,7 +300,7 @@ export default function AdminSettings() {
     setTestingConnection({ ...testingConnection, 'sms-activate': true });
     try {
       // Call edge function to check balance
-      const { data, error } = await supabase.functions.invoke('get-providers-status');
+      const { data, error } = await cloudFunctions.invoke('get-providers-status');
       
       if (error) throw error;
       

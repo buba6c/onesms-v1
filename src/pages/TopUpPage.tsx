@@ -21,7 +21,7 @@ import {
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 import { packagesApi } from '@/lib/api/packages';
 
 export default function TopUpPage() {
@@ -228,7 +228,7 @@ export default function TopUpPage() {
 
       } else if (selectedProvider === 'paydunya') {
         // PayDunya payment
-        const { data, error } = await supabase.functions.invoke('paydunya-create-payment', {
+        const { data, error } = await cloudFunctions.invoke('paydunya-create-payment', {
           body: {
             amount: amount,
             userId: user.id,
@@ -252,7 +252,7 @@ export default function TopUpPage() {
 
       } else {
         // MoneyFusion payment (default)
-        const { data, error } = await supabase.functions.invoke('init-moneyfusion-payment', {
+        const { data, error } = await cloudFunctions.invoke('init-moneyfusion-payment', {
           body: {
             amount: amount,
             currency: 'XOF',

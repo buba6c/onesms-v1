@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { formatPhoneNumber } from '@/utils/phoneFormatter';
@@ -300,7 +300,7 @@ export default function HistoryPage() {
 
     setLoadingMessages(true);
     try {
-      const { data, error } = await supabase.functions.invoke('get-rent-status', {
+      const { data, error } = await cloudFunctions.invoke('get-rent-status', {
         body: { rentId: rentalId, userId: user?.id }
       });
       if (!error && data?.success) {
@@ -343,7 +343,7 @@ export default function HistoryPage() {
       // console.log('🚫 [CANCEL] Starting cancellation for:', { activationId, orderId });
 
       // 1. Cancel via Edge Function (plus sécurisé)
-      const { data, error } = await supabase.functions.invoke('cancel-sms-activate-order', {
+      const { data, error } = await cloudFunctions.invoke('cancel-sms-activate-order', {
         body: { orderId: parseInt(orderId) }
       });
 
@@ -390,7 +390,7 @@ export default function HistoryPage() {
 
   const checkActivationStatus = async (activationId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('check-sms-activate-status', {
+      const { data, error } = await cloudFunctions.invoke('check-sms-activate-status', {
         body: { activationId, userId: user?.id }
       });
 

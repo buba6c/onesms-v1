@@ -2,7 +2,7 @@
  * Service pour récupérer les données SMS-Activate en temps réel
  */
 
-import { supabase } from '@/lib/supabase'
+import { supabase, cloudFunctions } from '@/lib/supabase'
 
 const SMS_ACTIVATE_API_KEY = import.meta.env.VITE_SMS_ACTIVATE_API_KEY
 const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
@@ -95,7 +95,7 @@ export const fetchSMSActivateCountries = async (serviceCode: string): Promise<Co
     ]
 
     // 🚀 Appeler l'Edge Function pour obtenir les données de TOUS les pays en 1 appel
-    const { data, error } = await supabase.functions.invoke('get-services-counts', {
+    const { data, error } = await cloudFunctions.invoke('get-services-counts', {
       body: { 
         countries: topCountries.map(c => c.id),
         serviceCode: smsActivateService

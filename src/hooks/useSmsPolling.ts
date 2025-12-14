@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 import { useToast } from './use-toast';
 
 interface ActiveNumber {
@@ -57,7 +57,7 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
 
         try {
           // 1. Vérification normale avec getStatusV2
-          const { data: checkData, error: checkError } = await supabase.functions.invoke('check-sms-activate-status', {
+          const { data: checkData, error: checkError } = await cloudFunctions.invoke('check-sms-activate-status', {
             body: {
               activationId: num.activationId || num.id,
               userId: userId

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, cloudFunctions } from '@/lib/supabase';
 
 // Type pour un message de rent
 export interface RentMessage {
@@ -74,7 +74,7 @@ export function useRentPolling({
         let hasNewMessages = false;
 
         for (const rentalId of rentalIds) {
-          const { data, error } = await supabase.functions.invoke('get-rent-status', {
+          const { data, error } = await cloudFunctions.invoke('get-rent-status', {
             body: { rentId: rentalId, userId: userIdRef.current }
           });
 
@@ -178,7 +178,7 @@ export function useRentPolling({
       }
 
       for (const rentalId of rentalIds) {
-        const { data, error } = await supabase.functions.invoke('get-rent-status', {
+        const { data, error } = await cloudFunctions.invoke('get-rent-status', {
           body: { rentId: rentalId, userId: userIdRef.current }
         });
 
