@@ -8,10 +8,30 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SMS_ACTIVATE_API_KEY = process.env.SMS_ACTIVATE_API_KEY;
 const PORT = process.env.PORT || 3001;
 
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php';
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php';
 
 // Supabase client with service role
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// Helper to safely fetch from SMS-Activate (handles text/JSON responses)
+async function fetchSmsActivate(url) {
+  const response = await fetch(url);
+  const text = await response.text();
+  
+  // Check for error responses (plain text)
+  const errorCodes = ['BAD_KEY', 'BAD_SERVICE', 'BAD_ACTION', 'NO_NUMBERS', 'NO_BALANCE', 'WRONG_SERVICE', 'NO_ACTIVATION'];
+  if (errorCodes.some(code => text.startsWith(code))) {
+    throw new Error(text);
+  }
+  
+  // Try to parse as JSON
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Return as-is if not JSON (like ACCESS_BALANCE:123)
+    return text;
+  }
+}
 
 const app = express();
 app.use(cors());
@@ -63,8 +83,7 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
 
     // Get price from SMS-Activate
     const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryCode}`;
-    const priceResponse = await fetch(priceUrl);
-    const priceData = await priceResponse.json();
+    const priceData = await fetchSmsActivate(priceUrl);
 
     let basePrice = 0;
     if (priceData[countryCode] && priceData[countryCode][serviceCode]) {
@@ -347,8 +366,7 @@ app.post('/functions/v1/get-rent-services', async (req, res) => {
     const { countryId = 2, rentTime = 4 } = req.body;
     
     const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${countryId}&rent_time=${rentTime}`;
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await fetchSmsActivate(url);
 
     if (data.services) {
       // Apply margin
@@ -407,8 +425,7 @@ app.post('/functions/v1/get-rent-status', async (req, res) => {
 
     // Check status at SMS-Activate
     const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentStatus&id=${rental.external_id}`;
-    const response = await fetch(statusUrl);
-    const data = await response.json();
+    const data = await fetchSmsActivate(statusUrl);
 
     return res.json({
       success: true,
@@ -473,9 +490,12 @@ app.post('/functions/v1/get-real-time-prices', async (req, res) => {
   try {
     const { serviceCode, countries = [] } = req.body;
     
+    if (!serviceCode) {
+      return res.status(400).json({ error: 'serviceCode is required' });
+    }
+    
     const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}`;
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await fetchSmsActivate(url);
 
     const margin = 1.5;
     const prices = {};
@@ -507,9 +527,12 @@ app.post('/functions/v1/get-top-countries-by-service', async (req, res) => {
   try {
     const { serviceCode } = req.body;
     
+    if (!serviceCode) {
+      return res.status(400).json({ error: 'serviceCode is required' });
+    }
+    
     const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getTopCountriesByService&service=${serviceCode}`;
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await fetchSmsActivate(url);
 
     return res.json({ success: true, countries: data });
   } catch (error) {
@@ -528,8 +551,7 @@ app.post('/functions/v1/get-services-counts', async (req, res) => {
     const { countryCode = 0 } = req.body;
     
     const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=${countryCode}`;
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await fetchSmsActivate(url);
 
     return res.json({ success: true, services: data });
   } catch (error) {
@@ -679,8 +701,7 @@ app.post('/functions/v1/rent-sms-activate-number', async (req, res) => {
 
     // Get rent price
     const priceUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${countryId}&rent_time=${rentTime}`;
-    const priceResponse = await fetch(priceUrl);
-    const priceData = await priceResponse.json();
+    const priceData = await fetchSmsActivate(priceUrl);
 
     let basePrice = 0;
     if (priceData.services && priceData.services[serviceCode]) {
@@ -700,8 +721,7 @@ app.post('/functions/v1/rent-sms-activate-number', async (req, res) => {
 
     // Rent number
     const rentUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentNumber&service=${serviceCode}&country=${countryId}&rent_time=${rentTime}${operator ? `&operator=${operator}` : ''}`;
-    const rentResponse = await fetch(rentUrl);
-    const rentData = await rentResponse.json();
+    const rentData = await fetchSmsActivate(rentUrl);
 
     if (rentData.status === 'success' && rentData.phone) {
       // Deduct balance
@@ -792,8 +812,7 @@ app.post('/functions/v1/continue-sms-activate-rent', async (req, res) => {
 
     // Continue at SMS-Activate
     const continueUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=continueRentNumber&id=${rental.external_id}&rent_time=1`;
-    const response = await fetch(continueUrl);
-    const data = await response.json();
+    const data = await fetchSmsActivate(continueUrl);
 
     if (data.status === 'success') {
       // Extend expiration
@@ -840,8 +859,7 @@ app.post('/functions/v1/get-sms-activate-inbox', async (req, res) => {
 
     // Get SMS from SMS-Activate
     const inboxUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentStatus&id=${rental.external_id}`;
-    const response = await fetch(inboxUrl);
-    const data = await response.json();
+    const data = await fetchSmsActivate(inboxUrl);
 
     return res.json({
       success: true,
