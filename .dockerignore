@@ -1,0 +1,29 @@
+# Ignore these files when building
+node_modules
+.git
+.gitignore
+*.md
+*.sql
+*.mjs
+*.log
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.node.json
+!postcss.config.js
+!tailwind.config.js
+!vite.config.ts
+.env*
+!.env.example
+dist
+.netlify
+supabase
+logs
+storage_backup
+android-app
+out
+out-icons
+virt capture
+sms activate help
+Admin panel
