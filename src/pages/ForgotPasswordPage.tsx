@@ -19,11 +19,22 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setLoading(true)
 
+    // Validation email
+    if (!email || !email.includes('@')) {
+      toast({
+        title: 'Email invalide',
+        description: 'Veuillez entrer une adresse email valide.',
+        variant: 'destructive',
+      })
+      setLoading(false)
+      return
+    }
+
     const { error } = await resetPasswordForEmail(email)
 
     if (error) {
       toast({
-        title: t('common.error'),
+        title: 'Erreur',
         description: error.message,
         variant: 'destructive',
       })
@@ -99,7 +110,7 @@ export default function ForgotPasswordPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
             <Link 
               to="/login" 
               className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1"
@@ -107,6 +118,12 @@ export default function ForgotPasswordPage() {
               <ArrowLeft className="w-4 h-4" />
               {t('auth.backToLogin')}
             </Link>
+            <div className="text-sm text-muted-foreground">
+              Pas de compte ?{' '}
+              <Link to="/register" className="text-primary hover:underline">
+                Créer un compte
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>

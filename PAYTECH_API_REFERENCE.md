@@ -22,11 +22,13 @@
 ## 🔧 CONFIGURATION ESSENTIELLE
 
 ### URL de Base
+
 ```
 https://paytech.sn/api
 ```
 
 ### Headers Requis
+
 ```javascript
 {
   "API_KEY": "votre_cle_api",           // Obtenu depuis Dashboard PayTech
@@ -48,6 +50,7 @@ https://paytech.sn/api
 **Mode Production:** Requiert validation manuelle
 
 **Documents requis:**
+
 - Numéro NINEA
 - Pièce d'identité ou passeport
 - Registre de commerce
@@ -66,18 +69,20 @@ https://paytech.sn/api
 ### 1. Demande de Paiement
 
 **Endpoint:**
+
 ```
 POST /payment/request-payment
 ```
 
 **Utilisation:**
+
 ```javascript
-fetch('https://paytech.sn/api/payment/request-payment', {
-  method: 'POST',
+fetch("https://paytech.sn/api/payment/request-payment", {
+  method: "POST",
   headers: {
-    'API_KEY': 'votre_cle_api',
-    'API_SECRET': 'votre_cle_secrete',
-    'Content-Type': 'application/json'
+    API_KEY: "votre_cle_api",
+    API_SECRET: "votre_cle_secrete",
+    "Content-Type": "application/json",
   },
   body: JSON.stringify({
     item_name: "Rechargement ONE SMS",
@@ -88,14 +93,15 @@ fetch('https://paytech.sn/api/payment/request-payment', {
     env: "test", // ou "prod"
     ipn_url: "https://votre-domaine.com/functions/v1/paytech-ipn",
     success_url: "https://votre-domaine.com/transactions?status=success",
-    cancel_url: "https://votre-domaine.com/transactions?status=cancelled"
-  })
-})
+    cancel_url: "https://votre-domaine.com/transactions?status=cancelled",
+  }),
+});
 ```
 
 ### 2. Vérification Statut Paiement
 
 **Endpoint:**
+
 ```
 GET /payment/get-status?token_payment={token}
 ```
@@ -103,6 +109,7 @@ GET /payment/get-status?token_payment={token}
 ### 3. API Transfer (Optionnel)
 
 **Endpoint:**
+
 ```
 POST /transfer/transferFund
 ```
@@ -110,6 +117,7 @@ POST /transfer/transferFund
 ### 4. API Remboursement
 
 **Endpoint:**
+
 ```
 POST /payment/refund-payment
 ```
@@ -120,19 +128,19 @@ POST /payment/refund-payment
 
 ### Paramètres Requis
 
-| Paramètre | Type | Obligatoire | Description |
-|-----------|------|-------------|-------------|
-| `item_name` | string | ✅ | Nom du produit/service |
-| `item_price` | number | ✅ | Prix en FCFA (XOF) |
-| `ref_command` | string | ✅ | Référence unique de la commande |
-| `command_name` | string | ✅ | Description de la commande |
-| `currency` | string | ❌ | Devise (XOF, EUR, USD). **Défaut:** XOF |
-| `env` | string | ❌ | Environnement (test, prod). **Défaut:** prod |
-| `ipn_url` | string | ⚠️ | URL de notification (HTTPS uniquement) |
-| `success_url` | string | ❌ | URL après paiement réussi |
-| `cancel_url` | string | ❌ | URL après annulation |
-| `custom_field` | string (JSON) | ❌ | Données additionnelles (JSON encodé) |
-| `target_payment` | string | ❌ | Méthode ciblée (ex: "Orange Money") |
+| Paramètre        | Type          | Obligatoire | Description                                  |
+| ---------------- | ------------- | ----------- | -------------------------------------------- |
+| `item_name`      | string        | ✅          | Nom du produit/service                       |
+| `item_price`     | number        | ✅          | Prix en FCFA (XOF)                           |
+| `ref_command`    | string        | ✅          | Référence unique de la commande              |
+| `command_name`   | string        | ✅          | Description de la commande                   |
+| `currency`       | string        | ❌          | Devise (XOF, EUR, USD). **Défaut:** XOF      |
+| `env`            | string        | ❌          | Environnement (test, prod). **Défaut:** prod |
+| `ipn_url`        | string        | ⚠️          | URL de notification (HTTPS uniquement)       |
+| `success_url`    | string        | ❌          | URL après paiement réussi                    |
+| `cancel_url`     | string        | ❌          | URL après annulation                         |
+| `custom_field`   | string (JSON) | ❌          | Données additionnelles (JSON encodé)         |
+| `target_payment` | string        | ❌          | Méthode ciblée (ex: "Orange Money")          |
 
 ⚠️ **IMPORTANT:** `ipn_url` est CRITIQUE pour recevoir les notifications de paiement
 
@@ -157,12 +165,13 @@ POST /payment/refund-payment
 ```
 
 **Utilisation:**
+
 ```javascript
 // Méthode unique (permet pré-remplissage)
-target_payment: "Orange Money"
+target_payment: "Orange Money";
 
 // Plusieurs méthodes (pas de pré-remplissage)
-target_payment: "Orange Money, Wave, Free Money"
+target_payment: "Orange Money, Wave, Free Money";
 ```
 
 ### Réponse API (Succès)
@@ -199,47 +208,47 @@ ou
 ### Exemple Complet (Node.js/Vite)
 
 ```javascript
-import axios from 'axios';
+import axios from "axios";
 
 const API_KEY = import.meta.env.VITE_PAYTECH_API_KEY;
 const API_SECRET = import.meta.env.VITE_PAYTECH_API_SECRET;
-const ENV = import.meta.env.VITE_PAYTECH_ENV || 'test';
+const ENV = import.meta.env.VITE_PAYTECH_ENV || "test";
 
 const requestPayment = async (amount, userId) => {
   const ref = `RECHARGE_${userId}_${Date.now()}`;
-  
+
   try {
     const { data } = await axios.post(
-      'https://paytech.sn/api/payment/request-payment',
+      "https://paytech.sn/api/payment/request-payment",
       {
-        item_name: 'Rechargement crédits ONE SMS',
+        item_name: "Rechargement crédits ONE SMS",
         item_price: amount,
-        currency: 'XOF',
+        currency: "XOF",
         ref_command: ref,
         command_name: `Rechargement de ${amount} XOF`,
         env: ENV,
         ipn_url: import.meta.env.VITE_PAYTECH_IPN_URL,
         success_url: import.meta.env.VITE_PAYTECH_SUCCESS_URL,
         cancel_url: import.meta.env.VITE_PAYTECH_CANCEL_URL,
-        custom_field: JSON.stringify({ user_id: userId, type: 'recharge' })
+        custom_field: JSON.stringify({ user_id: userId, type: "recharge" }),
       },
       {
         headers: {
-          'API_KEY': API_KEY,
-          'API_SECRET': API_SECRET,
-          'Content-Type': 'application/json'
-        }
+          API_KEY: API_KEY,
+          API_SECRET: API_SECRET,
+          "Content-Type": "application/json",
+        },
       }
     );
-    
+
     if (data.success === 1) {
       // Redirection vers PayTech
       window.location.href = data.redirect_url;
     } else {
-      throw new Error(data.message || 'Erreur lors de la demande de paiement');
+      throw new Error(data.message || "Erreur lors de la demande de paiement");
     }
   } catch (error) {
-    console.error('PayTech request failed:', error);
+    console.error("PayTech request failed:", error);
     throw error;
   }
 };
@@ -254,6 +263,7 @@ const requestPayment = async (amount, userId) => {
 **IPN = Instant Payment Notification**
 
 Une requête POST envoyée par PayTech à votre serveur pour notifier:
+
 - ✅ Paiement réussi (`sale_complete`)
 - ❌ Paiement annulé (`sale_canceled`)
 - 💰 Remboursement effectué (`refund_complete`)
@@ -263,25 +273,25 @@ Une requête POST envoyée par PayTech à votre serveur pour notifier:
 ⚠️ **HTTPS UNIQUEMENT** - PayTech n'envoie pas sur HTTP
 
 ```javascript
-ipn_url: "https://votredomaine.com/functions/v1/paytech-ipn"
+ipn_url: "https://votredomaine.com/functions/v1/paytech-ipn";
 ```
 
 ### Paramètres Reçus (IPN)
 
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `type_event` | string | Type: `sale_complete`, `sale_canceled`, `refund_complete` |
-| `ref_command` | string | Référence de la commande (même que dans demande) |
-| `item_name` | string | Nom du produit |
-| `item_price` | number | Prix final payé |
-| `currency` | string | Devise (XOF, EUR, USD) |
-| `token` | string | Token unique du paiement |
-| `payment_method` | string | Méthode utilisée (Orange Money, Wave, etc.) |
-| `client_phone` | string | Numéro du client (ex: "221772457199") |
-| `custom_field` | string | Données JSON (encodé Base64) |
-| `api_key_sha256` | string | Hash SHA256 de votre API_KEY |
-| `api_secret_sha256` | string | Hash SHA256 de votre API_SECRET |
-| `hmac_compute` | string | Signature HMAC-SHA256 pour vérification |
+| Paramètre           | Type   | Description                                               |
+| ------------------- | ------ | --------------------------------------------------------- |
+| `type_event`        | string | Type: `sale_complete`, `sale_canceled`, `refund_complete` |
+| `ref_command`       | string | Référence de la commande (même que dans demande)          |
+| `item_name`         | string | Nom du produit                                            |
+| `item_price`        | number | Prix final payé                                           |
+| `currency`          | string | Devise (XOF, EUR, USD)                                    |
+| `token`             | string | Token unique du paiement                                  |
+| `payment_method`    | string | Méthode utilisée (Orange Money, Wave, etc.)               |
+| `client_phone`      | string | Numéro du client (ex: "221772457199")                     |
+| `custom_field`      | string | Données JSON (encodé Base64)                              |
+| `api_key_sha256`    | string | Hash SHA256 de votre API_KEY                              |
+| `api_secret_sha256` | string | Hash SHA256 de votre API_SECRET                           |
+| `hmac_compute`      | string | Signature HMAC-SHA256 pour vérification                   |
 
 ### Exemple Notification (sale_complete)
 
@@ -306,63 +316,76 @@ ipn_url: "https://votredomaine.com/functions/v1/paytech-ipn"
 
 ```typescript
 // Deno Edge Function (Supabase)
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     const ipnData = await req.json();
-    
+
     // 1. Vérifier signature
-    const apiKey = Deno.env.get('PAYTECH_API_KEY');
-    const apiSecret = Deno.env.get('PAYTECH_API_SECRET');
-    
-    const expectedKeyHash = createHmac('sha256', '').update(apiKey).digest('hex');
-    const expectedSecretHash = createHmac('sha256', '').update(apiSecret).digest('hex');
-    
-    if (ipnData.api_key_sha256 !== expectedKeyHash || 
-        ipnData.api_secret_sha256 !== expectedSecretHash) {
-      return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 });
-    }
-    
-    // 2. Trouver transaction
-    const { data: transaction } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('payment_ref', ipnData.ref_command)
-      .single();
-    
-    if (!transaction) {
-      return new Response(JSON.stringify({ error: 'Transaction not found' }), { status: 404 });
-    }
-    
-    // 3. Mettre à jour statut
-    const newStatus = ipnData.type_event === 'sale_complete' ? 'completed' : 'failed';
-    
-    await supabase
-      .from('transactions')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', transaction.id);
-    
-    // 4. Ajouter crédits si succès
-    if (newStatus === 'completed') {
-      await supabase.rpc('add_credits', {
-        p_user_id: transaction.user_id,
-        p_amount: transaction.amount,
-        p_type: 'recharge',
-        p_transaction_id: transaction.id,
-        p_description: `Rechargement via PayTech - ${ipnData.ref_command}`
+    const apiKey = Deno.env.get("PAYTECH_API_KEY");
+    const apiSecret = Deno.env.get("PAYTECH_API_SECRET");
+
+    const expectedKeyHash = createHmac("sha256", "")
+      .update(apiKey)
+      .digest("hex");
+    const expectedSecretHash = createHmac("sha256", "")
+      .update(apiSecret)
+      .digest("hex");
+
+    if (
+      ipnData.api_key_sha256 !== expectedKeyHash ||
+      ipnData.api_secret_sha256 !== expectedSecretHash
+    ) {
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 401,
       });
     }
-    
+
+    // 2. Trouver transaction
+    const { data: transaction } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("payment_ref", ipnData.ref_command)
+      .single();
+
+    if (!transaction) {
+      return new Response(JSON.stringify({ error: "Transaction not found" }), {
+        status: 404,
+      });
+    }
+
+    // 3. Mettre à jour statut
+    const newStatus =
+      ipnData.type_event === "sale_complete" ? "completed" : "failed";
+
+    await supabase
+      .from("transactions")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", transaction.id);
+
+    // 4. Ajouter crédits si succès
+    if (newStatus === "completed") {
+      await supabase.rpc("add_credits", {
+        p_user_id: transaction.user_id,
+        p_amount: transaction.amount,
+        p_type: "recharge",
+        p_transaction_id: transaction.id,
+        p_description: `Rechargement via PayTech - ${ipnData.ref_command}`,
+      });
+    }
+
     return new Response(JSON.stringify({ success: true }), { status: 200 });
   } catch (error) {
-    console.error('IPN error:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    console.error("IPN error:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+    });
   }
 });
 ```
@@ -376,45 +399,51 @@ PayTech propose **2 méthodes** de vérification:
 ### Méthode 1: HMAC-SHA256 (Recommandée)
 
 **Formule pour paiements:**
+
 ```
 Message = item_price|ref_command|api_key
 HMAC = HMAC-SHA256(Message, api_secret)
 ```
 
 **Vérification:**
+
 ```javascript
-import CryptoJS from 'crypto-js';
+import CryptoJS from "crypto-js";
 
 const verifyHMAC = (ipnData, apiKey, apiSecret) => {
   const message = `${ipnData.item_price}|${ipnData.ref_command}|${apiKey}`;
   const expectedHmac = CryptoJS.HmacSHA256(message, apiSecret).toString();
-  
+
   return expectedHmac === ipnData.hmac_compute;
 };
 ```
 
 **Exemple Deno (Edge Function):**
+
 ```typescript
-import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts';
+import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 const message = `${ipnData.item_price}|${ipnData.ref_command}|${apiKey}`;
-const expectedHmac = createHmac('sha256', apiSecret).update(message).digest('hex');
+const expectedHmac = createHmac("sha256", apiSecret)
+  .update(message)
+  .digest("hex");
 
 if (expectedHmac !== ipnData.hmac_compute) {
-  return new Response('Invalid HMAC', { status: 401 });
+  return new Response("Invalid HMAC", { status: 401 });
 }
 ```
 
 ### Méthode 2: SHA256 (Classique)
 
 **Vérification:**
+
 ```javascript
-import CryptoJS from 'crypto-js';
+import CryptoJS from "crypto-js";
 
 const verifySHA256 = (ipnData, apiKey, apiSecret) => {
   const expectedKeyHash = CryptoJS.SHA256(apiKey).toString();
   const expectedSecretHash = CryptoJS.SHA256(apiSecret).toString();
-  
+
   return (
     expectedKeyHash === ipnData.api_key_sha256 &&
     expectedSecretHash === ipnData.api_secret_sha256
@@ -423,15 +452,20 @@ const verifySHA256 = (ipnData, apiKey, apiSecret) => {
 ```
 
 **Exemple Deno:**
+
 ```typescript
-import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts';
+import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
-const expectedKeyHash = createHmac('sha256', '').update(apiKey).digest('hex');
-const expectedSecretHash = createHmac('sha256', '').update(apiSecret).digest('hex');
+const expectedKeyHash = createHmac("sha256", "").update(apiKey).digest("hex");
+const expectedSecretHash = createHmac("sha256", "")
+  .update(apiSecret)
+  .digest("hex");
 
-if (ipnData.api_key_sha256 !== expectedKeyHash || 
-    ipnData.api_secret_sha256 !== expectedSecretHash) {
-  return new Response('Invalid signature', { status: 401 });
+if (
+  ipnData.api_key_sha256 !== expectedKeyHash ||
+  ipnData.api_secret_sha256 !== expectedSecretHash
+) {
+  return new Response("Invalid signature", { status: 401 });
 }
 ```
 
@@ -444,46 +478,53 @@ if (ipnData.api_key_sha256 !== expectedKeyHash ||
 ### Mode Test (Sandbox)
 
 **Configuration:**
+
 ```javascript
-env: "test"
+env: "test";
 ```
 
 **Caractéristiques:**
+
 - ✅ Disponible immédiatement (sans validation)
 - 💰 Montant débité: **100-150 FCFA aléatoire** (peu importe montant transaction)
 - 🚫 NE PAS utiliser en production publique
 - ⚙️ Pour développement et tests internes uniquement
 
 **Exemple:**
+
 ```javascript
 const paymentData = {
   item_name: "Test Rechargement",
-  item_price: 5000,          // Facturé 5000 XOF
+  item_price: 5000, // Facturé 5000 XOF
   // Mais client paiera 100-150 XOF aléatoire en test
-  env: "test"
+  env: "test",
 };
 ```
 
 ### Mode Production
 
 **Configuration:**
+
 ```javascript
-env: "prod"
+env: "prod";
 ```
 
 **Caractéristiques:**
+
 - 💰 Montant débité: **Montant exact de la transaction**
 - ✅ Requiert validation manuelle du compte
 - 📄 Documents requis (voir section Activation Production)
 - ⏱️ Délai: 48h maximum
 
 **Activation:**
+
 1. Envoyer email à contact@paytech.sn
 2. Objet: "Activation Compte PayTech"
 3. Joindre documents
 4. Attendre confirmation (48h max)
 
 ⚠️ **ERREUR si compte non activé:**
+
 ```json
 {
   "success": 0,
@@ -495,15 +536,15 @@ env: "prod"
 
 ## ⚠️ CODES D'ERREUR
 
-| Code | Message | Solution |
-|------|---------|----------|
-| `success: 1` | ✅ Succès | Continuer avec `redirect_url` |
-| `success: 0` | ❌ Erreur générale | Vérifier `message` pour détails |
+| Code          | Message               | Solution                           |
+| ------------- | --------------------- | ---------------------------------- |
+| `success: 1`  | ✅ Succès             | Continuer avec `redirect_url`      |
+| `success: 0`  | ❌ Erreur générale    | Vérifier `message` pour détails    |
 | `success: -1` | 🔑 Clés API invalides | Vérifier `API_KEY` et `API_SECRET` |
-| 401 | ❌ Unauthorized | Clés API manquantes ou incorrectes |
-| 403 | 🚫 Forbidden | Compte non activé pour production |
-| 404 | 🔍 Not Found | Endpoint incorrect |
-| 500 | 🔥 Server Error | Erreur côté PayTech (réessayer) |
+| 401           | ❌ Unauthorized       | Clés API manquantes ou incorrectes |
+| 403           | 🚫 Forbidden          | Compte non activé pour production  |
+| 404           | 🔍 Not Found          | Endpoint incorrect                 |
+| 500           | 🔥 Server Error       | Erreur côté PayTech (réessayer)    |
 
 ---
 
@@ -512,6 +553,7 @@ env: "prod"
 ### Frontend (Vite/React)
 
 - [ ] **1. Configuration .env**
+
   ```bash
   VITE_PAYTECH_API_KEY=votre_cle_api
   VITE_PAYTECH_API_SECRET=votre_cle_secrete
@@ -522,134 +564,150 @@ env: "prod"
   ```
 
 - [ ] **2. API Client (src/lib/api/paytech.ts)**
+
   ```typescript
-  import axios from 'axios';
-  
+  import axios from "axios";
+
   const apiPaytech = axios.create({
-    baseURL: 'https://paytech.sn/api',
+    baseURL: "https://paytech.sn/api",
     headers: {
-      'API_KEY': import.meta.env.VITE_PAYTECH_API_KEY,
-      'API_SECRET': import.meta.env.VITE_PAYTECH_API_SECRET,
-      'Content-Type': 'application/json'
-    }
+      API_KEY: import.meta.env.VITE_PAYTECH_API_KEY,
+      API_SECRET: import.meta.env.VITE_PAYTECH_API_SECRET,
+      "Content-Type": "application/json",
+    },
   });
-  
-  export const requestPayment = async (payment, ipnUrl, successUrl, cancelUrl) => {
-    const { data } = await apiPaytech.post('/payment/request-payment', {
+
+  export const requestPayment = async (
+    payment,
+    ipnUrl,
+    successUrl,
+    cancelUrl
+  ) => {
+    const { data } = await apiPaytech.post("/payment/request-payment", {
       ...payment,
       env: import.meta.env.VITE_PAYTECH_ENV,
       ipn_url: ipnUrl,
       success_url: successUrl,
-      cancel_url: cancelUrl
+      cancel_url: cancelUrl,
     });
     return data;
   };
   ```
 
 - [ ] **3. Mutation Rechargement**
+
   ```typescript
   const rechargeMutation = useMutation({
     mutationFn: async (amount) => {
       const ref = `RECHARGE_${user.id}_${Date.now()}`;
-      
+
       const payment = await paytech.requestPayment(
         {
-          item_name: 'Rechargement crédits ONE SMS',
+          item_name: "Rechargement crédits ONE SMS",
           item_price: amount,
-          currency: 'XOF',
+          currency: "XOF",
           ref_command: ref,
-          command_name: `Rechargement de ${amount} XOF`
+          command_name: `Rechargement de ${amount} XOF`,
         },
         import.meta.env.VITE_PAYTECH_IPN_URL,
         import.meta.env.VITE_PAYTECH_SUCCESS_URL,
         import.meta.env.VITE_PAYTECH_CANCEL_URL
       );
-      
+
       // Créer transaction dans Supabase
-      await supabase.from('transactions').insert({
+      await supabase.from("transactions").insert({
         user_id: user.id,
-        type: 'recharge',
+        type: "recharge",
         amount: amount,
-        status: 'pending',
-        payment_method: 'paytech',
-        payment_ref: ref
+        status: "pending",
+        payment_method: "paytech",
+        payment_ref: ref,
       });
-      
+
       return payment;
     },
     onSuccess: (payment) => {
       if (!payment.redirect_url) {
-        throw new Error('No redirect URL from PayTech');
+        throw new Error("No redirect URL from PayTech");
       }
       window.location.href = payment.redirect_url;
-    }
+    },
   });
   ```
 
 ### Backend (Supabase Edge Function)
 
 - [ ] **4. Edge Function IPN (supabase/functions/paytech-ipn/index.ts)**
+
   ```typescript
-  import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-  import { createHmac } from 'https://deno.land/std@0.168.0/node/crypto.ts';
-  
+  import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+  import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
+
   serve(async (req) => {
     // 1. CORS
-    if (req.method === 'OPTIONS') {
-      return new Response('ok', { headers: corsHeaders });
+    if (req.method === "OPTIONS") {
+      return new Response("ok", { headers: corsHeaders });
     }
-    
+
     // 2. Vérifier signature
     const ipnData = await req.json();
-    const apiKey = Deno.env.get('PAYTECH_API_KEY');
-    const apiSecret = Deno.env.get('PAYTECH_API_SECRET');
-    
-    const expectedKeyHash = createHmac('sha256', '').update(apiKey).digest('hex');
-    const expectedSecretHash = createHmac('sha256', '').update(apiSecret).digest('hex');
-    
-    if (ipnData.api_key_sha256 !== expectedKeyHash || 
-        ipnData.api_secret_sha256 !== expectedSecretHash) {
-      return new Response('Invalid signature', { status: 401 });
+    const apiKey = Deno.env.get("PAYTECH_API_KEY");
+    const apiSecret = Deno.env.get("PAYTECH_API_SECRET");
+
+    const expectedKeyHash = createHmac("sha256", "")
+      .update(apiKey)
+      .digest("hex");
+    const expectedSecretHash = createHmac("sha256", "")
+      .update(apiSecret)
+      .digest("hex");
+
+    if (
+      ipnData.api_key_sha256 !== expectedKeyHash ||
+      ipnData.api_secret_sha256 !== expectedSecretHash
+    ) {
+      return new Response("Invalid signature", { status: 401 });
     }
-    
+
     // 3. Traiter paiement
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+      Deno.env.get("SUPABASE_URL"),
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
     );
-    
+
     const { data: transaction } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('payment_ref', ipnData.ref_command)
+      .from("transactions")
+      .select("*")
+      .eq("payment_ref", ipnData.ref_command)
       .single();
-    
+
     if (!transaction) {
-      return new Response('Transaction not found', { status: 404 });
+      return new Response("Transaction not found", { status: 404 });
     }
-    
-    const newStatus = ipnData.type_event === 'sale_complete' ? 'completed' : 'failed';
-    
+
+    const newStatus =
+      ipnData.type_event === "sale_complete" ? "completed" : "failed";
+
     await supabase
-      .from('transactions')
+      .from("transactions")
       .update({ status: newStatus })
-      .eq('id', transaction.id);
-    
-    if (newStatus === 'completed') {
-      await supabase.rpc('add_credits', {
+      .eq("id", transaction.id);
+
+    if (newStatus === "completed") {
+      await supabase.rpc("add_credits", {
         p_user_id: transaction.user_id,
         p_amount: transaction.amount,
-        p_type: 'recharge',
-        p_transaction_id: transaction.id
+        p_type: "recharge",
+        p_transaction_id: transaction.id,
       });
     }
-    
-    return new Response('IPN OK', { status: 200 });
+
+    return new Response("IPN OK", { status: 200 });
   });
   ```
 
 - [ ] **5. Variables Environnement Supabase**
+
   ```bash
   # Dans Supabase Dashboard → Edge Functions → Environment Variables
   PAYTECH_API_KEY=same_as_frontend
@@ -664,16 +722,19 @@ env: "prod"
 ### Configuration Production
 
 - [ ] **7. Domaine Production**
+
   - Remplacer `yourdomain.com` par domaine réel
   - Vérifier HTTPS actif
   - Tester IPN URL accessible publiquement
 
 - [ ] **8. Webhook PayTech Dashboard**
+
   - Se connecter à https://paytech.sn/dashboard
   - Aller dans Paramètres → Webhook
   - Ajouter: `https://votredomaine.com/functions/v1/paytech-ipn`
 
 - [ ] **9. Activation Compte Production**
+
   - Envoyer email à contact@paytech.sn
   - Joindre documents requis
   - Attendre validation (48h)

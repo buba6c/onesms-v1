@@ -3,26 +3,33 @@
 ## 🚨 PROBLÈMES TROUVÉS
 
 ### 1. **URLs Supabase incorrectes** ❌
+
 Les workflows pointaient vers un **AUTRE projet Supabase**:
+
 ```
 https://htfqmamvmhdoixqcbbbw.supabase.co ❌ MAUVAIS PROJET
 ```
 
 Au lieu de:
+
 ```
 https://qepxgaozywhjbnvqkgfr.supabase.co ✅ NOTRE PROJET
 ```
 
 ### 2. **Workflow sync-sms-activate.yml manquant** ❌
+
 Le workflow pour synchroniser SMS-Activate n'existait PAS!
 
-**Impact**: 
+**Impact**:
+
 - Synchronisation manuelle uniquement
 - `total_available` jamais mis à jour automatiquement
 - Services invisibles dans le Dashboard
 
 ### 3. **Fréquence trop élevée** ⚠️
+
 `sync-service-counts.yml` s'exécutait **toutes les 5 minutes**:
+
 - 8,640 runs/mois
 - Risque de dépasser le quota GitHub Actions gratuit (2000 min/mois)
 
@@ -31,12 +38,14 @@ Le workflow pour synchroniser SMS-Activate n'existait PAS!
 ## ✅ CORRECTIONS APPLIQUÉES
 
 ### **1. sync-countries.yml**
+
 ```diff
 - 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-countries'
 + 'https://qepxgaozywhjbnvqkgfr.supabase.co/functions/v1/sync-countries'
 ```
 
 ### **2. sync-service-counts.yml**
+
 ```diff
 - cron: '*/5 * * * *'  # Toutes les 5 minutes
 + cron: '*/15 * * * *' # Toutes les 15 minutes
@@ -46,12 +55,13 @@ Le workflow pour synchroniser SMS-Activate n'existait PAS!
 ```
 
 ### **3. sync-sms-activate.yml** ✨ NOUVEAU
+
 ```yaml
 name: Sync SMS-Activate
 
 on:
   schedule:
-    - cron: '*/30 * * * *' # Toutes les 30 minutes
+    - cron: "*/30 * * * *" # Toutes les 30 minutes
   workflow_dispatch:
 
 jobs:
@@ -70,11 +80,11 @@ jobs:
 
 ## 📊 WORKFLOWS APRÈS CORRECTIONS
 
-| Workflow | Fréquence | Edge Function | Status |
-|----------|-----------|---------------|--------|
-| sync-sms-activate.yml | **30min** ✨ | sync-sms-activate | ✅ Créé |
+| Workflow                | Fréquence    | Edge Function       | Status     |
+| ----------------------- | ------------ | ------------------- | ---------- |
+| sync-sms-activate.yml   | **30min** ✨ | sync-sms-activate   | ✅ Créé    |
 | sync-service-counts.yml | **15min** 🔧 | sync-service-counts | ✅ Corrigé |
-| sync-countries.yml | **1h** | sync-countries | ✅ Corrigé |
+| sync-countries.yml      | **1h**       | sync-countries      | ✅ Corrigé |
 
 **Tous pointent maintenant vers**: `qepxgaozywhjbnvqkgfr.supabase.co` ✅
 
@@ -83,6 +93,7 @@ jobs:
 ## 🎯 CE QUE FONT LES WORKFLOWS
 
 ### **sync-sms-activate.yml** (30min)
+
 1. Fetch SMS-Activate API (getPrices)
 2. Insert/Update services avec:
    - Icons corrects (📷💬✈️🔍👤)
@@ -95,11 +106,13 @@ jobs:
 **Résultat**: Services affichent les vrais totaux et apparaissent dans le Dashboard
 
 ### **sync-service-counts.yml** (15min)
+
 1. Fetch nombres disponibles par pays
 2. Met à jour `total_available` pour chaque service
 3. Rapide et léger
 
 ### **sync-countries.yml** (1h)
+
 1. Fetch liste des pays depuis SMS-Activate
 2. Met à jour la table `countries`
 3. Peu fréquent car les pays changent rarement
@@ -109,6 +122,7 @@ jobs:
 ## 🚀 DÉPLOIEMENT
 
 ✅ **Commit et push effectués**:
+
 ```bash
 git add .github/workflows/*.yml
 git commit -m "Fix: Corriger URLs Supabase et ajouter workflow sync-sms-activate"
@@ -116,6 +130,7 @@ git push origin main
 ```
 
 **Fichiers modifiés**:
+
 - `.github/workflows/sync-countries.yml` (URL corrigée)
 - `.github/workflows/sync-service-counts.yml` (URL corrigée + fréquence)
 - `.github/workflows/sync-sms-activate.yml` (nouveau)
@@ -125,11 +140,13 @@ git push origin main
 ## 🧪 COMMENT TESTER
 
 ### **Option 1: Script automatisé**
+
 ```bash
 ./test_github_workflows.sh
 ```
 
 Ce script:
+
 - ✅ Vérifie que GitHub CLI est installé
 - ✅ Vérifie l'authentification
 - ✅ Liste les workflows
@@ -140,11 +157,13 @@ Ce script:
 ### **Option 2: Commandes manuelles**
 
 **Lister les workflows**:
+
 ```bash
 gh workflow list
 ```
 
 **Déclencher manuellement**:
+
 ```bash
 gh workflow run sync-sms-activate.yml
 gh workflow run sync-service-counts.yml
@@ -152,16 +171,19 @@ gh workflow run sync-countries.yml
 ```
 
 **Voir les runs récents**:
+
 ```bash
 gh run list --limit 10
 ```
 
 **Voir les logs d'un run**:
+
 ```bash
 gh run view <run_id> --log
 ```
 
 **Suivre en direct**:
+
 ```bash
 gh run watch <run_id>
 ```
@@ -173,18 +195,22 @@ gh run watch <run_id>
 ### **Secret GitHub: SUPABASE_SERVICE_ROLE_KEY**
 
 **Vérifier s'il existe**:
+
 ```bash
 gh secret list
 ```
 
 **L'ajouter s'il manque**:
+
 ```bash
 gh secret set SUPABASE_SERVICE_ROLE_KEY
 ```
+
 Puis coller la clé depuis:
 https://supabase.com/dashboard/project/qepxgaozywhjbnvqkgfr/settings/api
 
 La clé ressemble à:
+
 ```
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
@@ -196,6 +222,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ### **Gratuit: 2000 min/mois**
 
 **Avec les nouvelles fréquences**:
+
 ```
 sync-sms-activate:    30min × 48/j × 30j = 1,440 runs/mois
 sync-service-counts:  15min × 96/j × 30j = 2,880 runs/mois
@@ -211,6 +238,7 @@ sync-countries:       60min × 24/j × 30j = 720 runs/mois
 ⚠️ **Légèrement au-dessus du quota gratuit**
 
 **Solutions**:
+
 1. Réduire sync-service-counts à 20-30 min → 1,200 min/mois ✅
 2. Passer à GitHub Actions payant ($0.008/min) → $20/mois
 3. Utiliser Supabase Cron Jobs (gratuit avec le plan) ✅ RECOMMANDÉ
@@ -237,6 +265,7 @@ SELECT cron.schedule(
 ```
 
 **Avantages**:
+
 - ✅ Gratuit (inclus dans Supabase)
 - ✅ Pas de quota
 - ✅ Plus rapide (même infrastructure)
@@ -262,11 +291,13 @@ SELECT cron.schedule(
 ### **Si les workflows échouent**:
 
 **1. Vérifier les secrets**:
+
 ```bash
 gh secret list
 ```
 
 **2. Voir les logs d'erreur**:
+
 ```bash
 gh run list --limit 5
 gh run view <run_id> --log
@@ -275,15 +306,18 @@ gh run view <run_id> --log
 **3. Erreurs courantes**:
 
 **"401 Unauthorized"**:
+
 - Secret SUPABASE_SERVICE_ROLE_KEY manquant ou incorrect
 - Solution: `gh secret set SUPABASE_SERVICE_ROLE_KEY`
 
 **"404 Not Found"**:
+
 - URL Supabase incorrecte
 - Edge Function pas déployée
 - Solution: Vérifier l'URL et déployer la fonction
 
 **"Timeout"**:
+
 - Edge Function prend trop de temps (>5 min)
 - Solution: Optimiser la fonction ou augmenter le timeout
 
@@ -315,6 +349,7 @@ Logs GitHub Actions:
 ```
 
 Dashboard:
+
 ```
 ✅ Instagram: 350,000 numbers
 ✅ WhatsApp: 543,868 numbers
@@ -358,22 +393,26 @@ gh secret set SUPABASE_SERVICE_ROLE_KEY
 ## 🚀 PROCHAINES ÉTAPES
 
 1. **Configurer le secret GitHub** (si pas fait):
+
    ```bash
    gh secret set SUPABASE_SERVICE_ROLE_KEY
    ```
 
 2. **Tester les workflows**:
+
    ```bash
    ./test_github_workflows.sh
    ```
 
 3. **Vérifier les logs**:
+
    ```bash
    gh run list
    gh run view <run_id> --log
    ```
 
 4. **Valider dans le Dashboard**:
+
    - Ouvrir http://localhost:3001
    - Vérifier que les services s'affichent
    - Vérifier les totaux et l'ordre

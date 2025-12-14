@@ -17,6 +17,7 @@ servicesToUpsert.push({
 ```
 
 **Impact**:
+
 - Dashboard filtre `.gt('total_available', 0)` → **Aucun service affiché**
 - Stats affichent 0 numéros disponibles
 - Les pricing_rules existent mais ne sont pas comptabilisées
@@ -34,31 +35,35 @@ servicesToUpsert.push({
 if (pricingRulesToUpsert.length > 0) {
   // Delete old SMS-Activate pricing rules
   await supabaseClient
-    .from('pricing_rules')
+    .from("pricing_rules")
     .delete()
-    .eq('provider', 'sms-activate')
+    .eq("provider", "sms-activate");
 
   // Insert new pricing rules in batches
-  const batchSize = 100
+  const batchSize = 100;
   for (let i = 0; i < pricingRulesToUpsert.length; i += batchSize) {
-    const batch = pricingRulesToUpsert.slice(i, i + batchSize)
-    await supabaseClient
-      .from('pricing_rules')
-      .insert(batch)
+    const batch = pricingRulesToUpsert.slice(i, i + batchSize);
+    await supabaseClient.from("pricing_rules").insert(batch);
   }
 
-  console.log(`✅ [SYNC-SMS-ACTIVATE] Synced ${pricingRulesToUpsert.length} pricing rules`)
+  console.log(
+    `✅ [SYNC-SMS-ACTIVATE] Synced ${pricingRulesToUpsert.length} pricing rules`
+  );
 }
 
 // 7. Update service totals from pricing_rules ✅ NOUVEAU
-console.log('🔄 [SYNC-SMS-ACTIVATE] Calculating service totals...')
-const { error: totalsError } = await supabaseClient
-  .rpc('calculate_service_totals')
+console.log("🔄 [SYNC-SMS-ACTIVATE] Calculating service totals...");
+const { error: totalsError } = await supabaseClient.rpc(
+  "calculate_service_totals"
+);
 
 if (totalsError) {
-  console.error('❌ [SYNC-SMS-ACTIVATE] Totals calculation error:', totalsError)
+  console.error(
+    "❌ [SYNC-SMS-ACTIVATE] Totals calculation error:",
+    totalsError
+  );
 } else {
-  console.log('✅ [SYNC-SMS-ACTIVATE] Service totals updated')
+  console.log("✅ [SYNC-SMS-ACTIVATE] Service totals updated");
 }
 ```
 
@@ -67,6 +72,7 @@ if (totalsError) {
 ## 🔄 FLUX DE SYNCHRONISATION COMPLET
 
 ### **Avant (incomplet)**:
+
 ```
 1. Fetch prices from SMS-Activate ✅
 2. Create services (total_available=0) ✅
@@ -75,6 +81,7 @@ if (totalsError) {
 ```
 
 ### **Après (complet)**:
+
 ```
 1. Fetch prices from SMS-Activate ✅
 2. Create services (total_available=0) ✅
@@ -111,6 +118,7 @@ $$;
 ```
 
 **Cette fonction**:
+
 1. Pour chaque service actif
 2. Somme tous les `available_count` des pricing_rules
 3. Met à jour le `total_available` du service
@@ -122,6 +130,7 @@ $$;
 **Créé**: `test_sync_complete.mjs`
 
 **Ce qu'il fait**:
+
 1. ✅ Affiche l'état AVANT synchronisation
 2. ✅ Lance la synchronisation
 3. ✅ Affiche l'état APRÈS synchronisation
@@ -130,6 +139,7 @@ $$;
 6. ✅ Diagnostic détaillé si problème
 
 **Comment l'utiliser**:
+
 ```bash
 node test_sync_complete.mjs
 ```
@@ -139,6 +149,7 @@ node test_sync_complete.mjs
 ## 📋 RÉSULTATS ATTENDUS
 
 ### **Avant**:
+
 ```
 Top 10 services (avant):
   1. ig       - Instagram           -        0 numbers - score: 1000
@@ -149,6 +160,7 @@ Top 10 services (avant):
 ```
 
 ### **Après**:
+
 ```
 Top 10 services (après):
   1. ig       - Instagram           -   350000 numbers - score: 1000 📈 +350000
@@ -175,11 +187,13 @@ Top 10 services (après):
 ## 📁 FICHIERS MODIFIÉS
 
 ### 1. `supabase/functions/sync-sms-activate/index.ts`
+
 - ✅ Ajout de l'appel à `calculate_service_totals()`
 - ✅ Logs pour tracking
 - ✅ Gestion d'erreur
 
 ### 2. Déploiement
+
 - ✅ Edge Function redéployée sur Supabase
 - ✅ Taille: 70.57kB
 
@@ -188,11 +202,13 @@ Top 10 services (après):
 ## 🚀 TESTS À EFFECTUER
 
 ### **1. Via le script de test**:
+
 ```bash
 node test_sync_complete.mjs
 ```
 
 **Attendu**:
+
 ```
 ✅ Tous les services ont total_available > 0
 ✅ Instagram est le premier service (score: 1000)
@@ -203,6 +219,7 @@ node test_sync_complete.mjs
 ```
 
 ### **2. Via l'interface Admin**:
+
 1. Ouvrir: http://localhost:3001/admin/services
 2. Cliquer sur "Synchroniser avec SMS-Activate"
 3. Attendre 10-15 secondes
@@ -210,6 +227,7 @@ node test_sync_complete.mjs
 5. Vérifier que les services ont des nombres > 0
 
 ### **3. Via le Dashboard**:
+
 1. Ouvrir: http://localhost:3001
 2. Vérifier que les services s'affichent
 3. Vérifier l'ordre: Instagram, WhatsApp, Telegram, Google, Facebook
@@ -221,8 +239,9 @@ node test_sync_complete.mjs
 ## 🔍 REQUÊTES SQL DE DIAGNOSTIC
 
 ### **Vérifier les totaux**:
+
 ```sql
-SELECT 
+SELECT
   s.code,
   s.name,
   s.total_available as service_total,
@@ -237,6 +256,7 @@ LIMIT 10;
 ```
 
 **Résultat attendu**:
+
 ```
 code | name      | service_total | calculated_total | difference
 -----|-----------|---------------|------------------|------------
@@ -252,29 +272,34 @@ tg   | Telegram  | 250000        | 250000           | 0  ✅
 ### **Si total_available reste à 0**:
 
 1. **Vérifier que la fonction RPC existe**:
+
 ```sql
-SELECT proname, prosrc 
-FROM pg_proc 
+SELECT proname, prosrc
+FROM pg_proc
 WHERE proname = 'calculate_service_totals';
 ```
 
 2. **Exécuter manuellement**:
+
 ```sql
 SELECT calculate_service_totals();
 ```
 
 3. **Vérifier les logs de la Edge Function**:
+
 - Chercher: "Service totals updated"
 - Si absent, la fonction n'a pas été appelée
 
 ### **Si aucun service ne s'affiche**:
 
 1. **Vérifier le filtre dans DashboardPage.tsx**:
+
 ```typescript
 .gt('total_available', 0)  // Doit filtrer uniquement les services avec stock
 ```
 
 2. **Vérifier que les services sont actifs**:
+
 ```sql
 SELECT code, name, active, total_available
 FROM services

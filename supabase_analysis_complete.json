@@ -1,0 +1,1834 @@
+{
+  "date": "2025-12-08T21:46:56.942Z",
+  "functions": {
+    "atomic-timeout-processor": {
+      "name": "atomic-timeout-processor",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "buy-5sim-hosting": {
+      "name": "buy-5sim-hosting",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "5SIM"
+      ],
+      "secrets": [
+        "FIVESIM_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "buy-sms-activate-number": {
+      "name": "buy-sms-activate-number",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate",
+        "5SIM"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY",
+        "FIVESIM_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "buy-sms-activate-rent": {
+      "name": "buy-sms-activate-rent",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "cancel-sms-activate-order": {
+      "name": "cancel-sms-activate-order",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "check-activation-owner": {
+      "name": "check-activation-owner",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "check-sms-activate-rent": {
+      "name": "check-sms-activate-rent",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "check-sms-activate-status": {
+      "name": "check-sms-activate-status",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "cleanup-expired-activations": {
+      "name": "cleanup-expired-activations",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "cleanup-expired-rentals": {
+      "name": "cleanup-expired-rentals",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "continue-rent": {
+      "name": "continue-rent",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "continue-sms-activate-rent": {
+      "name": "continue-sms-activate-rent",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "cron-atomic-reliable": {
+      "name": "cron-atomic-reliable",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": true,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "cron-check-pending-sms": {
+      "name": "cron-check-pending-sms",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": true,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "cron-wallet-health": {
+      "name": "cron-wallet-health",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": true,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "medium"
+    },
+    "debug-sms-activation": {
+      "name": "debug-sms-activation",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "finish-sms-activate": {
+      "name": "finish-sms-activate",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "fix-badoo-tinder": {
+      "name": "fix-badoo-tinder",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "fix-rls-activations": {
+      "name": "fix-rls-activations",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": false,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "generate-service-icon": {
+      "name": "generate-service-icon",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "high"
+    },
+    "get-5sim-inbox": {
+      "name": "get-5sim-inbox",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": false,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "5SIM"
+      ],
+      "secrets": [
+        "FIVESIM_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "get-all-countries": {
+      "name": "get-all-countries",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": false,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "get-country-availability": {
+      "name": "get-country-availability",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": false,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "get-providers-status": {
+      "name": "get-providers-status",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate",
+        "5SIM"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY",
+        "FIVESIM_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "get-real-time-prices": {
+      "name": "get-real-time-prices",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": false,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "get-rent-services": {
+      "name": "get-rent-services",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "get-rent-status": {
+      "name": "get-rent-status",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "get-services-counts": {
+      "name": "get-services-counts",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": false,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "get-sms-activate-inbox": {
+      "name": "get-sms-activate-inbox",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "get-top-countries-by-service": {
+      "name": "get-top-countries-by-service",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "init-moneroo-payment": {
+      "name": "init-moneroo-payment",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "Moneroo"
+      ],
+      "secrets": [
+        "MONEROO_PUBLIC_KEY",
+        "MONEROO_WEBHOOK_SECRET"
+      ],
+      "complexity": "medium"
+    },
+    "init-moneyfusion-payment": {
+      "name": "init-moneyfusion-payment",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "MoneyFusion"
+      ],
+      "secrets": [
+        "MONEYFUSION_API_URL",
+        "MONEYFUSION_MERCHANT_ID"
+      ],
+      "complexity": "medium"
+    },
+    "link-referral": {
+      "name": "link-referral",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "moneroo-webhook": {
+      "name": "moneroo-webhook",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": true,
+      "isCron": false,
+      "externalAPIs": [
+        "Moneroo"
+      ],
+      "secrets": [
+        "MONEROO_PUBLIC_KEY",
+        "MONEROO_WEBHOOK_SECRET"
+      ],
+      "complexity": "medium"
+    },
+    "moneyfusion-webhook": {
+      "name": "moneyfusion-webhook",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": true,
+      "isCron": false,
+      "externalAPIs": [
+        "MoneyFusion"
+      ],
+      "secrets": [
+        "MONEYFUSION_API_URL",
+        "MONEYFUSION_MERCHANT_ID"
+      ],
+      "complexity": "high"
+    },
+    "paydunya-create-payment": {
+      "name": "paydunya-create-payment",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "PayDunya"
+      ],
+      "secrets": [
+        "PAYDUNYA_MASTER_KEY",
+        "PAYDUNYA_PRIVATE_KEY",
+        "PAYDUNYA_TOKEN"
+      ],
+      "complexity": "medium"
+    },
+    "paydunya-verify-payment": {
+      "name": "paydunya-verify-payment",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "PayDunya"
+      ],
+      "secrets": [
+        "PAYDUNYA_MASTER_KEY",
+        "PAYDUNYA_PRIVATE_KEY",
+        "PAYDUNYA_TOKEN"
+      ],
+      "complexity": "medium"
+    },
+    "paydunya-webhook": {
+      "name": "paydunya-webhook",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": true,
+      "isCron": false,
+      "externalAPIs": [
+        "PayDunya"
+      ],
+      "secrets": [
+        "PAYDUNYA_MASTER_KEY",
+        "PAYDUNYA_PRIVATE_KEY",
+        "PAYDUNYA_TOKEN"
+      ],
+      "complexity": "medium"
+    },
+    "paytech-ipn": {
+      "name": "paytech-ipn",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": true,
+      "isCron": false,
+      "externalAPIs": [
+        "PayTech"
+      ],
+      "secrets": [
+        "PAYTECH_API_KEY",
+        "PAYTECH_API_SECRET"
+      ],
+      "complexity": "medium"
+    },
+    "recover-sms-from-history": {
+      "name": "recover-sms-from-history",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "rent-number": {
+      "name": "rent-number",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "rent-sms-activate-number": {
+      "name": "rent-sms-activate-number",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "restore-frozen-amounts": {
+      "name": "restore-frozen-amounts",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "retry-sms-activate": {
+      "name": "retry-sms-activate",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "send-email": {
+      "name": "send-email",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "medium"
+    },
+    "send-promo-emails": {
+      "name": "send-promo-emails",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "medium"
+    },
+    "set-rent-status": {
+      "name": "set-rent-status",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "sms-webhook": {
+      "name": "sms-webhook",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": true,
+      "isCron": false,
+      "externalAPIs": [
+        "5SIM"
+      ],
+      "secrets": [
+        "FIVESIM_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "sync-all-services": {
+      "name": "sync-all-services",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "sync-countries": {
+      "name": "sync-countries",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "sync-rent-services": {
+      "name": "sync-rent-services",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "sync-service-counts": {
+      "name": "sync-service-counts",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "medium"
+    },
+    "sync-services-unified": {
+      "name": "sync-services-unified",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "sync-sms-activate": {
+      "name": "sync-sms-activate",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate",
+        "5SIM"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY",
+        "FIVESIM_API_KEY"
+      ],
+      "complexity": "high"
+    },
+    "sync-sms-activate-activations": {
+      "name": "sync-sms-activate-activations",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "update-activation-sms": {
+      "name": "update-activation-sms",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "SMS Activate"
+      ],
+      "secrets": [
+        "SMS_ACTIVATE_API_KEY"
+      ],
+      "complexity": "low"
+    },
+    "update-popularity-scores": {
+      "name": "update-popularity-scores",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "update-success-rates": {
+      "name": "update-success-rates",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    },
+    "verify-moneroo-payment": {
+      "name": "verify-moneroo-payment",
+      "hasAuth": true,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": false,
+      "isCron": false,
+      "externalAPIs": [
+        "Moneroo"
+      ],
+      "secrets": [
+        "MONEROO_PUBLIC_KEY",
+        "MONEROO_WEBHOOK_SECRET"
+      ],
+      "complexity": "medium"
+    },
+    "webhook-sms-activate": {
+      "name": "webhook-sms-activate",
+      "hasAuth": false,
+      "usesCors": true,
+      "usesDatabase": true,
+      "isWebhook": true,
+      "isCron": false,
+      "externalAPIs": [],
+      "secrets": [],
+      "complexity": "low"
+    }
+  },
+  "categories": {
+    "Paiements (Critique)": [
+      {
+        "name": "init-moneroo-payment",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "Moneroo"
+        ],
+        "secrets": [
+          "MONEROO_PUBLIC_KEY",
+          "MONEROO_WEBHOOK_SECRET"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "init-moneyfusion-payment",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "MoneyFusion"
+        ],
+        "secrets": [
+          "MONEYFUSION_API_URL",
+          "MONEYFUSION_MERCHANT_ID"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "paydunya-create-payment",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "PayDunya"
+        ],
+        "secrets": [
+          "PAYDUNYA_MASTER_KEY",
+          "PAYDUNYA_PRIVATE_KEY",
+          "PAYDUNYA_TOKEN"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "paydunya-verify-payment",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "PayDunya"
+        ],
+        "secrets": [
+          "PAYDUNYA_MASTER_KEY",
+          "PAYDUNYA_PRIVATE_KEY",
+          "PAYDUNYA_TOKEN"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "verify-moneroo-payment",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "Moneroo"
+        ],
+        "secrets": [
+          "MONEROO_PUBLIC_KEY",
+          "MONEROO_WEBHOOK_SECRET"
+        ],
+        "complexity": "medium"
+      }
+    ],
+    "SMS/Activations (Critique)": [
+      {
+        "name": "buy-5sim-hosting",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "5SIM"
+        ],
+        "secrets": [
+          "FIVESIM_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "buy-sms-activate-number",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate",
+          "5SIM"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY",
+          "FIVESIM_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "buy-sms-activate-rent",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "cancel-sms-activate-order",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "check-sms-activate-rent",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "check-sms-activate-status",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "cleanup-expired-activations",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "cleanup-expired-rentals",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "continue-rent",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "continue-sms-activate-rent",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "debug-sms-activation",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "finish-sms-activate",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "get-5sim-inbox",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": false,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "5SIM"
+        ],
+        "secrets": [
+          "FIVESIM_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "get-all-countries",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": false,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "get-country-availability",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": false,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "get-providers-status",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate",
+          "5SIM"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY",
+          "FIVESIM_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "get-real-time-prices",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": false,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "get-rent-services",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "get-rent-status",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "get-services-counts",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": false,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "get-sms-activate-inbox",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "get-top-countries-by-service",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "recover-sms-from-history",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "rent-number",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "rent-sms-activate-number",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "retry-sms-activate",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "set-rent-status",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "sync-all-services",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "sync-countries",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "sync-rent-services",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "sync-service-counts",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "sync-services-unified",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "sync-sms-activate",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate",
+          "5SIM"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY",
+          "FIVESIM_API_KEY"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "sync-sms-activate-activations",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      },
+      {
+        "name": "update-activation-sms",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "low"
+      }
+    ],
+    "Webhooks": [
+      {
+        "name": "moneroo-webhook",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": true,
+        "isCron": false,
+        "externalAPIs": [
+          "Moneroo"
+        ],
+        "secrets": [
+          "MONEROO_PUBLIC_KEY",
+          "MONEROO_WEBHOOK_SECRET"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "moneyfusion-webhook",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": true,
+        "isCron": false,
+        "externalAPIs": [
+          "MoneyFusion"
+        ],
+        "secrets": [
+          "MONEYFUSION_API_URL",
+          "MONEYFUSION_MERCHANT_ID"
+        ],
+        "complexity": "high"
+      },
+      {
+        "name": "paydunya-webhook",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": true,
+        "isCron": false,
+        "externalAPIs": [
+          "PayDunya"
+        ],
+        "secrets": [
+          "PAYDUNYA_MASTER_KEY",
+          "PAYDUNYA_PRIVATE_KEY",
+          "PAYDUNYA_TOKEN"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "paytech-ipn",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": true,
+        "isCron": false,
+        "externalAPIs": [
+          "PayTech"
+        ],
+        "secrets": [
+          "PAYTECH_API_KEY",
+          "PAYTECH_API_SECRET"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "sms-webhook",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": true,
+        "isCron": false,
+        "externalAPIs": [
+          "5SIM"
+        ],
+        "secrets": [
+          "FIVESIM_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "webhook-sms-activate",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": true,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      }
+    ],
+    "Cron Jobs": [
+      {
+        "name": "cron-atomic-reliable",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": true,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "cron-check-pending-sms",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": true,
+        "externalAPIs": [
+          "SMS Activate"
+        ],
+        "secrets": [
+          "SMS_ACTIVATE_API_KEY"
+        ],
+        "complexity": "medium"
+      },
+      {
+        "name": "cron-wallet-health",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": true,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "medium"
+      }
+    ],
+    "Services/Sync": [
+      {
+        "name": "generate-service-icon",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "high"
+      }
+    ],
+    "Utilitaires": [
+      {
+        "name": "atomic-timeout-processor",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "check-activation-owner",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "fix-badoo-tinder",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "fix-rls-activations",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": false,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "link-referral",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "restore-frozen-amounts",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "send-email",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "medium"
+      },
+      {
+        "name": "send-promo-emails",
+        "hasAuth": true,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "medium"
+      },
+      {
+        "name": "update-popularity-scores",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      },
+      {
+        "name": "update-success-rates",
+        "hasAuth": false,
+        "usesCors": true,
+        "usesDatabase": true,
+        "isWebhook": false,
+        "isCron": false,
+        "externalAPIs": [],
+        "secrets": [],
+        "complexity": "low"
+      }
+    ]
+  },
+  "cronJobs": 3,
+  "secrets": [
+    "FIVESIM_API_KEY",
+    "SMS_ACTIVATE_API_KEY",
+    "MONEROO_PUBLIC_KEY",
+    "MONEROO_WEBHOOK_SECRET",
+    "MONEYFUSION_API_URL",
+    "MONEYFUSION_MERCHANT_ID",
+    "PAYDUNYA_MASTER_KEY",
+    "PAYDUNYA_PRIVATE_KEY",
+    "PAYDUNYA_TOKEN",
+    "PAYTECH_API_KEY",
+    "PAYTECH_API_SECRET"
+  ],
+  "webhooks": [
+    {
+      "service": "PayDunya",
+      "function": "paydunya-webhook",
+      "dashboard": "https://paydunya.com/dashboard/webhooks"
+    },
+    {
+      "service": "MoneyFusion",
+      "function": "moneyfusion-webhook",
+      "dashboard": "https://moneyfusion.com/settings/webhooks"
+    },
+    {
+      "service": "Moneroo",
+      "function": "moneroo-webhook",
+      "dashboard": "https://moneroo.com/dashboard/webhooks"
+    },
+    {
+      "service": "PayTech",
+      "function": "paytech-ipn",
+      "dashboard": "https://paytech.sn/dashboard"
+    },
+    {
+      "service": "SMS Activate",
+      "function": "webhook-sms-activate",
+      "dashboard": "https://sms-activate.org/en/api2"
+    }
+  ],
+  "criticalFunctions": [
+    "init-moneroo-payment",
+    "init-moneyfusion-payment",
+    "paydunya-create-payment",
+    "paydunya-verify-payment",
+    "verify-moneroo-payment",
+    "buy-5sim-hosting",
+    "buy-sms-activate-number",
+    "buy-sms-activate-rent",
+    "cancel-sms-activate-order",
+    "check-sms-activate-rent",
+    "check-sms-activate-status",
+    "cleanup-expired-activations",
+    "cleanup-expired-rentals",
+    "continue-rent",
+    "continue-sms-activate-rent",
+    "debug-sms-activation",
+    "finish-sms-activate",
+    "get-5sim-inbox",
+    "get-all-countries",
+    "get-country-availability",
+    "get-providers-status",
+    "get-real-time-prices",
+    "get-rent-services",
+    "get-rent-status",
+    "get-services-counts",
+    "get-sms-activate-inbox",
+    "get-top-countries-by-service",
+    "recover-sms-from-history",
+    "rent-number",
+    "rent-sms-activate-number",
+    "retry-sms-activate",
+    "set-rent-status",
+    "sync-all-services",
+    "sync-countries",
+    "sync-rent-services",
+    "sync-service-counts",
+    "sync-services-unified",
+    "sync-sms-activate",
+    "sync-sms-activate-activations",
+    "update-activation-sms"
+  ]
+}

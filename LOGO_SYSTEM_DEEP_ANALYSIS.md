@@ -35,6 +35,7 @@ Le système de logos utilise **3 sources** avec fallback automatique:
 ### 1. `/src/lib/logo-service.ts` (🔑 Core du système)
 
 **Responsabilités**:
+
 - Génération des URLs Logo.dev
 - Mapping services → domaines
 - Génération de SVG fallback
@@ -81,30 +82,33 @@ getFlagEmoji(countryCode: string): string
 
 ```tsx
 // Ligne 31-47: Gestionnaire d'erreur pour les logos
-const handleLogoError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode: string) => {
-  const target = e.target as HTMLImageElement
-  
+const handleLogoError = (
+  e: React.SyntheticEvent<HTMLImageElement>,
+  serviceCode: string
+) => {
+  const target = e.target as HTMLImageElement;
+
   // Tentative 1: Logo.dev échoué
-  if (!target.src.includes('data:image/svg')) {
+  if (!target.src.includes("data:image/svg")) {
     // Essayer le fallback SVG
-    target.src = getServiceLogoFallback(serviceCode)
-    return
+    target.src = getServiceLogoFallback(serviceCode);
+    return;
   }
-  
+
   // Tentative 2: SVG échoué
   // Afficher l'emoji de secours
-  target.style.display = 'none'
-  const emoji = target.nextElementSibling as HTMLSpanElement
+  target.style.display = "none";
+  const emoji = target.nextElementSibling as HTMLSpanElement;
   if (emoji) {
-    emoji.style.display = 'flex'
+    emoji.style.display = "flex";
   }
-}
+};
 
 // Ligne 970-977: Affichage du logo dans l'interface
 <div className="w-11 h-11 bg-white border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
   {/* Image principale (Logo.dev) */}
-  <img 
-    src={getServiceLogo(service.code)} 
+  <img
+    src={getServiceLogo(service.code)}
     alt={service.name}
     className="w-8 h-8 object-contain"
     onError={(e) => handleLogoError(e, service.code)}
@@ -113,10 +117,11 @@ const handleLogoError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode:
   <span className="text-xl hidden items-center justify-center">
     {getServiceIcon(service.code)}
   </span>
-</div>
+</div>;
 ```
 
 **CSS/Styles**:
+
 - Conteneur: `w-11 h-11` (44x44px) avec border
 - Image: `w-8 h-8` (32x32px) centré
 - Emoji: `text-xl` (20px) caché initialement
@@ -130,7 +135,6 @@ function detectServiceIcon(code: string, name: string): string {
   // Détection intelligente basée sur:
   // 1. Code du service (ex: 'ig', 'fb', 'wa')
   // 2. Nom du service (ex: 'Instagram', 'Facebook')
-  
   // Catégories:
   // - Social networks: 📷 📱 🐦 🎥 👻 💼 🔵
   // - Messengers: 💬 ✈️ 💜 📝
@@ -140,49 +144,49 @@ function detectServiceIcon(code: string, name: string): string {
   // - Dating: 🔥 💛 💕
   // - Transport: 🚗 🏍️
   // - Finance: 💳 💰
-  
   // Default: 📱
 }
 ```
 
 **Ligne 391**: Emoji assigné au service lors de la sync
+
 ```typescript
-const icon = detectServiceIcon(serviceCode, displayName)
+const icon = detectServiceIcon(serviceCode, displayName);
 
 servicesToUpsert.push({
   code: serviceCode,
   name: displayName,
-  icon: icon,  // ⬅️ Emoji stocké en DB
+  icon: icon, // ⬅️ Emoji stocké en DB
   // ...
-})
+});
 ```
 
 ## 📊 MAPPING SERVICE → DOMAINE
 
 **`SERVICE_DOMAINS`** dans `/src/lib/logo-service.ts`:
 
-| Code SMS-Activate | Domaine Logo.dev | Service |
-|-------------------|------------------|---------|
-| `wa` | whatsapp.com | WhatsApp |
-| `tg` | telegram.org | Telegram |
-| `ig` | instagram.com | Instagram |
-| `fb` | facebook.com | Facebook |
-| `go` | google.com | Google |
-| `ds` | discord.com | Discord |
-| `am` | amazon.com | Amazon |
-| `nf` | netflix.com | Netflix |
-| `mm` | microsoft.com | Microsoft |
-| `wx` | apple.com | Apple |
-| `mb` | yahoo.com | Yahoo |
-| `oi` | tinder.com | Tinder ⭐ |
-| `qv` | badoo.com | Badoo |
-| `ub` | uber.com | Uber |
-| `ts` | paypal.com | PayPal |
-| `st` | steampowered.com | Steam |
-| `lf` | tiktok.com | TikTok |
-| `vi` | viber.com | Viber |
-| `me` | line.me | LINE |
-| `bn` | binance.com | Binance |
+| Code SMS-Activate | Domaine Logo.dev | Service   |
+| ----------------- | ---------------- | --------- |
+| `wa`              | whatsapp.com     | WhatsApp  |
+| `tg`              | telegram.org     | Telegram  |
+| `ig`              | instagram.com    | Instagram |
+| `fb`              | facebook.com     | Facebook  |
+| `go`              | google.com       | Google    |
+| `ds`              | discord.com      | Discord   |
+| `am`              | amazon.com       | Amazon    |
+| `nf`              | netflix.com      | Netflix   |
+| `mm`              | microsoft.com    | Microsoft |
+| `wx`              | apple.com        | Apple     |
+| `mb`              | yahoo.com        | Yahoo     |
+| `oi`              | tinder.com       | Tinder ⭐ |
+| `qv`              | badoo.com        | Badoo     |
+| `ub`              | uber.com         | Uber      |
+| `ts`              | paypal.com       | PayPal    |
+| `st`              | steampowered.com | Steam     |
+| `lf`              | tiktok.com       | TikTok    |
+| `vi`              | viber.com        | Viber     |
+| `me`              | line.me          | LINE      |
+| `bn`              | binance.com      | Binance   |
 
 **50+ mappings au total** (voir fichier pour liste complète)
 
@@ -197,6 +201,7 @@ servicesToUpsert.push({
 ```
 
 **Statistiques actuelles** (top 50 services):
+
 - `📱` : 37 services (default)
 - `🎵` : 2 services (Spotify, TikTok)
 - `🔵` : 1 service (VKontakte)
@@ -207,6 +212,7 @@ servicesToUpsert.push({
 - `🔥` : 1 service (Tinder)
 
 **Problèmes identifiés**:
+
 - Beaucoup de services utilisent `📱` (emoji par défaut)
 - Certains services ont des chemins SVG invalides: `/twitter.svg`, `/uber.svg`, `/paypal.svg`
 - Ces chemins doivent être des emojis
@@ -355,6 +361,7 @@ getServiceIcon('oi')
 ### 1. ❌ Chemins SVG invalides dans la DB
 
 **Problème**:
+
 ```sql
 SELECT code, icon FROM services WHERE icon LIKE '/%';
 
@@ -365,6 +372,7 @@ SELECT code, icon FROM services WHERE icon LIKE '/%';
 ```
 
 **Solution**:
+
 ```sql
 -- Corriger les chemins invalides
 UPDATE services SET icon = '🐦' WHERE code = 'tw';  -- Twitter
@@ -380,11 +388,13 @@ UPDATE services SET icon = '💳' WHERE code = 'ts';  -- PayPal
 
 ### 3. 🔄 Duplicatas avec codes longs/courts
 
-**Problème**: 
+**Problème**:
+
 - Service "Google" (code `google`) → icon `📱`
 - Service "Google" (code `go`) → icon `📱`
 
 **Impact**: Les deux essaient Logo.dev mais avec des domaines différents
+
 - `google.com` → OK
 - `go.com` → ❌ 404
 
@@ -399,19 +409,19 @@ Ajouter plus de mappings pour les codes SMS-Activate spéciaux:
 ```typescript
 const SERVICE_DOMAINS: Record<string, string> = {
   // Existants...
-  
+
   // Ajouter:
-  'hw': 'alipay.com',      // Alipay/Alibaba
-  'lf': 'tiktok.com',      // TikTok
-  'ni': 'gojek.com',       // Gojek
-  'jg': 'grab.com',        // Grab
-  'ka': 'shopee.com',      // Shopee
-  'dl': 'lazada.com',      // Lazada
-  'bd': 'badoo.com',       // Badoo
-  'mo': 'bumble.com',      // Bumble
-  'vz': 'hinge.co',        // Hinge
+  hw: "alipay.com", // Alipay/Alibaba
+  lf: "tiktok.com", // TikTok
+  ni: "gojek.com", // Gojek
+  jg: "grab.com", // Grab
+  ka: "shopee.com", // Shopee
+  dl: "lazada.com", // Lazada
+  bd: "badoo.com", // Badoo
+  mo: "bumble.com", // Bumble
+  vz: "hinge.co", // Hinge
   // ... et 100+ autres
-}
+};
 ```
 
 ### 2. ✅ Corriger les emojis en DB
@@ -455,12 +465,18 @@ Ajouter plus de détections dans la fonction de sync:
 function detectServiceIcon(code: string, name: string): string {
   // Ajouter 100+ mappings basés sur l'API SMS-Activate
   const iconMap: Record<string, string> = {
-    'wa': '💬', 'tg': '✈️', 'ig': '📸', 'fb': '👥',
-    'go': '🔍', 'ds': '💬', 'am': '📦', 'nf': '🎬',
+    wa: "💬",
+    tg: "✈️",
+    ig: "📸",
+    fb: "👥",
+    go: "🔍",
+    ds: "💬",
+    am: "📦",
+    nf: "🎬",
     // ... 100+ codes
-  }
-  
-  return iconMap[code.toLowerCase()] || '📱'
+  };
+
+  return iconMap[code.toLowerCase()] || "📱";
 }
 ```
 

@@ -68,7 +68,7 @@ serve(async (req) => {
       try {
         const startTime = Date.now()
         const response = await fetch(
-          `https://api.sms-activate.org/stubs/handler_api.php?api_key=${smsActivateKey}&action=getBalance`,
+          `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${smsActivateKey}&action=getBalance`,
           { signal: AbortSignal.timeout(5000) }
         )
         const responseTime = Date.now() - startTime
@@ -91,7 +91,7 @@ serve(async (req) => {
             status: 'active',
             balance,
             currency: 'RUB',
-            apiUrl: 'https://api.sms-activate.org',
+            apiUrl: 'https://api.sms-activate.ae',
             lastCheck: new Date().toISOString(),
             stats: {
               todayPurchases: purchases?.length || 0,
@@ -108,7 +108,7 @@ serve(async (req) => {
           status: 'error',
           balance: 0,
           currency: 'RUB',
-          apiUrl: 'https://api.sms-activate.org',
+          apiUrl: 'https://api.sms-activate.ae',
           lastCheck: new Date().toISOString(),
           error: error.message
         })

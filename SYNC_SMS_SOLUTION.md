@@ -3,6 +3,7 @@
 ## 🎯 Problème
 
 Le numéro **6283187992496** a reçu un SMS sur SMS-Activate mais :
+
 - L'activation a été marquée `STATUS_CANCEL` trop tôt
 - Le SMS existe toujours dans l'API SMS-Activate
 - Notre plateforme ne l'a pas récupéré
@@ -12,6 +13,7 @@ Le numéro **6283187992496** a reçu un SMS sur SMS-Activate mais :
 SMS-Activate a une API spéciale qui retourne **TOUTES les activations actives avec leurs SMS** :
 
 ### Réponse de l'API
+
 ```json
 {
   "status": "success",
@@ -19,8 +21,8 @@ SMS-Activate a une API spéciale qui retourne **TOUTES les activations actives a
     {
       "activationId": "4450380782",
       "phoneNumber": "6283187992496",
-      "smsCode": ["123456"],           // ← LE CODE
-      "smsText": ["Your code is..."],  // ← LE TEXTE COMPLET
+      "smsCode": ["123456"], // ← LE CODE
+      "smsText": ["Your code is..."], // ← LE TEXTE COMPLET
       "activationStatus": "4",
       "serviceCode": "wa",
       "countryCode": "6"
@@ -36,6 +38,7 @@ SMS-Activate a une API spéciale qui retourne **TOUTES les activations actives a
 **Nom:** `sync-sms-activate-activations`
 
 **Fonction:**
+
 1. Appelle `getActiveActivations` sur SMS-Activate
 2. Récupère TOUTES les activations actives avec SMS
 3. Compare avec notre base de données
@@ -51,11 +54,14 @@ SMS-Activate a une API spéciale qui retourne **TOUTES les activations actives a
 Dans votre navigateur, console (F12) :
 
 ```javascript
-const { data, error } = await supabase.functions.invoke('sync-sms-activate-activations');
-console.log('Résultat:', data);
+const { data, error } = await supabase.functions.invoke(
+  "sync-sms-activate-activations"
+);
+console.log("Résultat:", data);
 ```
 
 **Ou via cURL:**
+
 ```bash
 curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-sms-activate-activations' \
   -H "Authorization: Bearer YOUR_ANON_KEY"
@@ -68,6 +74,7 @@ Créer un Cron qui appelle cette fonction toutes les 30 secondes pour synchronis
 ## 🧪 Test pour Votre Numéro
 
 1. **Vérifier l'état actuel:**
+
 ```sql
 SELECT phone, status, sms_code, sms_text, order_id
 FROM activations
@@ -75,12 +82,16 @@ WHERE phone = '6283187992496';
 ```
 
 2. **Appeler la fonction de sync:**
+
 ```javascript
-const { data } = await supabase.functions.invoke('sync-sms-activate-activations');
+const { data } = await supabase.functions.invoke(
+  "sync-sms-activate-activations"
+);
 // data = { synced: 1, updated: 1, message: "..." }
 ```
 
 3. **Re-vérifier après sync:**
+
 ```sql
 SELECT phone, status, sms_code, sms_text
 FROM activations
@@ -88,6 +99,7 @@ WHERE phone = '6283187992496';
 ```
 
 **Résultat attendu:**
+
 - `status` → 'received' ✅
 - `sms_code` → Le code du SMS ✅
 - `sms_text` → Le texte complet ✅
@@ -98,14 +110,14 @@ Pour automatiser, modifiez le hook `useSmsPolling` pour appeler cette fonction d
 
 ```typescript
 // Si getStatusV2 échoue, essayer la sync globale
-if (checkData.data?.status === 'cancelled' || checkError) {
-  console.log('🔄 Tentative de sync globale...');
+if (checkData.data?.status === "cancelled" || checkError) {
+  console.log("🔄 Tentative de sync globale...");
   const { data: syncData } = await supabase.functions.invoke(
-    'sync-sms-activate-activations'
+    "sync-sms-activate-activations"
   );
-  
+
   if (syncData?.updated > 0) {
-    console.log('✅ SMS récupéré via sync!');
+    console.log("✅ SMS récupéré via sync!");
     // Re-check l'activation
     refetchActivations();
   }
@@ -114,13 +126,13 @@ if (checkData.data?.status === 'cancelled' || checkError) {
 
 ## 📊 Avantages
 
-| Méthode | getStatusV2 | getActiveActivations (Sync) |
-|---------|-------------|---------------------------|
-| **Scope** | 1 activation | Toutes les activations |
-| **SMS après cancel** | ❌ Non | ✅ Oui |
-| **Texte complet** | ✅ Oui | ✅ Oui |
-| **Performance** | Rapide | Plus lent (mais global) |
-| **Usage** | Polling principal | Backup / Récupération |
+| Méthode              | getStatusV2       | getActiveActivations (Sync) |
+| -------------------- | ----------------- | --------------------------- |
+| **Scope**            | 1 activation      | Toutes les activations      |
+| **SMS après cancel** | ❌ Non            | ✅ Oui                      |
+| **Texte complet**    | ✅ Oui            | ✅ Oui                      |
+| **Performance**      | Rapide            | Plus lent (mais global)     |
+| **Usage**            | Polling principal | Backup / Récupération       |
 
 ## 🎯 Workflow Recommandé
 
@@ -140,21 +152,21 @@ if (checkData.data?.status === 'cancelled' || checkError) {
 
 ```javascript
 // 1. Appeler la fonction de sync
-const result = await supabase.functions.invoke('sync-sms-activate-activations');
-console.log('Sync result:', result);
+const result = await supabase.functions.invoke("sync-sms-activate-activations");
+console.log("Sync result:", result);
 
 // 2. Vérifier si le SMS a été trouvé
 if (result.data.updated > 0) {
-  console.log('✅ SMS récupéré!');
-  
+  console.log("✅ SMS récupéré!");
+
   // 3. Recharger les activations
   const { data: activation } = await supabase
-    .from('activations')
-    .select('*')
-    .eq('phone', '6283187992496')
+    .from("activations")
+    .select("*")
+    .eq("phone", "6283187992496")
     .single();
-    
-  console.log('Activation mise à jour:', activation);
+
+  console.log("Activation mise à jour:", activation);
 }
 ```
 
@@ -171,8 +183,11 @@ Si l'activation a déjà expiré côté SMS-Activate (>20 min), le SMS est perdu
 **TESTEZ MAINTENANT pendant que l'activation est encore active sur SMS-Activate !**
 
 Ouvrez votre plateforme et dans la console (F12) :
+
 ```javascript
-const { data } = await supabase.functions.invoke('sync-sms-activate-activations');
+const { data } = await supabase.functions.invoke(
+  "sync-sms-activate-activations"
+);
 console.log(data);
 ```
 

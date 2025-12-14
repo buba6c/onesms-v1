@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.onesms_sn.twa",
+    "sha256_cert_fingerprints": [
+      "3C:82:77:6A:11:06:E6:EB:1F:8C:20:72:D5:FE:EF:88:0B:79:AE:99:E2:97:36:85:B9:E1:F2:A5:10:44:4E:D3"
+    ]
+  }
+}]

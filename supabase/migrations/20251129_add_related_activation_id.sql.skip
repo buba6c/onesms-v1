@@ -1,0 +1,13 @@
+-- Add related_activation_id column to transactions table
+-- This links transactions to activations for proper status tracking
+
+ALTER TABLE transactions 
+ADD COLUMN IF NOT EXISTS related_activation_id UUID REFERENCES activations(id) ON DELETE SET NULL;
+
+-- Create index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_transactions_related_activation_id 
+ON transactions(related_activation_id) 
+WHERE related_activation_id IS NOT NULL;
+
+-- Comment
+COMMENT ON COLUMN transactions.related_activation_id IS 'Links transaction to related activation for status tracking';

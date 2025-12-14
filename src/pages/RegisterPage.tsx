@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,11 +11,23 @@ export default function RegisterPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const [searchParams] = useSearchParams()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [referralCode, setReferralCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+
+  // Pré-remplit le code de parrainage depuis l'URL (?ref=CODE) et le conserve côté client
+  useEffect(() => {
+    const code = searchParams.get('ref') || searchParams.get('code')
+    if (code) {
+      setReferralCode(code)
+      localStorage.setItem('pending_referral_code', code)
+    }
+  }, [searchParams])
 
   const handleGoogleLogin = async () => {
     const { error } = await signInWithGoogle()
@@ -31,6 +43,15 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (!acceptedTerms) {
+      toast({
+        title: t('auth.acceptTermsTitle', 'Consentement requis'),
+        description: t('auth.acceptTermsDesc', 'Vous devez accepter les conditions pour continuer.'),
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (password !== confirmPassword) {
       toast({
         title: 'Error',
@@ -42,7 +63,11 @@ export default function RegisterPage() {
 
     setLoading(true)
 
-    const { data, error } = await signUp(email, password, { full_name: fullName })
+    const { data, error } = await signUp(email, password, { full_name: fullName, referral_code: referralCode || undefined })
+
+    if (referralCode) {
+      localStorage.setItem('pending_referral_code', referralCode)
+    }
 
     if (error) {
       toast({
@@ -124,7 +149,39 @@ export default function RegisterPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <div>
+              <label htmlFor="referralCode" className="text-sm font-medium">
+                Code de parrainage (optionnel)
+              </label>
+              <Input
+                id="referralCode"
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.trim())}
+                placeholder="Saisissez un code ou laissez vide"
+              />
+            </div>
+
+            <div className="flex items-start gap-2 rounded-md border p-3">
+              <input
+                id="accept-terms"
+                type="checkbox"
+                className="mt-1 h-4 w-4 border-gray-300 text-primary focus:ring-primary"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                required
+              />
+              <label htmlFor="accept-terms" className="text-sm text-muted-foreground leading-5">
+                {t('auth.acceptTerms', 'J’accepte les Conditions d’utilisation')} {' '}
+                {t('auth.and', 'et la')}{' '}
+                <Link to="/privacy" className="text-primary underline underline-offset-2">
+                  {t('auth.privacyPolicy', 'Politique de confidentialité')}
+                </Link>
+                {'.'}
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={loading || !acceptedTerms}>
               {loading ? 'Loading...' : t('nav.register')}
             </Button>
           </form>

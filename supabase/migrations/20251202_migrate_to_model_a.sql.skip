@@ -1,0 +1,675 @@
+-- ========================================================================
+-- MIGRATION WALLET: MODEL B → MODEL A (Freeze Virtuel)
+-- ========================================================================
+-- Date: 2 décembre 2025
+-- Objectif: Corriger design flaw Model B (frozen > balance impossible)
+-- ========================================================================
+
+-- ========================================================================
+-- ÉTAPE 1: BACKUP & ANALYSE ÉTAT ACTUEL
+-- ========================================================================
+
+-- Vue temporaire pour audit AVANT migration
+CREATE TEMP TABLE wallet_backup_before AS
+SELECT 
+  u.id,
+  u.email,
+  u.balance,
+  u.frozen_balance,
+  COALESCE(SUM(a.frozen_amount), 0) as frozen_in_activations,
+  COALESCE(SUM(r.frozen_amount), 0) as frozen_in_rentals,
+  NOW() as backup_timestamp
+FROM users u
+LEFT JOIN activations a ON a.user_id = u.id AND a.frozen_amount > 0
+LEFT JOIN rentals r ON r.user_id = u.id AND r.frozen_amount > 0
+GROUP BY u.id, u.email, u.balance, u.frozen_balance;
+
+-- Log de l'état actuel
+DO $$
+DECLARE
+  total_users INT;
+  users_with_frozen INT;
+  total_balance DECIMAL;
+  total_frozen DECIMAL;
+BEGIN
+  SELECT COUNT(*), SUM(balance), SUM(frozen_balance)
+  INTO total_users, total_balance, total_frozen
+  FROM users;
+  
+  SELECT COUNT(*)
+  INTO users_with_frozen
+  FROM users
+  WHERE frozen_balance > 0;
+  
+  RAISE NOTICE '📊 ÉTAT AVANT MIGRATION:';
+  RAISE NOTICE '   Users total: %', total_users;
+  RAISE NOTICE '   Users avec frozen: %', users_with_frozen;
+  RAISE NOTICE '   Balance totale: % Ⓐ', total_balance;
+  RAISE NOTICE '   Frozen total: % Ⓐ', total_frozen;
+END $$;
+
+-- ========================================================================
+-- ÉTAPE 2: MIGRATION DONNÉES USERS (Model B → Model A)
+-- ========================================================================
+
+-- MODEL B (actuel): balance déjà débité, frozen = montant gelé
+-- MODEL A (nouveau): balance = total possédé, frozen = réservé
+-- 
+-- Transformation: balance_new = balance_old + frozen_old
+-- Exemple: balance=15, frozen=5 → balance=20, frozen=5
+
+DO $$
+DECLARE
+  user_record RECORD;
+  new_balance DECIMAL;
+BEGIN
+  RAISE NOTICE '🔄 MIGRATION USERS: Model B → Model A';
+  
+  FOR user_record IN 
+    SELECT id, email, balance, frozen_balance 
+    FROM users 
+    WHERE frozen_balance > 0
+  LOOP
+    -- Calculer nouveau balance (ajouter le frozen actuel)
+    new_balance := user_record.balance + user_record.frozen_balance;
+    
+    -- Update balance
+    UPDATE users
+    SET balance = new_balance
+    WHERE id = user_record.id;
+    
+    RAISE NOTICE '   User %: balance % → % (frozen: %)',
+      user_record.email,
+      user_record.balance,
+      new_balance,
+      user_record.frozen_balance;
+  END LOOP;
+  
+  RAISE NOTICE '✅ Migration users terminée';
+END $$;
+
+-- ========================================================================
+-- ÉTAPE 3: DROP ANCIENNES FONCTIONS & CONTRAINTES
+-- ========================================================================
+
+DROP FUNCTION IF EXISTS atomic_refund_direct CASCADE;
+DROP FUNCTION IF EXISTS atomic_freeze CASCADE;
+DROP FUNCTION IF EXISTS atomic_commit CASCADE;
+DROP FUNCTION IF EXISTS atomic_refund CASCADE;
+
+-- Supprimer vue santé (sera recréée)
+DROP VIEW IF EXISTS v_frozen_balance_health CASCADE;
+
+-- ========================================================================
+-- ÉTAPE 4: RECRÉER FONCTIONS RPC ATOMIQUES (MODEL A)
+-- ========================================================================
+
+-- ========================================================================
+-- FONCTION 1: FREEZE (Réservation virtuelle - Model A)
+-- ========================================================================
+-- LOGIQUE MODEL A:
+-- - balance = INCHANGÉ (pas de débit)
+-- - frozen_balance = frozen_balance + amount (réservation)
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION atomic_freeze(
+  p_user_id UUID,
+  p_amount DECIMAL,
+  p_transaction_id UUID,
+  p_activation_id UUID DEFAULT NULL,
+  p_rental_id UUID DEFAULT NULL,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+  v_user RECORD;
+  v_available DECIMAL;
+  v_new_frozen DECIMAL;
+BEGIN
+  -- Validation
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Amount must be positive: %', p_amount;
+  END IF;
+  
+  -- 1. LOCK USER (FOR UPDATE)
+  SELECT balance, frozen_balance
+  INTO v_user
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User not found: %', p_user_id;
+  END IF;
+  
+  -- 2. CHECK AVAILABLE BALANCE (Model A: disponible = balance - frozen)
+  v_available := v_user.balance - v_user.frozen_balance;
+  IF v_available < p_amount THEN
+    RAISE EXCEPTION 'Insufficient balance: % available, % required', v_available, p_amount;
+  END IF;
+  
+  -- 3. CALCULATE NEW VALUES (Model A: balance inchangé, frozen augmente)
+  v_new_frozen := v_user.frozen_balance + p_amount;
+  
+  -- Vérification: frozen ne peut pas dépasser balance
+  IF v_new_frozen > v_user.balance THEN
+    RAISE EXCEPTION 'Cannot freeze %: would exceed balance (% frozen + % new > % balance)',
+      p_amount, v_user.frozen_balance, p_amount, v_user.balance;
+  END IF;
+  
+  -- 4. UPDATE USER (Model A: SEUL frozen change)
+  UPDATE users
+  SET 
+    frozen_balance = v_new_frozen,
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  -- 5. UPDATE ACTIVATION/RENTAL frozen_amount
+  IF p_activation_id IS NOT NULL THEN
+    UPDATE activations
+    SET frozen_amount = p_amount
+    WHERE id = p_activation_id;
+  END IF;
+  
+  IF p_rental_id IS NOT NULL THEN
+    UPDATE rentals
+    SET frozen_amount = p_amount
+    WHERE id = p_rental_id;
+  END IF;
+  
+  -- 6. LOG OPERATION
+  INSERT INTO balance_operations (
+    user_id, 
+    activation_id,
+    rental_id,
+    related_transaction_id,
+    operation_type, 
+    amount,
+    balance_before, 
+    balance_after,
+    frozen_before, 
+    frozen_after,
+    reason
+  ) VALUES (
+    p_user_id, 
+    p_activation_id,
+    p_rental_id,
+    p_transaction_id,
+    'freeze', 
+    p_amount,
+    v_user.balance, 
+    v_user.balance,  -- ✅ INCHANGÉ
+    v_user.frozen_balance, 
+    v_new_frozen,
+    COALESCE(p_reason, 'Credits frozen for purchase')
+  );
+  
+  -- 7. RETURN RESULT
+  RETURN json_build_object(
+    'success', true,
+    'balance_before', v_user.balance,
+    'balance_after', v_user.balance,  -- ✅ INCHANGÉ
+    'frozen_before', v_user.frozen_balance,
+    'frozen_after', v_new_frozen,
+    'available', v_user.balance - v_new_frozen
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- FONCTION 2: COMMIT (Consommation définitive - Model A)
+-- ========================================================================
+-- LOGIQUE MODEL A:
+-- - balance = balance - amount (DÉBIT EFFECTIF)
+-- - frozen_balance = frozen_balance - amount (libération)
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION atomic_commit(
+  p_user_id UUID,
+  p_amount DECIMAL,  -- ✅ AJOUTÉ pour flexibilité
+  p_activation_id UUID DEFAULT NULL,
+  p_rental_id UUID DEFAULT NULL,
+  p_transaction_id UUID DEFAULT NULL,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+  v_user RECORD;
+  v_frozen_amount DECIMAL;
+  v_amount_to_commit DECIMAL;
+  v_new_balance DECIMAL;
+  v_new_frozen DECIMAL;
+BEGIN
+  -- 1. LOCK USER
+  SELECT balance, frozen_balance
+  INTO v_user
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User not found: %', p_user_id;
+  END IF;
+  
+  -- 2. DÉTERMINER LE MONTANT À COMMITER
+  IF p_amount IS NOT NULL AND p_amount > 0 THEN
+    -- Montant explicite fourni
+    v_amount_to_commit := p_amount;
+  ELSE
+    -- Récupérer depuis activation/rental
+    IF p_activation_id IS NOT NULL THEN
+      SELECT frozen_amount INTO v_frozen_amount
+      FROM activations
+      WHERE id = p_activation_id
+      FOR UPDATE;
+      
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Activation not found: %', p_activation_id;
+      END IF;
+      v_amount_to_commit := v_frozen_amount;
+    ELSIF p_rental_id IS NOT NULL THEN
+      SELECT frozen_amount INTO v_frozen_amount
+      FROM rentals
+      WHERE id = p_rental_id
+      FOR UPDATE;
+      
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Rental not found: %', p_rental_id;
+      END IF;
+      v_amount_to_commit := v_frozen_amount;
+    ELSE
+      RAISE EXCEPTION 'Must provide p_amount or activation_id/rental_id';
+    END IF;
+  END IF;
+  
+  -- 3. CALCULATE NEW VALUES (Model A: balance diminue, frozen diminue)
+  v_amount_to_commit := LEAST(v_amount_to_commit, v_user.frozen_balance); -- Sécurisé
+  v_new_balance := v_user.balance - v_amount_to_commit;
+  v_new_frozen := GREATEST(0, v_user.frozen_balance - v_amount_to_commit);
+  
+  IF v_new_balance < 0 THEN
+    RAISE EXCEPTION 'Cannot commit %: would result in negative balance', v_amount_to_commit;
+  END IF;
+  
+  -- 4. UPDATE USER (Model A: balance diminue, frozen diminue)
+  UPDATE users
+  SET 
+    balance = v_new_balance,
+    frozen_balance = v_new_frozen,
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  -- 5. RESET frozen_amount ON ACTIVATION/RENTAL
+  IF p_activation_id IS NOT NULL THEN
+    UPDATE activations
+    SET 
+      frozen_amount = 0,
+      charged = true,
+      status = CASE WHEN status = 'waiting' THEN 'success' ELSE status END,
+      updated_at = NOW()
+    WHERE id = p_activation_id;
+  END IF;
+  
+  IF p_rental_id IS NOT NULL THEN
+    UPDATE rentals
+    SET 
+      frozen_amount = 0,
+      status = CASE WHEN status = 'active' THEN 'completed' ELSE status END,
+      updated_at = NOW()
+    WHERE id = p_rental_id;
+  END IF;
+  
+  -- 6. UPDATE TRANSACTION
+  IF p_transaction_id IS NOT NULL THEN
+    UPDATE transactions
+    SET 
+      status = 'completed',
+      balance_after = v_new_balance,
+      updated_at = NOW()
+    WHERE id = p_transaction_id AND status = 'pending';
+  END IF;
+  
+  -- 7. LOG OPERATION
+  INSERT INTO balance_operations (
+    user_id, 
+    activation_id,
+    rental_id,
+    related_transaction_id,
+    operation_type, 
+    amount,
+    balance_before, 
+    balance_after,
+    frozen_before, 
+    frozen_after,
+    reason
+  ) VALUES (
+    p_user_id, 
+    p_activation_id,
+    p_rental_id,
+    p_transaction_id,
+    'commit', 
+    v_amount_to_commit,
+    v_user.balance,
+    v_new_balance,  -- ✅ DIMINUE
+    v_user.frozen_balance, 
+    v_new_frozen,
+    COALESCE(p_reason, 'Credits committed after success')
+  );
+  
+  -- 8. RETURN RESULT
+  RETURN json_build_object(
+    'success', true,
+    'amount_committed', v_amount_to_commit,
+    'balance_before', v_user.balance,
+    'balance_after', v_new_balance,
+    'frozen_before', v_user.frozen_balance,
+    'frozen_after', v_new_frozen
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- FONCTION 3: REFUND (Remboursement - Model A)
+-- ========================================================================
+-- LOGIQUE MODEL A:
+-- - balance = INCHANGÉ (pas de remboursement car pas encore débité)
+-- - frozen_balance = frozen_balance - amount (libération)
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION atomic_refund(
+  p_user_id UUID,
+  p_amount DECIMAL,  -- ✅ AJOUTÉ pour flexibilité
+  p_activation_id UUID DEFAULT NULL,
+  p_rental_id UUID DEFAULT NULL,
+  p_transaction_id UUID DEFAULT NULL,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+  v_user RECORD;
+  v_frozen_amount DECIMAL;
+  v_amount_to_refund DECIMAL;
+  v_new_frozen DECIMAL;
+BEGIN
+  -- 1. LOCK USER
+  SELECT balance, frozen_balance
+  INTO v_user
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User not found: %', p_user_id;
+  END IF;
+  
+  -- 2. DÉTERMINER LE MONTANT À REMBOURSER
+  IF p_amount IS NOT NULL AND p_amount > 0 THEN
+    -- Montant explicite fourni
+    v_amount_to_refund := p_amount;
+  ELSE
+    -- Récupérer depuis activation/rental
+    IF p_activation_id IS NOT NULL THEN
+      SELECT frozen_amount INTO v_frozen_amount
+      FROM activations
+      WHERE id = p_activation_id
+      FOR UPDATE;
+      
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Activation not found: %', p_activation_id;
+      END IF;
+      v_amount_to_refund := v_frozen_amount;
+    ELSIF p_rental_id IS NOT NULL THEN
+      SELECT frozen_amount INTO v_frozen_amount
+      FROM rentals
+      WHERE id = p_rental_id
+      FOR UPDATE;
+      
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Rental not found: %', p_rental_id;
+      END IF;
+      v_amount_to_refund := v_frozen_amount;
+    ELSE
+      RAISE EXCEPTION 'Must provide p_amount or activation_id/rental_id';
+    END IF;
+  END IF;
+  
+  -- 3. CALCULATE NEW VALUES (Model A: balance inchangé, frozen diminue)
+  v_amount_to_refund := LEAST(v_amount_to_refund, v_user.frozen_balance); -- Sécurisé
+  v_new_frozen := GREATEST(0, v_user.frozen_balance - v_amount_to_refund);
+  
+  -- 4. UPDATE USER (Model A: SEUL frozen change)
+  UPDATE users
+  SET 
+    frozen_balance = v_new_frozen,
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  -- 5. RESET frozen_amount AND UPDATE STATUS
+  IF p_activation_id IS NOT NULL THEN
+    UPDATE activations
+    SET 
+      frozen_amount = 0,
+      status = CASE 
+        WHEN status IN ('pending', 'waiting') THEN 'cancelled'
+        ELSE status 
+      END,
+      updated_at = NOW()
+    WHERE id = p_activation_id;
+  END IF;
+  
+  IF p_rental_id IS NOT NULL THEN
+    UPDATE rentals
+    SET 
+      frozen_amount = 0,
+      status = CASE 
+        WHEN status = 'active' THEN 'cancelled'
+        ELSE status 
+      END,
+      updated_at = NOW()
+    WHERE id = p_rental_id;
+  END IF;
+  
+  -- 6. UPDATE TRANSACTION
+  IF p_transaction_id IS NOT NULL THEN
+    UPDATE transactions
+    SET 
+      status = 'refunded',
+      balance_after = v_user.balance,  -- Inchangé
+      updated_at = NOW()
+    WHERE id = p_transaction_id AND status = 'pending';
+  END IF;
+  
+  -- 7. LOG OPERATION
+  INSERT INTO balance_operations (
+    user_id, 
+    activation_id,
+    rental_id,
+    related_transaction_id,
+    operation_type, 
+    amount,
+    balance_before, 
+    balance_after,
+    frozen_before, 
+    frozen_after,
+    reason
+  ) VALUES (
+    p_user_id, 
+    p_activation_id,
+    p_rental_id,
+    p_transaction_id,
+    'refund', 
+    v_amount_to_refund,
+    v_user.balance,
+    v_user.balance,  -- ✅ INCHANGÉ
+    v_user.frozen_balance, 
+    v_new_frozen,
+    COALESCE(p_reason, 'Credits refunded after cancellation')
+  );
+  
+  -- 8. RETURN RESULT
+  RETURN json_build_object(
+    'success', true,
+    'amount_refunded', v_amount_to_refund,
+    'balance', v_user.balance,
+    'frozen_before', v_user.frozen_balance,
+    'frozen_after', v_new_frozen
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- ÉTAPE 5: METTRE À JOUR CONTRAINTES (Model A)
+-- ========================================================================
+
+-- Recréer table balance_operations avec contraintes Model A
+DROP TABLE IF EXISTS balance_operations CASCADE;
+
+CREATE TABLE balance_operations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  activation_id UUID REFERENCES activations(id) ON DELETE SET NULL,
+  rental_id UUID REFERENCES rentals(id) ON DELETE SET NULL,
+  related_transaction_id UUID,
+  
+  operation_type TEXT NOT NULL CHECK (operation_type IN ('freeze', 'commit', 'refund')),
+  amount DECIMAL NOT NULL CHECK (amount > 0),
+  
+  balance_before DECIMAL NOT NULL,
+  balance_after DECIMAL NOT NULL,
+  frozen_before DECIMAL NOT NULL,
+  frozen_after DECIMAL NOT NULL,
+  
+  reason TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  
+  -- Constraints MODEL A
+  CONSTRAINT valid_balance CHECK (balance_after >= 0),
+  CONSTRAINT valid_frozen CHECK (frozen_after >= 0 AND frozen_after <= balance_after),
+  CONSTRAINT valid_freeze_op_model_a CHECK (
+    -- FREEZE: balance INCHANGÉ, frozen augmente
+    (operation_type = 'freeze' AND 
+     balance_after = balance_before AND 
+     frozen_after = frozen_before + amount)
+    OR
+    -- COMMIT: balance diminue, frozen diminue
+    (operation_type = 'commit' AND 
+     balance_after = balance_before - amount AND 
+     frozen_after = frozen_before - amount)
+    OR
+    -- REFUND: balance INCHANGÉ, frozen diminue
+    (operation_type = 'refund' AND 
+     balance_after = balance_before AND 
+     frozen_after = frozen_before - amount)
+  )
+);
+
+CREATE INDEX idx_balance_ops_user ON balance_operations(user_id, created_at DESC);
+CREATE INDEX idx_balance_ops_activation ON balance_operations(activation_id);
+CREATE INDEX idx_balance_ops_rental ON balance_operations(rental_id);
+CREATE INDEX idx_balance_ops_related_tx ON balance_operations(related_transaction_id);
+CREATE INDEX idx_balance_ops_type ON balance_operations(operation_type, created_at DESC);
+
+-- ========================================================================
+-- ÉTAPE 6: AJOUTER COLONNE sms_received_count AUX RENTALS
+-- ========================================================================
+
+ALTER TABLE rentals 
+ADD COLUMN IF NOT EXISTS sms_received_count INT DEFAULT 0 CHECK (sms_received_count >= 0);
+
+COMMENT ON COLUMN rentals.sms_received_count IS 'Nombre de SMS reçus pendant la location - utilisé pour politique remboursement';
+
+-- ========================================================================
+-- ÉTAPE 7: RECRÉER VUE SANTÉ WALLET
+-- ========================================================================
+
+CREATE VIEW v_frozen_balance_health AS
+SELECT 
+  u.id AS user_id,
+  u.email,
+  u.balance,
+  u.frozen_balance,
+  COALESCE(SUM(a.frozen_amount), 0) AS total_frozen_in_activations,
+  COALESCE(SUM(r.frozen_amount), 0) AS total_frozen_in_rentals,
+  (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0)) AS expected_frozen,
+  u.frozen_balance - (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0)) AS frozen_diff,
+  u.balance - u.frozen_balance AS available_balance,
+  CASE
+    WHEN u.balance < 0 THEN 'CRITICAL: Negative balance'
+    WHEN u.frozen_balance > u.balance THEN 'CRITICAL: Frozen > Balance'
+    WHEN ABS(u.frozen_balance - (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0))) > 0.01 
+      THEN 'WARNING: Frozen mismatch'
+    ELSE 'OK'
+  END AS health_status,
+  NOW() AS checked_at
+FROM users u
+LEFT JOIN activations a ON a.user_id = u.id AND a.status IN ('pending', 'waiting') AND a.frozen_amount > 0
+LEFT JOIN rentals r ON r.user_id = u.id AND r.status = 'active' AND r.frozen_amount > 0
+GROUP BY u.id, u.email, u.balance, u.frozen_balance;
+
+-- ========================================================================
+-- ÉTAPE 8: PERMISSIONS
+-- ========================================================================
+
+GRANT EXECUTE ON FUNCTION atomic_freeze TO service_role, authenticated;
+GRANT EXECUTE ON FUNCTION atomic_commit TO service_role, authenticated;
+GRANT EXECUTE ON FUNCTION atomic_refund TO service_role, authenticated;
+
+GRANT SELECT ON balance_operations TO authenticated;
+GRANT INSERT ON balance_operations TO service_role;
+
+GRANT SELECT ON v_frozen_balance_health TO authenticated, anon;
+
+-- ========================================================================
+-- ÉTAPE 9: VALIDATION POST-MIGRATION
+-- ========================================================================
+
+DO $$
+DECLARE
+  total_users INT;
+  users_with_frozen INT;
+  total_balance DECIMAL;
+  total_frozen DECIMAL;
+  incoherent_users INT;
+BEGIN
+  -- Stats globales
+  SELECT COUNT(*), SUM(balance), SUM(frozen_balance)
+  INTO total_users, total_balance, total_frozen
+  FROM users;
+  
+  SELECT COUNT(*)
+  INTO users_with_frozen
+  FROM users
+  WHERE frozen_balance > 0;
+  
+  -- Vérifier cohérence
+  SELECT COUNT(*)
+  INTO incoherent_users
+  FROM users
+  WHERE frozen_balance > balance;
+  
+  RAISE NOTICE '';
+  RAISE NOTICE '✅ MIGRATION TERMINÉE - ÉTAT APRÈS:';
+  RAISE NOTICE '   Users total: %', total_users;
+  RAISE NOTICE '   Users avec frozen: %', users_with_frozen;
+  RAISE NOTICE '   Balance totale: % Ⓐ', total_balance;
+  RAISE NOTICE '   Frozen total: % Ⓐ', total_frozen;
+  RAISE NOTICE '   Users incohérents (frozen > balance): %', incoherent_users;
+  
+  IF incoherent_users > 0 THEN
+    RAISE WARNING '⚠️ Des incohérences détectées! Vérifier v_frozen_balance_health';
+  ELSE
+    RAISE NOTICE '✅ Tous les wallets sont cohérents!';
+  END IF;
+END $$;
+
+-- ========================================================================
+-- COMMENTAIRES
+-- ========================================================================
+
+COMMENT ON FUNCTION atomic_freeze IS 'Model A: Réservation virtuelle (balance inchangé, frozen augmente)';
+COMMENT ON FUNCTION atomic_commit IS 'Model A: Consommation définitive (balance diminue, frozen diminue)';
+COMMENT ON FUNCTION atomic_refund IS 'Model A: Libération (balance inchangé, frozen diminue)';
+COMMENT ON TABLE balance_operations IS 'Audit trail complet - contraintes Model A appliquées';
+COMMENT ON VIEW v_frozen_balance_health IS 'Vue santé wallets - Model A (frozen <= balance garanti)';

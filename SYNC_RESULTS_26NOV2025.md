@@ -13,14 +13,16 @@
 **Résultat:** 1,029 services synchronisés avec l'API en temps réel
 
 **Détails:**
+
 - Batch updates optimisés (50 services par batch)
 - 21 batches exécutés en 4 secondes
 - 100% de succès (aucune erreur)
 - 10 services déjà à jour (skip automatique)
 
 **Exemples de services mis à jour:**
+
 - `go` (Google): 0 → 5,818,282 numéros ✅
-- `oi` (Tinder): 0 → 5,526,543 numéros ✅  
+- `oi` (Tinder): 0 → 5,526,543 numéros ✅
 - `ew`: 0 → 6,965,817 numéros ✅
 - `tn`: 0 → 6,910,842 numéros ✅
 
@@ -33,6 +35,7 @@
 **Status:** NON AJOUTÉS (Row Level Security)
 
 **TOP 10 services manquants:**
+
 1. `sn` - 2,413,674 numéros (Snapchat)
 2. `ags` - 628,356 numéros
 3. `nq` - 587,171 numéros
@@ -55,6 +58,7 @@
 **Détection:** 1,379 services marqués comme obsolètes
 
 **Problème découvert:** Ces services NE SONT PAS obsolètes! Ils existent toujours dans l'API avec du stock:
+
 - ebay: 2,851,853 numéros
 - alibaba: 2,516,016 numéros
 - nike: 2,513,820 numéros
@@ -93,6 +97,7 @@ Stock total:                 589,844,010 numéros
 ## 🎯 Impact Utilisateur
 
 ### Avant Sync
+
 ```
 Services visibles (stock>0):  ~1,250
 Google (go):                  0 numéros
@@ -100,6 +105,7 @@ Tinder (oi):                  0 numéros
 ```
 
 ### Après Sync
+
 ```
 Services visibles (stock>0):  1,296 (+46 services) ✅
 Google (go):                  5,818,282 numéros ✅
@@ -113,6 +119,7 @@ Tinder (oi):                  5,526,543 numéros ✅
 ## 🚧 Limitations Rencontrées
 
 ### 1. Row Level Security (RLS)
+
 - La clé `SUPABASE_SERVICE_ROLE_KEY_LOCAL` dans `.env` est invalide
 - Impossible d'insérer de nouveaux services (622 manquants)
 - Impossible de bypasser les policies
@@ -122,6 +129,7 @@ Tinder (oi):                  5,526,543 numéros ✅
 **Solution permanente:** Obtenir la vraie `service_role` key depuis Supabase Dashboard → Settings → API
 
 ### 2. Bug Détection Obsolètes
+
 - Le script détecte 1,379 services comme obsolètes alors qu'ils existent dans l'API
 - Problème probable: comparaison case-sensitive ou format différent des codes
 
@@ -134,6 +142,7 @@ Tinder (oi):                  5,526,543 numéros ✅
 ### URGENT - Ajouter Services Manquants (622)
 
 **Option 1: SQL Manuelle**
+
 ```sql
 INSERT INTO services (code, name, display_name, icon, category, active, total_available)
 VALUES
@@ -144,6 +153,7 @@ ON CONFLICT (code) DO NOTHING;
 ```
 
 **Option 2: Obtenir SERVICE_ROLE_KEY**
+
 1. Aller sur Supabase Dashboard
 2. Settings → API
 3. Copier `service_role` secret key
@@ -156,6 +166,7 @@ ON CONFLICT (code) DO NOTHING;
 ### HIGH - Corriger Bug Obsolètes
 
 Modifier `scripts/sync-services-realtime.js`:
+
 - Vérifier format des codes (lowercase vs uppercase)
 - Ajouter logs debug pour voir codes API vs DB
 - Corriger logique de comparaison
@@ -163,6 +174,7 @@ Modifier `scripts/sync-services-realtime.js`:
 ### MEDIUM - Activer Cron Job
 
 Une fois les 622 services ajoutés:
+
 ```bash
 ./scripts/setup-cron.sh
 ```
@@ -184,16 +196,19 @@ Cron configuré pour sync toutes les 5 minutes
 ## 🐛 Bugs Identifiés
 
 ### Bug #1: SERVICE_ROLE_KEY invalide
+
 **Symptom:** `new row violates row-level security policy`  
 **Impact:** Impossible d'insérer nouveaux services  
 **Fix:** Obtenir vraie clé depuis Supabase Dashboard
 
 ### Bug #2: Détection obsolètes incorrecte
+
 **Symptom:** 1,379 services marqués obsolètes alors qu'ils existent dans API  
 **Impact:** Risque de désactiver services valides  
 **Fix:** Corriger logique comparaison codes
 
 ### Bug #3: logError is not a function
+
 **Symptom:** Erreur à la fin du script après logging  
 **Impact:** Mineur - sync terminée avec succès malgré erreur  
 **Fix:** Ajouter `logError` dans le bloc try/catch final
@@ -203,6 +218,7 @@ Cron configuré pour sync toutes les 5 minutes
 ## 📝 Logs
 
 ### Log Sync Manuelle
+
 ```
 ✅ 1,029 stocks mis à jour en 4 secondes
 ⚠️  622 services manquants (non ajoutés)
@@ -210,6 +226,7 @@ Cron configuré pour sync toutes les 5 minutes
 ```
 
 ### Fichier Log
+
 ```
 logs/sync-manual-20251126-164225.log
 ```
@@ -221,12 +238,14 @@ logs/sync-manual-20251126-164225.log
 **Synchronisation PARTIELLEMENT réussie:**
 
 ✅ **Réussi:**
+
 - 1,029 stocks synchronisés
 - Google, Tinder et autres services majeurs restaurés
 - Script optimisé et fonctionnel
 - Documentation complète
 
 ⚠️ **À Finaliser:**
+
 - Ajouter 622 services manquants (besoin SERVICE_ROLE_KEY)
 - Corriger bug détection obsolètes
 - Activer cron job automatique

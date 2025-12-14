@@ -9,15 +9,18 @@
 ## 🎯 RÉSUMÉ EXÉCUTIF
 
 ### Balance API
+
 - ✅ **4.47 ₽** disponible
 
 ### Services API Réels
+
 - ✅ **1,661 services uniques** dans l'API
 - ✅ **1,640 services avec stock > 0** (98.7%)
 - ✅ **595,023,064 numéros** disponibles au total
 - ✅ **193 pays** supportés
 
 ### Notre Base de Données
+
 - ⚠️ **2,418 services actifs**
 - ⚠️ **1,296 services avec stock** (53.6%)
 - ⚠️ **1,122 services stock=0** (46.4%)
@@ -32,12 +35,14 @@
 Services présents dans notre DB mais **N'EXISTENT PLUS** dans l'API SMS-Activate
 
 **Impact:**
+
 - Encombrent la base de données
 - Affichés en Admin (confusion)
 - Stock toujours à 0 (impossible à synchroniser)
 - Ralentissent les requêtes
 
 **Exemples (TOP 20):**
+
 ```
 1. reddit           - Reddit (réseau social)
 2. ebay             - eBay (e-commerce)
@@ -63,13 +68,14 @@ Services présents dans notre DB mais **N'EXISTENT PLUS** dans l'API SMS-Activat
 ```
 
 **Solution:**
+
 ```sql
 -- Désactiver les services obsolètes
-UPDATE services 
-SET active = false, 
+UPDATE services
+SET active = false,
     total_available = 0
 WHERE code IN (
-  'reddit', 'ebay', 'yahoo', 'alibaba', 'nike', 
+  'reddit', 'ebay', 'yahoo', 'alibaba', 'nike',
   'coinbase', 'bolt', 'grabtaxi', 'bonchat', ...
   -- Liste complète de 1,379 codes
 );
@@ -83,11 +89,13 @@ WHERE code IN (
 Services disponibles dans l'API SMS-Activate mais **ABSENTS** de notre DB
 
 **Impact:**
+
 - Utilisateurs ne peuvent pas les acheter
 - Perte de revenus potentiels
 - DB incomplète vs concurrents
 
 **Exemples avec stock (TOP 20):**
+
 ```
 Code | Stock     | Disponibilité
 -----|-----------|---------------
@@ -114,10 +122,11 @@ bvs  | 1,118     | ✅ Disponible
 ```
 
 **Solution:**
+
 ```sql
 -- Ajouter les services manquants
 INSERT INTO services (code, name, display_name, active, category, popularity_score)
-VALUES 
+VALUES
   ('zz', 'Service ZZ', 'Service ZZ', true, 'other', 100),
   ('sn', 'Service SN', 'Service SN', true, 'other', 500),
   ('kp', 'Service KP', 'Service KP', true, 'other', 300),
@@ -133,11 +142,13 @@ ON CONFLICT (code) DO NOTHING;
 Services avec `total_available = 0` en DB alors que l'API a du stock > 0
 
 **Impact:**
+
 - Utilisateurs ne voient pas ces services (filtre stock>0)
 - 997 services cachés alors qu'ils sont disponibles
 - Perte massive de revenus
 
 **TOP 20 Services avec Stock Désynchronisé:**
+
 ```
 Code | DB Stock | API Stock  | Différence  | Priorité
 -----|----------|------------|-------------|----------
@@ -164,6 +175,7 @@ lf   | 0        | 5,085,574  | +5,085,574  | 🔥 URGENT
 ```
 
 **Solution:**
+
 ```sql
 -- Synchroniser le stock depuis l'API
 UPDATE services SET total_available = 6965817 WHERE code = 'ew';
@@ -180,6 +192,7 @@ UPDATE services SET total_available = 6909073 WHERE code = 'nz';
 Dernière synchronisation: **21 Novembre** (il y a 5 jours)
 
 **Impact:**
+
 - Stock obsolète quotidiennement
 - Services manquants non détectés
 - Services obsolètes non supprimés
@@ -194,24 +207,26 @@ Cron job automatique toutes les 5 minutes
 
 ### Comparaison DB vs API
 
-| Métrique | DB | API | Différence | Note |
-|----------|-----|-----|------------|------|
-| **Total services** | 2,418 | 1,661 | +757 | DB a trop de services |
-| **Services stock>0** | 1,296 (53.6%) | 1,640 (98.7%) | -344 | API a plus de disponibilité |
-| **Services stock=0** | 1,122 (46.4%) | 21 (1.3%) | +1,101 | DB très désynchronisé |
-| **Services obsolètes** | 1,379 (57%) | 0 | +1,379 | À nettoyer |
-| **Services manquants** | 0 | 622 | -622 | À ajouter |
-| **Stock incorrect** | 997 (41%) | 0 | +997 | À synchroniser |
+| Métrique               | DB            | API           | Différence | Note                        |
+| ---------------------- | ------------- | ------------- | ---------- | --------------------------- |
+| **Total services**     | 2,418         | 1,661         | +757       | DB a trop de services       |
+| **Services stock>0**   | 1,296 (53.6%) | 1,640 (98.7%) | -344       | API a plus de disponibilité |
+| **Services stock=0**   | 1,122 (46.4%) | 21 (1.3%)     | +1,101     | DB très désynchronisé       |
+| **Services obsolètes** | 1,379 (57%)   | 0             | +1,379     | À nettoyer                  |
+| **Services manquants** | 0             | 622           | -622       | À ajouter                   |
+| **Stock incorrect**    | 997 (41%)     | 0             | +997       | À synchroniser              |
 
 ### Kazakhstan (pays #2) - Exemple
 
 **API SMS-Activate:**
+
 - 164 services disponibles
 - 162 avec stock (98.8%)
 - 2 sans stock (1.2%)
 - Stock total: 49,801,689 numéros
 
 **TOP 15 Services Kazakhstan:**
+
 ```
 Rank | Code | Stock     | Prix
 -----|------|-----------|------
@@ -239,16 +254,19 @@ Rank | Code | Stock     | Prix
 ### Méthode à Utiliser: `getPrices()`
 
 **Endpoint:**
+
 ```
 GET https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getPrices&service=$service&country=$country
 ```
 
 **Paramètres:**
+
 - `api_key` - Clé API (obligatoire)
 - `service` - Code service (optionnel, par défaut tous)
 - `country` - Code pays (optionnel, par défaut tous)
 
 **Réponse Format:**
+
 ```json
 {
   "2": {
@@ -267,6 +285,7 @@ GET https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=ge
 ```
 
 **Avantages vs `getNumbersStatus()`:**
+
 - ✅ Retourne **TOUS les pays** (193 pays)
 - ✅ Retourne **TOUS les services** (1,661 services)
 - ✅ Inclut le **stock** (`count`)
@@ -275,6 +294,7 @@ GET https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=ge
 - ✅ Format structuré (Pays → Service → Data)
 
 **Inconvénients `getNumbersStatus()`:**
+
 - ❌ Un seul pays à la fois
 - ❌ 193 requêtes nécessaires pour tout
 - ❌ Pas de prix
@@ -287,10 +307,11 @@ GET https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=ge
 ### Phase 1: Nettoyage (URGENT)
 
 **1. Désactiver Services Obsolètes**
+
 ```sql
 -- Script: scripts/cleanup-obsolete-services.sql
-UPDATE services 
-SET 
+UPDATE services
+SET
   active = false,
   total_available = 0,
   updated_at = NOW()
@@ -304,14 +325,15 @@ AND active = true;
 ```
 
 **2. Ajouter Services Manquants**
+
 ```sql
 -- Script: scripts/add-missing-services.sql
 INSERT INTO services (
-  code, name, display_name, icon, 
-  category, popularity_score, active, 
+  code, name, display_name, icon,
+  category, popularity_score, active,
   created_at, updated_at
 )
-VALUES 
+VALUES
   ('zz', 'Service ZZ', 'Service ZZ', '📱', 'other', 100, true, NOW(), NOW()),
   ('sn', 'Service SN', 'Service SN', '📱', 'other', 500, true, NOW(), NOW()),
   ('kp', 'Service KP', 'Service KP', '📱', 'other', 300, true, NOW(), NOW()),
@@ -322,6 +344,7 @@ ON CONFLICT (code) DO NOTHING;
 ```
 
 **3. Synchroniser Stock**
+
 ```sql
 -- Script: scripts/sync-all-stock.sql
 -- Généré dynamiquement depuis API getPrices()
@@ -339,11 +362,12 @@ UPDATE services SET total_available = 6909073, updated_at = NOW() WHERE code = '
 ### Phase 2: Automatisation (CRITIQUE)
 
 **Cron Job Node.js:**
+
 ```javascript
 // scripts/sync-api-realtime.js
 
-const https = require('https');
-const { createClient } = require('@supabase/supabase-js');
+const https = require("https");
+const { createClient } = require("@supabase/supabase-js");
 
 const API_KEY = process.env.VITE_SMS_ACTIVATE_API_KEY;
 const supabase = createClient(
@@ -354,150 +378,148 @@ const supabase = createClient(
 async function getPricesAPI() {
   return new Promise((resolve, reject) => {
     const path = `/stubs/handler_api.php?api_key=${API_KEY}&action=getPrices`;
-    https.get({ 
-      hostname: 'api.sms-activate.ae', 
-      path 
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(e);
+    https
+      .get(
+        {
+          hostname: "api.sms-activate.ae",
+          path,
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(e);
+            }
+          });
         }
-      });
-    }).on('error', reject);
+      )
+      .on("error", reject);
   });
 }
 
 async function syncAllServices() {
-  console.log('🔄 Sync API → DB started...');
-  
+  console.log("🔄 Sync API → DB started...");
+
   try {
     // 1. Récupérer données API
     const apiData = await getPricesAPI();
-    
+
     // 2. Extraire tous les services uniques avec leur stock
     const servicesStock = {};
     const servicesCountries = {};
-    
+
     Object.entries(apiData).forEach(([countryId, services]) => {
       Object.entries(services).forEach(([code, data]) => {
         const count = parseInt(data.count) || 0;
         const cost = parseFloat(data.cost) || 0;
-        
+
         if (!servicesStock[code]) {
           servicesStock[code] = 0;
           servicesCountries[code] = [];
         }
-        
+
         servicesStock[code] += count;
         servicesCountries[code].push({
           country: countryId,
           count,
-          cost
+          cost,
         });
       });
     });
-    
+
     const apiCodes = Object.keys(servicesStock);
     console.log(`✅ API: ${apiCodes.length} services trouvés`);
-    
+
     // 3. Charger services DB
     const { data: dbServices } = await supabase
-      .from('services')
-      .select('id, code, name, total_available, active');
-    
+      .from("services")
+      .select("id, code, name, total_available, active");
+
     console.log(`✅ DB: ${dbServices.length} services chargés`);
-    
-    const dbCodes = new Set(dbServices.map(s => s.code));
-    
+
+    const dbCodes = new Set(dbServices.map((s) => s.code));
+
     // 4. Désactiver services obsolètes
     const obsolete = dbServices
-      .filter(s => s.active && !apiCodes.includes(s.code))
-      .map(s => s.id);
-    
+      .filter((s) => s.active && !apiCodes.includes(s.code))
+      .map((s) => s.id);
+
     if (obsolete.length > 0) {
       await supabase
-        .from('services')
+        .from("services")
         .update({ active: false, total_available: 0 })
-        .in('id', obsolete);
-      
+        .in("id", obsolete);
+
       console.log(`🗑️  ${obsolete.length} services obsolètes désactivés`);
     }
-    
+
     // 5. Ajouter services manquants
-    const missing = apiCodes.filter(code => !dbCodes.has(code));
-    
+    const missing = apiCodes.filter((code) => !dbCodes.has(code));
+
     if (missing.length > 0) {
-      const newServices = missing.map(code => ({
+      const newServices = missing.map((code) => ({
         code,
         name: `Service ${code.toUpperCase()}`,
         display_name: `Service ${code.toUpperCase()}`,
-        icon: '📱',
-        category: 'other',
+        icon: "📱",
+        category: "other",
         popularity_score: 50,
         active: true,
-        total_available: servicesStock[code]
+        total_available: servicesStock[code],
       }));
-      
-      await supabase
-        .from('services')
-        .insert(newServices);
-      
+
+      await supabase.from("services").insert(newServices);
+
       console.log(`➕ ${missing.length} nouveaux services ajoutés`);
     }
-    
+
     // 6. Synchroniser stock
     let synced = 0;
     for (const service of dbServices) {
       if (apiCodes.includes(service.code)) {
         const newStock = servicesStock[service.code];
-        
+
         if (service.total_available !== newStock) {
           await supabase
-            .from('services')
-            .update({ 
+            .from("services")
+            .update({
               total_available: newStock,
-              active: true 
+              active: true,
             })
-            .eq('id', service.id);
-          
+            .eq("id", service.id);
+
           synced++;
         }
       }
     }
-    
+
     console.log(`🔄 ${synced} services synchronisés`);
-    
+
     // 7. Log sync
-    await supabase
-      .from('sync_logs')
-      .insert({
-        sync_type: 'full',
-        status: 'success',
-        services_synced: synced,
-        countries_synced: Object.keys(apiData).length,
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString()
-      });
-    
-    console.log('✅ Sync terminé avec succès');
-    
+    await supabase.from("sync_logs").insert({
+      sync_type: "full",
+      status: "success",
+      services_synced: synced,
+      countries_synced: Object.keys(apiData).length,
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    });
+
+    console.log("✅ Sync terminé avec succès");
   } catch (error) {
-    console.error('❌ Erreur sync:', error);
-    
+    console.error("❌ Erreur sync:", error);
+
     // Log erreur
-    await supabase
-      .from('sync_logs')
-      .insert({
-        sync_type: 'full',
-        status: 'error',
-        error_message: error.message,
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString()
-      });
+    await supabase.from("sync_logs").insert({
+      sync_type: "full",
+      status: "error",
+      error_message: error.message,
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    });
   }
 }
 
@@ -506,6 +528,7 @@ syncAllServices();
 ```
 
 **Cron Configuration:**
+
 ```bash
 # Toutes les 5 minutes
 */5 * * * * cd /path/to/project && node scripts/sync-api-realtime.js >> logs/sync.log 2>&1
@@ -518,22 +541,23 @@ syncAllServices();
 ### Phase 3: Monitoring
 
 **Dashboard Sync:**
+
 ```typescript
 // src/pages/admin/AdminSyncStatus.tsx
 
 const { data: latestSync } = useQuery({
-  queryKey: ['latest-sync'],
+  queryKey: ["latest-sync"],
   queryFn: async () => {
     const { data } = await supabase
-      .from('sync_logs')
-      .select('*')
-      .order('completed_at', { ascending: false })
+      .from("sync_logs")
+      .select("*")
+      .order("completed_at", { ascending: false })
       .limit(1)
       .single();
-    
+
     return data;
   },
-  refetchInterval: 5000 // Refresh toutes les 5 secondes
+  refetchInterval: 5000, // Refresh toutes les 5 secondes
 });
 
 return (
@@ -553,21 +577,24 @@ return (
 ### Priorité CRITIQUE (Aujourd'hui)
 
 1. **Exécuter Sync Manuel Complet**
+
    ```bash
    node scripts/sync-api-realtime.js
    ```
+
    → Synchronise 997 services avec stock incorrect
    → Ajoute 622 services manquants
    → Désactive 1,379 services obsolètes
 
 2. **Vérifier Résultats**
+
    ```sql
-   SELECT 
+   SELECT
      COUNT(*) FILTER (WHERE active = true AND total_available > 0) as visible,
      COUNT(*) FILTER (WHERE active = true AND total_available = 0) as hidden,
      COUNT(*) FILTER (WHERE active = false) as obsolete
    FROM services;
-   
+
    -- Attendu:
    -- visible: ~2,258 (1,296 + 622 + 340 synchronisés)
    -- hidden: ~0
@@ -585,11 +612,13 @@ return (
 ### Priorité HAUTE (Cette Semaine)
 
 4. **Optimiser Mapping Noms Services**
+
    - Utiliser `getServicesList` pour obtenir noms officiels
    - Mapper codes vers noms lisibles
    - Mettre à jour colonne `display_name`
 
 5. **Ajouter Catégories Intelligentes**
+
    - Analyser codes services (wa, tg, ig → messaging)
    - Auto-catégoriser nouveaux services
    - Améliorer UX Dashboard
@@ -604,6 +633,7 @@ return (
 ## 📈 RÉSULTATS ATTENDUS
 
 ### Avant Corrections
+
 ```
 Services Admin:       2,418 (100%)
 Services User:        1,296 (53.6%)
@@ -613,6 +643,7 @@ Services Manquants:   622
 ```
 
 ### Après Corrections
+
 ```
 Services Admin:       2,661 (100%) → +243 services
 Services User:        2,640 (99.2%) → +1,344 services ✅
@@ -622,6 +653,7 @@ Services Manquants:   0 → -622 services ✅
 ```
 
 **Impact Utilisateur:**
+
 - ✅ **+104% services visibles** (1,296 → 2,640)
 - ✅ **99.2% disponibilité** (vs 53.6%)
 - ✅ **Sync temps réel** (vs 5 jours retard)

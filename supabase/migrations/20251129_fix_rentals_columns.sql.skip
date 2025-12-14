@@ -1,0 +1,29 @@
+-- Migration: Ajouter les colonnes manquantes à la table rentals
+-- Date: 2025-11-29
+
+-- Ajouter les colonnes manquantes
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS rent_id TEXT;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS operator TEXT DEFAULT 'auto';
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS total_cost DECIMAL(10, 2);
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10, 2);
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS duration_hours INTEGER;
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'sms-activate';
+ALTER TABLE rentals ADD COLUMN IF NOT EXISTS message_count INTEGER DEFAULT 0;
+
+-- Mettre à jour les colonnes existantes pour être cohérentes
+UPDATE rentals SET rent_id = rental_id WHERE rent_id IS NULL;
+UPDATE rentals SET total_cost = price WHERE total_cost IS NULL;
+UPDATE rentals SET duration_hours = rent_hours WHERE duration_hours IS NULL;
+UPDATE rentals SET expires_at = end_date WHERE expires_at IS NULL;
+
+-- Index pour rent_id
+CREATE INDEX IF NOT EXISTS idx_rentals_rent_id ON rentals(rent_id);
+CREATE INDEX IF NOT EXISTS idx_rentals_provider ON rentals(provider);
+
+-- Autoriser service role à insérer/modifier les rentals
+DROP POLICY IF EXISTS "Service role full access rentals" ON rentals;
+CREATE POLICY "Service role full access rentals" ON rentals 
+  FOR ALL 
+  USING (true) 
+  WITH CHECK (true);

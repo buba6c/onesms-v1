@@ -264,13 +264,13 @@ export default function HomePage() {
     queryKey: ['homepage-pricing'],
     queryFn: async () => {
       try {
-        // Try to get prices from services table
+        // Try to get prices from services table (using our_price column)
         const { data, error } = await supabase
           .from('services')
-          .select('price')
+          .select('our_price')
           .eq('active', true)
-          .gt('price', 0)
-          .order('price', { ascending: true })
+          .gt('our_price', 0)
+          .order('our_price', { ascending: true })
           .limit(100);
         
         if (error) {
@@ -279,7 +279,7 @@ export default function HomePage() {
         }
         
         if (data && data.length > 0) {
-          const prices = data.map((s: any) => s.price).filter((p: number) => p > 0);
+          const prices = data.map((s: any) => s.our_price).filter((p: number) => p > 0);
           if (prices.length > 0) {
             return {
               min: Math.min(...prices),
@@ -455,8 +455,8 @@ export default function HomePage() {
       <section className="relative min-h-[90vh] bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white overflow-hidden flex items-center pt-14 md:pt-0">
         {/* Animated Background */}
         <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-3xl"></div>
         </div>
         
@@ -468,7 +468,9 @@ export default function HomePage() {
             
             {/* Main Title */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-4 md:mb-6 leading-tight tracking-tight animate-fade-in-up">
-              {t('homepage.hero.title')}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-100">
+                OneSMS
+              </span>
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
                 {t('homepage.hero.titleHighlight')}
@@ -489,9 +491,6 @@ export default function HomePage() {
                 </Button>
               </Link>
             </div>
-
-            {/* Trust Badge */}
-            <p className="text-sm text-blue-200/60 mb-8 animate-fade-in animate-delay-500">{t('homepage.hero.trustedBy')}</p>
 
             {/* Stats Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-4xl mx-auto mb-12 md:mb-16 px-4">
@@ -708,6 +707,118 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Referral Banner Section - Invite friends */}
+      <section className="py-10 md:py-20 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-cyan-100/50 rounded-full blur-3xl" />
+        </div>
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-5xl mx-auto">
+            {/* Section Header */}
+            <div className="text-center mb-6 md:mb-10">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-100 to-blue-100 text-blue-700 px-4 md:px-5 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-semibold mb-3 md:mb-4 shadow-sm">
+                <Gift className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                {t('homepage.referralBanner.badge')}
+              </div>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-gray-900 mb-2">
+                {t('homepage.referralBanner.title')}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600"> {t('homepage.referralBanner.titleHighlight')}</span>
+              </h2>
+              <p className="text-sm md:text-base text-gray-600 max-w-2xl mx-auto mt-3 md:mt-4 px-2">
+                {t('homepage.referralBanner.description')}
+              </p>
+            </div>
+
+            {/* Main Card */}
+            <div className="bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative">
+              {/* Background elements */}
+              <div className="absolute inset-0">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.2),transparent_50%)]"></div>
+                <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(139,92,246,0.2),transparent_50%)]"></div>
+              </div>
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+
+              <div className="grid md:grid-cols-2 gap-0 relative z-10">
+                {/* Left Content */}
+                <div className="p-5 sm:p-6 md:p-10 lg:p-12 text-white">
+                  {/* Bonus Highlight - Mobile first */}
+                  <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 rounded-xl p-3 sm:p-4 mb-5 md:mb-6">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🎁</span>
+                      <div>
+                        <p className="text-white font-bold text-sm sm:text-base md:text-lg">
+                          {t('referral.bonusHighlight')}
+                        </p>
+                        <p className="text-yellow-200/80 text-xs sm:text-sm hidden sm:block">
+                          {t('referral.bonusHighlightDesc')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Benefits */}
+                  <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
+                    {[t('homepage.referralBanner.benefit1'), t('homepage.referralBanner.benefit2'), t('homepage.referralBanner.benefit3')].map((benefit, idx) => (
+                      <div key={idx} className="flex items-center gap-3 md:gap-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg md:rounded-xl p-3 md:p-4">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/30">
+                          <Check className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                        </div>
+                        <span className="text-blue-100 font-medium text-sm md:text-lg">{benefit}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CTAs */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Link to="/register" className="w-full sm:w-auto">
+                      <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 h-12 md:h-14 px-6 md:px-8 font-bold text-base md:text-lg shadow-lg shadow-cyan-500/30 transition-all hover:scale-105">
+                        {t('homepage.referralBanner.cta')}
+                        <ArrowRight className="ml-2 w-4 h-4 md:w-5 md:h-5" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Right Visual */}
+                <div className="p-5 sm:p-6 md:p-10 lg:p-12 flex flex-col justify-center relative border-t md:border-t-0 md:border-l border-white/10">
+                  {/* Decorative circles - hidden on mobile */}
+                  <div className="hidden md:block absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-2xl" />
+                  <div className="hidden md:block absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl" />
+                  
+                  <div className="relative z-10 text-white text-center">
+                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-xl shadow-cyan-500/40">
+                      <Users className="w-7 h-7 md:w-10 md:h-10" />
+                    </div>
+
+                    <p className="text-blue-200/80 text-xs md:text-sm mb-1 md:mb-2">{t('homepage.referralBanner.haveCode')}</p>
+                    <p className="text-lg md:text-2xl font-bold mb-4 md:mb-6">
+                      {t('homepage.referralBanner.enterCode')}
+                    </p>
+
+                    {/* Fake code input visual */}
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg md:rounded-xl p-3 md:p-5 max-w-xs mx-auto">
+                      <div className="flex items-center gap-2 md:gap-3 justify-center">
+                        <Gift className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
+                        <span className="text-base md:text-xl font-mono font-bold tracking-wider md:tracking-widest text-cyan-300">ABC123XYZ</span>
+                      </div>
+                      <p className="text-[10px] md:text-xs text-blue-200/60 mt-2 md:mt-3">{t('homepage.referralBanner.codeExample')}</p>
+                    </div>
+
+                    <Link to="/referral" className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-medium text-sm md:text-base mt-4 md:mt-6 transition-colors">
+                      {t('homepage.referralBanner.ctaLearnMore')}
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

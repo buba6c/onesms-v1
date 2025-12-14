@@ -3,12 +3,14 @@
 ## 📊 Logs à Vérifier dans Console Browser (F12)
 
 ### 1. Au Chargement de la Page
+
 ```
 ✅ Attendu:
 [REALTIME] WebSocket connecté avec succès
 ```
 
 ### 2. Quand on Sélectionne un Service en Mode Rent
+
 ```
 ✅ Attendu:
 🌐 [LIVE] Chargement pays mode=rent service=amazon
@@ -22,6 +24,7 @@
 ```
 
 ### 3. Quand on Clique sur Rent/Activate
+
 ```
 ✅ Attendu:
 🔍 [RENT] SMS-Activate sélectionnera automatiquement le meilleur opérateur
@@ -31,6 +34,7 @@
 ```
 
 ### 4. Edge Function Logs (Backend)
+
 ```
 ✅ Attendu dans logs Supabase:
 🚀 [BUY-RENT] Function called
@@ -48,6 +52,7 @@
 ## 🚨 Erreurs Possibles et Solutions
 
 ### Erreur 1: "Service not available"
+
 ```javascript
 ❌ Console:
 ⚠️ [RENT] Service amazon pas disponible pour location
@@ -60,6 +65,7 @@
 ```
 
 ### Erreur 2: "NO_BALANCE"
+
 ```javascript
 ❌ Response: {status: "error", message: "NO_BALANCE"}
 
@@ -69,6 +75,7 @@
 ```
 
 ### Erreur 3: "NO_NUMBERS"
+
 ```javascript
 ❌ Response: {status: "error", message: "NO_NUMBERS"}
 
@@ -78,6 +85,7 @@
 ```
 
 ### Erreur 4: "Insufficient balance"
+
 ```javascript
 ❌ Error: Insufficient balance. Required: 21.95Ⓐ, Available: 5Ⓐ
 
@@ -87,6 +95,7 @@
 ```
 
 ### Erreur 5: API URL incorrecte (CORRIGÉ)
+
 ```javascript
 ❌ Avant:
 Failed to fetch: api.sms-activate.ae
@@ -101,19 +110,19 @@ Collez ce code dans la console browser (F12):
 
 ```javascript
 // Test 1: Vérifier get-rent-services
-const testServices = await supabase.functions.invoke('get-rent-services', {
-  body: { rentTime: '4' }
+const testServices = await supabase.functions.invoke("get-rent-services", {
+  body: { rentTime: "4" },
 });
-console.log('Services disponibles:', testServices);
+console.log("Services disponibles:", testServices);
 
 // Test 2: Vérifier service spécifique
 const services = testServices.data.services;
-console.log('WhatsApp (wa):', services.wa);
-console.log('Any other (any):', services.any);
-console.log('Full rent (full):', services.full);
+console.log("WhatsApp (wa):", services.wa);
+console.log("Any other (any):", services.any);
+console.log("Full rent (full):", services.full);
 
 // Test 3: Liste tous les services
-console.log('Tous les services:', Object.keys(services));
+console.log("Tous les services:", Object.keys(services));
 ```
 
 ## 📋 Informations à Fournir pour Debug
@@ -130,20 +139,24 @@ Si ça ne fonctionne toujours pas, donnez-moi:
 ## 🔗 Vérifications Rapides
 
 ### Check 1: Edge Function déployée
+
 ```bash
 supabase functions list
 # Devrait montrer: buy-sms-activate-rent
 ```
 
 ### Check 2: Variables d'environnement
+
 - `SMS_ACTIVATE_API_KEY` doit être définie
 - Vérifier dans dashboard Supabase → Edge Functions → Secrets
 
 ### Check 3: Mode Rent activé
+
 - Toggle "Activation/Rent" en haut à gauche doit être sur "Rent"
 - Sidebar doit montrer "Any other ❓" et "Full rent 🏠"
 
 ### Check 4: Service dans DB
+
 ```sql
 SELECT * FROM services WHERE code = 'wa';
 -- Doit retourner WhatsApp

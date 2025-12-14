@@ -16,9 +16,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!acceptedTerms) {
+      toast({
+        title: t('auth.acceptTermsTitle', 'Consentement requis'),
+        description: t('auth.acceptTermsDesc', 'Vous devez accepter les conditions pour continuer.'),
+        variant: 'destructive'
+      })
+      return
+    }
     setLoading(true)
 
     const { data, error } = await signIn(email, password)
@@ -109,6 +118,30 @@ export default function LoginPage() {
               />
             </div>
 
+            <div className="flex items-start gap-2 rounded-md border p-3">
+              <input
+                id="accept-terms"
+                type="checkbox"
+                className="mt-1 h-4 w-4 border-gray-300 text-primary focus:ring-primary"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                required
+              />
+              <label htmlFor="accept-terms" className="text-sm text-muted-foreground leading-5">
+                {t('auth.acceptTerms', 'J’accepte les Conditions d’utilisation')} {' '}
+                {t('auth.and', 'et la')}{' '}
+                <a
+                  href="http://localhost:3001/privacy"
+                  className="text-primary underline underline-offset-2"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t('auth.privacyPolicy', 'Politique de confidentialité')}
+                </a>
+                {'.'}
+              </label>
+            </div>
+
             {/* Forgot password link */}
             <div className="text-right">
               <Link 
@@ -119,7 +152,7 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !acceptedTerms}>
               {loading ? t('common.loading') : t('nav.login')}
             </Button>
           </form>

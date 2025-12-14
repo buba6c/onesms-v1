@@ -22,11 +22,11 @@
 
 Vous avez **3 systèmes de synchronisation** qui tournent :
 
-| Système | Fréquence | Objectif | Edge Function |
-|---------|-----------|----------|---------------|
-| **Sync SMS-Activate** | Toutes les 30 min | Sync complet (services + pays + pricing_rules) | `sync-sms-activate` |
-| **Sync Service Counts** | Toutes les 15 min | Update `services.total_available` | `sync-service-counts` |
-| **Sync Countries** | Toutes les heures | Update pays + stats | `sync-countries` |
+| Système                 | Fréquence         | Objectif                                       | Edge Function         |
+| ----------------------- | ----------------- | ---------------------------------------------- | --------------------- |
+| **Sync SMS-Activate**   | Toutes les 30 min | Sync complet (services + pays + pricing_rules) | `sync-sms-activate`   |
+| **Sync Service Counts** | Toutes les 15 min | Update `services.total_available`              | `sync-service-counts` |
+| **Sync Countries**      | Toutes les heures | Update pays + stats                            | `sync-countries`      |
 
 ### ⚠️ PROBLÈME MAJEUR DÉTECTÉ
 
@@ -36,7 +36,8 @@ Vous avez **3 systèmes de synchronisation** qui tournent :
 - `sync-service-counts` → Update SEULEMENT total_available
 - `sync-countries` → Update SEULEMENT pays + stats
 
-**❌ INCOHÉRENCE:** 
+**❌ INCOHÉRENCE:**
+
 - `sync-service-counts` utilise `getNumbersStatus` (retourne juste des counts)
 - `sync-sms-activate` utilise `getPrices` (retourne cost + count)
 - Ils ne travaillent PAS sur les mêmes données!
@@ -82,7 +83,7 @@ totalCounts = {
 
 // 5️⃣ UPDATE EN BATCH
 for each service:
-  UPDATE services 
+  UPDATE services
   SET total_available = totalCounts[code]
   WHERE code = service_code
 ```
@@ -90,40 +91,49 @@ for each service:
 ### 2.3 Problèmes identifiés
 
 #### ❌ Problème #1: Pas de pricing_rules
+
 Cette fonction **NE MET PAS À JOUR** la table `pricing_rules`!
+
 - Elle utilise `getNumbersStatus` qui retourne seulement des COUNTS
 - Elle ne touche PAS aux prix (activation_cost, activation_price)
 - Résultat: **Incohérence entre `services.total_available` et `pricing_rules.available_count`**
 
 #### ❌ Problème #2: Seulement 5 pays
+
 ```typescript
-const topCountries = [187, 4, 6, 22, 12]
+const topCountries = [187, 4, 6, 22, 12];
 ```
+
 Vous avez 150+ pays dans la DB mais vous scannez seulement 5!
+
 - 97% des pays ignorés
 - Pas de vision globale
 - Counts biaisés
 
 #### ❌ Problème #3: Pas de calculate_service_totals()
+
 Après l'update, la fonction **N'APPELLE PAS** le SQL function:
+
 ```typescript
 // ❌ MANQUANT
-await supabaseClient.rpc('calculate_service_totals')
+await supabaseClient.rpc("calculate_service_totals");
 ```
 
 **Impact:**
+
 - Les totaux sont calculés manuellement (somme de 5 pays)
 - Pas synchronisé avec pricing_rules
 - Si pricing_rules change, total_available reste obsolète
 
 #### ❌ Problème #4: Upsert ignores conflicts
+
 ```typescript
 const { data: updateData, error: updateError } = await supabase
-  .from('services')
-  .upsert(updates, { 
-    onConflict: 'code',
-    ignoreDuplicates: false 
-  })
+  .from("services")
+  .upsert(updates, {
+    onConflict: "code",
+    ignoreDuplicates: false,
+  });
 ```
 
 **Problème:** Si un service n'existe pas, il sera créé SANS icône, category, name!
@@ -165,12 +175,12 @@ for each country:
   2. GET https://api.sms-activate.ae/stubs/handler_api.php
          ?action=getNumbersStatus
          &country=187
-  
+
   3. Count services and numbers:
      - totalServices (nombre de services dispo)
      - totalNumbers (somme de tous les numéros)
      - topServices (top 5 services du pays)
-  
+
   4. Upsert dans countries table:
      {
        code: 'usa',
@@ -198,45 +208,54 @@ INSERT sync_logs:
 ```typescript
 const COUNTRY_MAPPING: Record<number, { code: string; name: string }> = {
   // ...
-  12: { code: 'usa', name: 'United States' },  // ❌ FAUX! 12 = UK/England
-  187: { code: 'usa', name: 'United States' }, // ✅ CORRECT
-  22: { code: 'ireland', name: 'Ireland' },    // ❌ FAUX! 22 = India (21)
+  12: { code: "usa", name: "United States" }, // ❌ FAUX! 12 = UK/England
+  187: { code: "usa", name: "United States" }, // ✅ CORRECT
+  22: { code: "ireland", name: "Ireland" }, // ❌ FAUX! 22 = India (21)
   // ...
-}
+};
 ```
 
 **Conséquences:**
+
 - USA compte en double (12 et 187)
 - India manquant (devrait être 21, pas 22)
 - Incohérence avec `sync-countries/index.ts` qui a le mapping correct
 
 #### ❌ Problème #2: Seulement 20 pays scannés
+
 ```typescript
 const topCountryIds = [...20 pays]
 ```
 
 Vous scannez 20 pays sur 150+!
+
 - 87% des pays jamais mis à jour
 - Pays populaires manquent (ex: Turkey 61, Brazil 72, Thailand 51)
 
 #### ❌ Problème #3: Pas de mise à jour pricing_rules
+
 Cette fonction update SEULEMENT la table `countries`, PAS `pricing_rules`!
+
 - Elle ne touche pas aux prix par pays/service
 - Juste des stats globales par pays
 - Pas d'info sur les opérateurs
 
 #### ❌ Problème #4: Delay entre pays (100ms)
+
 ```typescript
-await new Promise(resolve => setTimeout(resolve, 100))
+await new Promise((resolve) => setTimeout(resolve, 100));
 ```
 
 **Problème:**
+
 - 20 pays × 100ms = 2 secondes de délai inutile
 - Edge Functions ont limite de 5 minutes
 - Ralentit la sync sans raison (API SMS-Activate supporte parallélisation)
 
 #### ❌ Problème #5: getNumbersStatus retourne counts simples
+
 Comme `sync-service-counts`, cette fonction utilise `getNumbersStatus`:
+
 ```typescript
 // Retourne:
 { "wa": "123456", "tg": "78900", ... }
@@ -266,18 +285,20 @@ Donc **pas de données de pricing** récupérées!
 
 **Vous avez 3 fonctions qui se chevauchent:**
 
-| Fonction | Services | Countries | Pricing Rules | Total Available |
-|----------|----------|-----------|---------------|-----------------|
-| sync-sms-activate | ✅ Insert | ✅ Insert | ✅ Insert | ✅ Calcule (RPC) |
-| sync-service-counts | ❌ Update | ❌ Non | ❌ Non | ✅ Update manuel |
-| sync-countries | ❌ Non | ✅ Update | ❌ Non | ❌ Non |
+| Fonction            | Services  | Countries | Pricing Rules | Total Available  |
+| ------------------- | --------- | --------- | ------------- | ---------------- |
+| sync-sms-activate   | ✅ Insert | ✅ Insert | ✅ Insert     | ✅ Calcule (RPC) |
+| sync-service-counts | ❌ Update | ❌ Non    | ❌ Non        | ✅ Update manuel |
+| sync-countries      | ❌ Non    | ✅ Update | ❌ Non        | ❌ Non           |
 
 **CONSÉQUENCE:**
+
 - `sync-sms-activate` fait le travail complet toutes les 30 min
 - `sync-service-counts` refait un calcul partiel toutes les 15 min (seulement 5 pays!)
 - `sync-countries` update juste les stats pays toutes les heures
 
 **❌ INCOHÉRENCE:** Les 3 systèmes ne sont PAS synchronisés!
+
 - `sync-service-counts` peut écraser les totaux calculés par `sync-sms-activate`
 - Les counts de `sync-service-counts` viennent de 5 pays seulement
 - Les totaux de `sync-sms-activate` viennent de 9 pays + pricing_rules
@@ -309,16 +330,19 @@ Donc **pas de données de pricing** récupérées!
 ### 4.3 Mapping country IDs incorrect
 
 **Dans sync-countries/index.ts:**
+
 ```typescript
 12: { code: 'usa', name: 'United States' },  // ❌ FAUX
 187: { code: 'usa', name: 'United States' }, // ✅ CORRECT
 ```
 
 **Selon SMS-Activate API officiel:**
+
 - ID 12 = **England** (United Kingdom)
 - ID 187 = **USA** (United States)
 
 **CORRECTION NÉCESSAIRE:**
+
 ```typescript
 12: { code: 'england', name: 'United Kingdom' },
 187: { code: 'usa', name: 'United States' },
@@ -326,11 +350,11 @@ Donc **pas de données de pricing** récupérées!
 
 ### 4.4 Coverage insuffisant
 
-| Système | Pays scannés | % Coverage | Problème |
-|---------|--------------|------------|----------|
-| sync-sms-activate | 9 pays | 4.5% | Pas de couverture globale |
-| sync-service-counts | 5 pays | 2.5% | Counts très biaisés |
-| sync-countries | 20 pays | 10% | 90% des pays ignorés |
+| Système             | Pays scannés | % Coverage | Problème                  |
+| ------------------- | ------------ | ---------- | ------------------------- |
+| sync-sms-activate   | 9 pays       | 4.5%       | Pas de couverture globale |
+| sync-service-counts | 5 pays       | 2.5%       | Counts très biaisés       |
+| sync-countries      | 20 pays      | 10%        | 90% des pays ignorés      |
 
 **Total pays SMS-Activate:** ~200 pays  
 **Total pays en DB:** 205 pays  
@@ -338,13 +362,14 @@ Donc **pas de données de pricing** récupérées!
 
 ### 4.5 API endpoints différents
 
-| Fonction | Endpoint | Retourne | Limite |
-|----------|----------|----------|--------|
-| sync-sms-activate | `getPrices` | cost + count + operators | ✅ Complet |
-| sync-service-counts | `getNumbersStatus` | counts seulement | ❌ Incomplet |
-| sync-countries | `getNumbersStatus` | counts seulement | ❌ Incomplet |
+| Fonction            | Endpoint           | Retourne                 | Limite       |
+| ------------------- | ------------------ | ------------------------ | ------------ |
+| sync-sms-activate   | `getPrices`        | cost + count + operators | ✅ Complet   |
+| sync-service-counts | `getNumbersStatus` | counts seulement         | ❌ Incomplet |
+| sync-countries      | `getNumbersStatus` | counts seulement         | ❌ Incomplet |
 
 **PROBLÈME:**
+
 - `getPrices` retourne tout: prix, counts, opérateurs
 - `getNumbersStatus` retourne seulement les counts
 - Utiliser 2 endpoints différents = données incohérentes!
@@ -434,51 +459,54 @@ Donc **pas de données de pricing** récupérées!
 ```
 T = 0:00  → sync-sms-activate execute
             services.total_available = 1,250,000 (calculate_service_totals)
-            
+
 T = 0:15  → sync-service-counts execute
             services.total_available = 725,000 (manual sum 5 pays)
             ❌ ÉCRASE le calcul précédent!
-            
+
 T = 0:30  → sync-sms-activate execute
             services.total_available = 1,250,000 (recalcule)
             ✅ Corrige temporairement
-            
+
 T = 0:45  → sync-service-counts execute
             services.total_available = 725,000
             ❌ ÉCRASE encore!
-            
+
 T = 1:00  → sync-countries execute
             countries stats updated
             services.total_available unchanged (pas touché)
-            
+
 → RÉSULTAT: Les counts oscillent entre 725k et 1.25M toutes les 15 min!
 ```
 
 ### 5.3 Bouton Admin Dashboard
 
 **Code actuel:**
+
 ```typescript
 // AdminServices.tsx
 <Button onClick={() => syncMutation.mutate()}>
   Synchroniser avec SMS-Activate
-</Button>
+</Button>;
 
 // sync-service.ts
 export const triggerSync = async () => {
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/sync-sms-activate`,
-    { method: 'POST' }
-  )
-}
+    { method: "POST" }
+  );
+};
 ```
 
 **❌ PROBLÈME:**
+
 - Le bouton appelle SEULEMENT `sync-sms-activate`
 - Il n'y a PAS de boutons pour `sync-service-counts` et `sync-countries`
 - Ces 2 fonctions tournent en background via GitHub Actions SEULEMENT
 - Admin ne peut pas les déclencher manuellement!
 
 **CE QUE L'ADMIN VOIT:**
+
 ```
 🔄 Synchroniser avec SMS-Activate
    → Appelle sync-sms-activate
@@ -498,13 +526,16 @@ sync-service-counts execute en background
 ### 6.1 Solution #1: Supprimer sync-service-counts (RECOMMANDÉ)
 
 **Pourquoi:**
+
 - ❌ Redondant avec sync-sms-activate
 - ❌ Utilise getNumbersStatus (incomplet) au lieu de getPrices (complet)
 - ❌ Scanne seulement 5 pays (biaisé)
 - ❌ Écrase les calculs corrects de calculate_service_totals()
 
 **Actions:**
+
 1. Désactiver le workflow GitHub Actions:
+
    ```bash
    # Renommer pour désactiver
    mv .github/workflows/sync-service-counts.yml \
@@ -512,6 +543,7 @@ sync-service-counts execute en background
    ```
 
 2. Supprimer l'Edge Function:
+
    ```bash
    rm -rf supabase/functions/sync-service-counts
    ```
@@ -523,6 +555,7 @@ sync-service-counts execute en background
    - Sync services + countries + pricing_rules
 
 **Résultat:**
+
 - ✅ Plus d'overwrites
 - ✅ Données cohérentes
 - ✅ Une seule source de vérité
@@ -533,12 +566,13 @@ sync-service-counts execute en background
 **Actions:**
 
 1. **Corriger le COUNTRY_MAPPING:**
+
    ```typescript
    // AVANT (incorrect)
    12: { code: 'usa', name: 'United States' },
    187: { code: 'usa', name: 'United States' },
    22: { code: 'ireland', name: 'Ireland' },
-   
+
    // APRÈS (correct)
    12: { code: 'england', name: 'United Kingdom' },
    187: { code: 'usa', name: 'United States' },
@@ -547,10 +581,11 @@ sync-service-counts execute en background
    ```
 
 2. **Augmenter le coverage:**
+
    ```typescript
    // AVANT: 20 pays
    const topCountryIds = [187, 4, 6, 22, 12, ...]
-   
+
    // APRÈS: Top 50 pays minimum
    const topCountryIds = [
      187, 4, 6, 21, 12,  // Top 5
@@ -561,21 +596,23 @@ sync-service-counts execute en background
    ```
 
 3. **Supprimer le delay inutile:**
+
    ```typescript
    // AVANT
-   await new Promise(resolve => setTimeout(resolve, 100))
-   
+   await new Promise((resolve) => setTimeout(resolve, 100));
+
    // APRÈS
    // Supprimer complètement (parallélisation OK)
    ```
 
 4. **Changer l'endpoint vers getPrices:**
+
    ```typescript
    // AVANT
-   const url = `${BASE_URL}?action=getNumbersStatus&country=${id}`
-   
+   const url = `${BASE_URL}?action=getNumbersStatus&country=${id}`;
+
    // APRÈS
-   const url = `${BASE_URL}?action=getPrices&country=${id}`
+   const url = `${BASE_URL}?action=getPrices&country=${id}`;
    ```
 
 ### 6.3 Solution #3: Architecture unifiée (OPTIMAL)
@@ -583,6 +620,7 @@ sync-service-counts execute en background
 **Garder SEULEMENT 2 fonctions:**
 
 #### A) sync-sms-activate (sync COMPLET)
+
 - **Fréquence:** Toutes les 30 minutes
 - **Objectif:** Sync complet de TOUT
 - **Actions:**
@@ -593,6 +631,7 @@ sync-service-counts execute en background
   5. Call calculate_service_totals()
 
 #### B) sync-quick-counts (sync RAPIDE)
+
 - **Fréquence:** Toutes les 5 minutes
 - **Objectif:** Update SEULEMENT les counts en temps quasi-réel
 - **Actions:**
@@ -601,6 +640,7 @@ sync-service-counts execute en background
   3. Pas de requêtes API (juste calculs DB)
 
 **Avantages:**
+
 - ✅ Sync complet toutes les 30 min (données fraîches)
 - ✅ Calcul rapide toutes les 5 min (temps réel)
 - ✅ Une seule source de vérité (pricing_rules)
@@ -617,37 +657,38 @@ sync-service-counts execute en background
   <Button onClick={() => syncFullMutation.mutate()}>
     <RefreshCw /> Sync Complet (SMS-Activate)
   </Button>
-  
+
   <Button onClick={() => syncCountsMutation.mutate()}>
     <Hash /> Update Counts Rapide
   </Button>
-  
+
   <Button onClick={() => syncCountriesMutation.mutate()}>
     <Globe /> Sync Countries Stats
   </Button>
-</div>
+</div>;
 
 // sync-service.ts
 export const triggerFullSync = async () => {
   return await fetch(`${SUPABASE_URL}/functions/v1/sync-sms-activate`, {
-    method: 'POST'
-  })
-}
+    method: "POST",
+  });
+};
 
 export const triggerCountsSync = async () => {
   // Appelle juste calculate_service_totals()
-  const { error } = await supabase.rpc('calculate_service_totals')
-  return { success: !error }
-}
+  const { error } = await supabase.rpc("calculate_service_totals");
+  return { success: !error };
+};
 
 export const triggerCountriesSync = async () => {
   return await fetch(`${SUPABASE_URL}/functions/v1/sync-countries`, {
-    method: 'POST'
-  })
-}
+    method: "POST",
+  });
+};
 ```
 
 **Avantages:**
+
 - ✅ Admin comprend ce qui se passe
 - ✅ Peut déclencher manuellement chaque sync
 - ✅ Transparence totale
@@ -698,6 +739,7 @@ EXECUTE FUNCTION detect_sync_conflicts();
 ```
 
 **Dashboard Admin affichera:**
+
 ```
 ⚠️ CONFLITS DÉTECTÉS:
 WhatsApp (wa): 1,250,000 → 725,000 (-42%) [15:23:45]
@@ -729,7 +771,9 @@ git push
 
 ```typescript
 // Augmenter de 20 à 50 pays minimum
-const topCountryIds = [/* ajouter 30 pays de plus */]
+const topCountryIds = [
+  /* ajouter 30 pays de plus */
+];
 ```
 
 ### Priorité 4: Ajouter monitoring (OPTIONNEL)

@@ -10,8 +10,9 @@
 ```
 
 Le script vous demandera :
+
 - ✅ AWS Access Key ID
-- ✅ AWS Secret Access Key  
+- ✅ AWS Secret Access Key
 - ✅ S3 Bucket Name
 - ✅ Supabase Service Role Key
 - ⚪ Brandfetch API Key (optionnel)
@@ -68,30 +69,35 @@ cat import-results.json | jq 'group_by(.source) | map({source: .[0].source, coun
 ## Résolution rapide de problèmes
 
 ### ❌ "Missing AWS credentials"
+
 → Vérifier `.env.icons` : les 3 variables AWS sont remplies
 
 ### ❌ "S3 upload failed: AccessDenied"
+
 → Vérifier les permissions IAM (PutObject, PutObjectAcl)
 
 ### ❌ "Database update failed"
+
 → Utiliser la **Service Role Key** (pas anon key)
 
 ### ⚠️ Icônes de mauvaise qualité
+
 → Ajouter une clé Brandfetch API
 
 ### 🐌 Trop lent
+
 → Augmenter `CONCURRENCY_LIMIT` dans import-icons.js (ligne 26)
 
 ---
 
 ## Coûts estimés
 
-| Service | Coût |
-|---------|------|
-| AWS S3 Storage (150 MB) | ~$0.003/mois |
-| AWS S3 PUT Requests (7800) | ~$0.04 |
+| Service                     | Coût                                      |
+| --------------------------- | ----------------------------------------- |
+| AWS S3 Storage (150 MB)     | ~$0.003/mois                              |
+| AWS S3 PUT Requests (7800)  | ~$0.04                                    |
 | Brandfetch API (1300 calls) | $29/mois (plan Pro) ou gratuit (100/mois) |
-| **TOTAL** | ~$0.04 + $29 (optionnel) |
+| **TOTAL**                   | ~$0.04 + $29 (optionnel)                  |
 
 ---
 
@@ -118,6 +124,7 @@ cat import-results.json | jq 'group_by(.source) | map({source: .[0].source, coun
 📖 **Documentation complète** : `README-ICONS.md`
 
 🐛 **En cas de problème** :
+
 1. Vérifier les logs console
 2. Consulter `import-results.ndjson`
 3. Tester avec 1 service : `.limit(1)` dans le code

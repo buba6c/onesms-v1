@@ -31,6 +31,7 @@ cat supabase/migrations/create_sync_logs_table.sql
 Copiez le contenu et exécutez-le dans **Supabase SQL Editor** (Dashboard → SQL Editor → New Query)
 
 **Vérification:**
+
 ```sql
 SELECT COUNT(*) FROM sync_logs;
 -- Devrait retourner 0 (table vide mais créée)
@@ -47,6 +48,7 @@ DRY_RUN=true node scripts/sync-services-realtime.js
 ```
 
 **Résultat attendu:**
+
 ```
 🔄 Sync API → DB started...
 ✅ API: 1,661 services trouvés
@@ -58,12 +60,14 @@ DRY_RUN=true node scripts/sync-services-realtime.js
 ```
 
 Si tout est OK, **exécutez la vraie sync:**
+
 ```bash
 # Synchronisation RÉELLE (modifie la DB)
 node scripts/sync-services-realtime.js
 ```
 
 **Vérification:**
+
 ```sql
 -- Voir dernière sync
 SELECT * FROM sync_logs ORDER BY started_at DESC LIMIT 1;
@@ -83,6 +87,7 @@ SELECT COUNT(*) FROM services WHERE active = true AND total_available > 0;
 ```
 
 Le script va:
+
 1. ✅ Vérifier Node.js et dépendances
 2. ✅ Créer dossier `logs/`
 3. ✅ Tester sync en dry run
@@ -90,6 +95,7 @@ Le script va:
 5. ✅ Afficher résumé installation
 
 **Vérification:**
+
 ```bash
 # Voir cron jobs actifs
 crontab -l
@@ -99,6 +105,7 @@ crontab -l
 ```
 
 **Logs temps réel:**
+
 ```bash
 # Suivre les logs de synchronisation
 tail -f logs/sync-cron.log
@@ -111,10 +118,10 @@ tail -f logs/sync-cron.log
 ### Ajouter Route dans `App.tsx`
 
 ```tsx
-import AdminSyncStatusPage from '@/pages/admin/AdminSyncStatusPage';
+import AdminSyncStatusPage from "@/pages/admin/AdminSyncStatusPage";
 
 // Dans vos routes admin
-<Route path="/admin/sync-status" element={<AdminSyncStatusPage />} />
+<Route path="/admin/sync-status" element={<AdminSyncStatusPage />} />;
 ```
 
 ### Ajouter Lien Menu Admin
@@ -128,6 +135,7 @@ import AdminSyncStatusPage from '@/pages/admin/AdminSyncStatusPage';
 ```
 
 **Accès Dashboard:**
+
 ```
 http://localhost:5173/admin/sync-status
 ```
@@ -137,9 +145,11 @@ http://localhost:5173/admin/sync-status
 ## 🎯 Ce Qui Va Être Synchronisé
 
 ### 1. Services Obsolètes (1,379 services)
+
 **Action:** Désactivés (`active = false`, `total_available = 0`)
 
 Exemples:
+
 - reddit, ebay, yahoo, alibaba, nike, coinbase, bolt, etc.
 
 **Pourquoi?** Ces services n'existent plus dans l'API SMS-Activate
@@ -147,9 +157,11 @@ Exemples:
 ---
 
 ### 2. Services Manquants (622 services)
+
 **Action:** Ajoutés dans la DB avec stock actuel
 
 TOP services:
+
 - `sn` (Snapchat) - 2,382,555 numéros
 - `zz` - 424,194 numéros
 - `ng` - 308,092 numéros
@@ -160,9 +172,11 @@ TOP services:
 ---
 
 ### 3. Stocks Incorrects (997 services)
+
 **Action:** Stock mis à jour depuis API
 
 Exemples:
+
 - `go` (Google): 0 → 5,818,282
 - `oi` (Tinder): 0 → 5,526,543
 - `ew`: 0 → 6,965,817
@@ -175,6 +189,7 @@ Exemples:
 ## 📈 Résultats Attendus
 
 ### Avant Sync
+
 ```
 Services visibles User: 1,296
 Services cachés:      1,122
@@ -184,6 +199,7 @@ Stock Tinder:         0
 ```
 
 ### Après Sync
+
 ```
 Services visibles User: ~2,640  (+104% 🚀)
 Services cachés:      ~21       (-98% ✅)
@@ -251,10 +267,10 @@ SELECT * FROM sync_stats LIMIT 24;
 SELECT COUNT(*) FROM services WHERE active = true AND total_available > 0;
 
 -- TOP 10 services par stock
-SELECT code, name, total_available 
-FROM services 
-WHERE active = true 
-ORDER BY total_available DESC 
+SELECT code, name, total_available
+FROM services
+WHERE active = true
+ORDER BY total_available DESC
 LIMIT 10;
 
 -- Nettoyer vieux logs (> 30 jours)
@@ -274,6 +290,7 @@ npm install
 ### Problème 2: "VITE_SUPABASE_SERVICE_ROLE_KEY not set"
 
 Ajoutez dans `.env`:
+
 ```
 VITE_SUPABASE_SERVICE_ROLE_KEY=votre_service_role_key
 ```
@@ -320,13 +337,13 @@ La clé `service_role` bypass RLS (Row Level Security) - **ne l'utilisez QUE dan
 // ✅ BON (script backend/cron)
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
-  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY  // OK ici
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY // OK ici
 );
 
 // ❌ MAUVAIS (code frontend)
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY  // DANGER!
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY // DANGER!
 );
 ```
 
@@ -344,6 +361,7 @@ const supabase = createClient(
 ### Optimisations
 
 Pour réduire charge si nécessaire:
+
 ```bash
 # Sync toutes les 10 min au lieu de 5
 */10 * * * * cd "/Users/mac/Desktop/ONE SMS V1" && node scripts/sync-services-realtime.js >> logs/sync-cron.log 2>&1

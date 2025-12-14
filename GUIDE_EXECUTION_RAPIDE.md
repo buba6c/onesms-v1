@@ -3,39 +3,44 @@
 ## ⚡ CORRECTION IMMÉDIATE (5 minutes)
 
 ### Étape 1: Ouvrir Supabase SQL Editor
+
 1. Aller sur https://supabase.com/dashboard
 2. Sélectionner votre projet
 3. Cliquer sur "SQL Editor" dans le menu latéral
 4. Cliquer sur "+ New Query"
 
 ### Étape 2: Copier le script SQL
+
 ```bash
 # Ouvrir le fichier dans votre éditeur
 open scripts/fix-sms-activate-sorting.sql
 ```
 
 Ou copier directement depuis VS Code:
+
 - Fichier: `scripts/fix-sms-activate-sorting.sql`
 - Tout sélectionner (Cmd+A)
 - Copier (Cmd+C)
 
 ### Étape 3: Exécuter dans Supabase
+
 1. Coller le script dans SQL Editor (Cmd+V)
 2. Cliquer sur "Run" (ou Cmd+Enter)
 3. Attendre ~5 minutes
 4. Vérifier les logs de validation
 
 ### Étape 4: Vérifier les résultats
+
 Exécuter cette requête pour voir le Top 30:
 
 ```sql
-SELECT 
-  code, 
-  name, 
-  popularity_score, 
-  total_available, 
+SELECT
+  code,
+  name,
+  popularity_score,
+  total_available,
   category,
-  CASE 
+  CASE
     WHEN code IN ('wa', 'tg', 'vi') THEN '✨ NOUVEAU'
     WHEN code IN ('go', 'ds', 'vk', 'am', 'nf') THEN '🔄 CONSOLIDÉ'
     ELSE '✅ CORRIGÉ'
@@ -47,6 +52,7 @@ LIMIT 30;
 ```
 
 **Résultat attendu:**
+
 ```
 wa  - WhatsApp    - 1000 - ✨ NOUVEAU
 tg  - Telegram    -  990 - ✨ NOUVEAU
@@ -62,6 +68,7 @@ go  - Google      -  950 - 🔄 CONSOLIDÉ
 ## 📊 VALIDATION COMPLÈTE
 
 ### 1. Vérifier les services manquants
+
 ```sql
 -- Doit retourner 3 lignes (wa, tg, vi)
 SELECT code, name, popularity_score, category
@@ -71,19 +78,21 @@ AND active = true;
 ```
 
 ### 2. Vérifier les duplicats éliminés
+
 ```sql
 -- Les versions longues doivent être inactive (active = false)
 SELECT code, name, active, total_available
 FROM services
 WHERE code IN (
   'whatsapp', 'telegram', 'viber',
-  'google', 'discord', 'vkontakte', 
+  'google', 'discord', 'vkontakte',
   'amazon', 'netflix', 'uber', 'paypal'
 )
 ORDER BY code;
 ```
 
 ### 3. Vérifier les catégories
+
 ```sql
 -- Doit montrer ~50 services populaires
 SELECT category, COUNT(*) as count
@@ -94,6 +103,7 @@ ORDER BY count DESC;
 ```
 
 **Résultat attendu:**
+
 ```
 other         - 1685
 shopping      -  180
@@ -109,15 +119,17 @@ dating        -   40
 ```
 
 ### 4. Vérifier les performances
+
 ```sql
 -- Doit montrer 3 index créés
-SELECT indexname, tablename 
-FROM pg_indexes 
+SELECT indexname, tablename
+FROM pg_indexes
 WHERE tablename = 'services'
 AND indexname LIKE 'idx_services_%';
 ```
 
 **Résultat attendu:**
+
 ```
 idx_services_popularity_sort
 idx_services_category_active
@@ -129,6 +141,7 @@ idx_services_name_search
 ## 🧪 TESTS DANS LE DASHBOARD
 
 ### Test 1: Ordre des services
+
 1. Ouvrir le Dashboard
 2. Vérifier que l'ordre est:
    - WhatsApp (💬)
@@ -138,16 +151,19 @@ idx_services_name_search
    - Facebook (👤)
 
 ### Test 2: Recherche
+
 1. Chercher "whatsapp" → doit trouver 1 résultat (wa)
 2. Chercher "telegram" → doit trouver 1 résultat (tg)
 3. Chercher "google" → doit trouver 1 résultat (go)
 
 ### Test 3: Catégories
+
 1. Filtrer par "popular" → doit afficher 50 services
 2. Filtrer par "messaging" → doit inclure wa, tg, vi, ds
 3. Filtrer par "social" → doit inclure ig, fb, tw
 
 ### Test 4: Performance
+
 1. Ouvrir DevTools (F12)
 2. Onglet Network
 3. Recharger le Dashboard
@@ -159,12 +175,14 @@ idx_services_name_search
 ## 🔄 COMPARAISON AVEC SMS-ACTIVATE
 
 ### Méthode 1: Visuelle
+
 1. Ouvrir https://sms-activate.ae/
 2. Ouvrir votre Dashboard
 3. Comparer l'ordre des 20 premiers services
 4. Ils doivent être identiques
 
 ### Méthode 2: API
+
 ```bash
 # Récupérer l'ordre SMS-Activate
 curl "https://api.sms-activate.ae/stubs/handler_api.php?api_key=YOUR_KEY&action=getNumbersStatus&country=0"
@@ -186,7 +204,7 @@ const supabase = createClient(
     .eq('active', true)
     .order('popularity_score', { ascending: false })
     .limit(20);
-  
+
   console.log('Notre ordre:');
   data.forEach((s, i) => console.log(`${i+1}. ${s.code} - ${s.name}`));
 })();
@@ -201,7 +219,7 @@ EOF
 
 ```sql
 -- 1. Créer un backup (AVANT toute modification)
-CREATE TABLE services_backup_20251126 AS 
+CREATE TABLE services_backup_20251126 AS
 SELECT * FROM services;
 
 -- 2. En cas d'erreur, restaurer
@@ -221,14 +239,17 @@ SELECT COUNT(*) FROM services;
 ### Après déploiement (J+1)
 
 1. **Temps de chargement Dashboard**
+
    - Cible: < 200ms
    - Mesure: DevTools Network tab
 
 2. **Taux de conversion**
+
    - Services avec activations / Total services visibles
    - Cible: +20% vs avant
 
 3. **Services populaires utilisés**
+
    - % d'activations sur Top 20
    - Cible: > 80%
 
@@ -241,13 +262,13 @@ SELECT COUNT(*) FROM services;
 ```sql
 -- Créer une vue pour le monitoring
 CREATE OR REPLACE VIEW services_monitoring AS
-SELECT 
+SELECT
   code,
   name,
   popularity_score,
   total_available,
   category,
-  CASE 
+  CASE
     WHEN popularity_score >= 900 THEN 'Top 10'
     WHEN popularity_score >= 800 THEN 'Top 20'
     WHEN popularity_score >= 700 THEN 'Top 30'
@@ -263,7 +284,7 @@ ORDER BY popularity_score DESC;
 SELECT tier, COUNT(*) as count
 FROM services_monitoring
 GROUP BY tier
-ORDER BY 
+ORDER BY
   CASE tier
     WHEN 'Top 10' THEN 1
     WHEN 'Top 20' THEN 2
@@ -278,18 +299,21 @@ ORDER BY
 ## 🎯 CHECKLIST FINALE
 
 ### Avant exécution
+
 - [ ] Backup de la table services créé
 - [ ] Script SQL vérifié
 - [ ] Accès Supabase SQL Editor confirmé
 - [ ] Équipe informée (optionnel)
 
 ### Pendant exécution
+
 - [ ] Script copié dans SQL Editor
 - [ ] Exécution lancée (Run)
 - [ ] Logs surveillés
 - [ ] Pas d'erreurs affichées
 
 ### Après exécution
+
 - [ ] Top 30 vérifié (wa, tg, vi en tête)
 - [ ] Duplicats éliminés (versions longues inactive)
 - [ ] 50 services "popular"
@@ -299,6 +323,7 @@ ORDER BY
 - [ ] Comparé avec SMS-Activate
 
 ### En production
+
 - [ ] Monitoring activé
 - [ ] Métriques collectées (J+1, J+7, J+30)
 - [ ] Feedback utilisateurs
@@ -309,24 +334,31 @@ ORDER BY
 ## 🆘 DÉPANNAGE
 
 ### Problème: "Function transfer_service_stock does not exist"
+
 **Solution**: Le script crée cette fonction. Vérifiez que tout le script a été copié.
 
 ### Problème: "Timeout during execution"
+
 **Solution**: Exécuter en plusieurs parties:
+
 1. D'abord: Partie 1 (créer services)
 2. Ensuite: Partie 2 (consolidation)
 3. Enfin: Partie 3 (scores) + Partie 4 (catégories)
 
 ### Problème: "Dashboard ne montre pas les changements"
-**Solution**: 
+
+**Solution**:
+
 1. Vider le cache du navigateur (Cmd+Shift+R)
 2. Vérifier que la requête React Query est invalidée
 3. Redémarrer le dev server si nécessaire
 
 ### Problème: "Services toujours en double"
+
 **Solution**: Vérifier que active = false pour les versions longues:
+
 ```sql
-SELECT code, active FROM services 
+SELECT code, active FROM services
 WHERE code IN ('google', 'discord', 'vkontakte');
 ```
 
@@ -335,6 +367,7 @@ WHERE code IN ('google', 'discord', 'vkontakte');
 ## 📞 SUPPORT
 
 En cas de problème:
+
 1. ✅ Vérifier cette checklist
 2. 📚 Consulter `ANALYSE_COMPLETE_TRI_SERVICES.md`
 3. 🔍 Exécuter les requêtes de validation
@@ -350,7 +383,7 @@ En cas de problème:
 Une fois tout exécuté et validé, exécuter cette requête pour générer un rapport:
 
 ```sql
-SELECT 
+SELECT
   '🎉 CORRECTION TERMINÉE' as status,
   (SELECT COUNT(*) FROM services WHERE code IN ('wa', 'tg', 'vi')) as nouveaux_services,
   (SELECT COUNT(*) FROM services WHERE code IN ('google', 'discord', 'vkontakte') AND active = false) as duplicats_elimines,
@@ -359,6 +392,7 @@ SELECT
 ```
 
 **Résultat attendu:**
+
 ```
 status: 🎉 CORRECTION TERMINÉE
 nouveaux_services: 3

@@ -114,7 +114,7 @@ const services = [
   { code: 'vz', name: 'Hinge', category: 'dating', icon: '💕', popularity: 820 },
   { code: 'df', name: 'Happn', category: 'dating', icon: '💜', popularity: 800 },
   { code: 'qv', name: 'Badoo', category: 'dating', icon: '💙', popularity: 780 },
-  { code: 'yw', name: 'Grindr', category: 'dating', icon: '🟡', popularity: 760 },
+  { code: 'gr', name: 'Grindr', category: 'dating', icon: '🟡', popularity: 760 },
   { code: 'vm', name: 'OkCupid', category: 'dating', icon: '💚', popularity: 740 },
   { code: 'pf', name: 'POF', category: 'dating', icon: '🐠', popularity: 720 },
   { code: 'fd', name: 'Mamba', category: 'dating', icon: '💜', popularity: 700 },

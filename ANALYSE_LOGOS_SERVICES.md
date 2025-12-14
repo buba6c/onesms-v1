@@ -5,15 +5,18 @@
 ### 1. **Récupérer la liste des services**
 
 **Endpoint**: `getServicesList`
+
 ```
 https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getServicesList&country=$country&lang=$lang
 ```
 
 **Paramètres**:
+
 - `country` (optionnel): ID du pays pour filtrer les services disponibles
 - `lang` (optionnel): 'ru', 'en', 'es', 'cn' (défaut: 'en')
 
 **Réponse**:
+
 ```json
 {
   "status": "success",
@@ -27,6 +30,7 @@ https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getSer
 ```
 
 ⚠️ **PROBLÈME**: Cette API ne retourne PAS:
+
 - Les logos/icons
 - L'ordre de popularité
 - Les catégories
@@ -37,11 +41,13 @@ https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getSer
 ### 2. **Récupérer les prix actuels**
 
 **Endpoint**: `getPrices`
+
 ```
 https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getPrices&service=$service&country=$country
 ```
 
 **Réponse**:
+
 ```json
 {
   "187": {
@@ -58,11 +64,13 @@ https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getPri
 ### 3. **Top 10 pays par service**
 
 **Endpoint**: `getListOfTopCountriesByService`
+
 ```
 https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getListOfTopCountriesByService&service=$service
 ```
 
 **Réponse**:
+
 ```json
 [
   {
@@ -80,6 +88,7 @@ https://api.sms-activate.ae/stubs/handler_api.php?api_key=$api_key&action=getLis
 D'après l'analyse du document et l'observation du site:
 
 ### **Ordre de popularité officiel**:
+
 1. **ig** - Instagram 📷
 2. **wa** - WhatsApp 💬
 3. **tg** - Telegram ✈️
@@ -92,6 +101,7 @@ D'après l'analyse du document et l'observation du site:
 10. **ds** - Discord 💬
 
 ### **Services populaires additionnels**:
+
 11. **mb** - Microsoft/Bing 🪟
 12. **am** - Amazon 📦
 13. **nf** - Netflix 🎬
@@ -110,12 +120,14 @@ D'après l'analyse du document et l'observation du site:
 ### 1. **Les logos ne sont PAS fournis par l'API**
 
 L'API SMS-Activate ne fournit:
+
 - ❌ Pas de logos/images
 - ❌ Pas d'icons
 - ✅ Seulement les codes (wa, ig, tg...)
 - ✅ Seulement les noms ("WhatsApp", "Instagram"...)
 
 **Solution actuelle**: On utilise un mapping manuel:
+
 ```typescript
 // src/lib/logo-service.ts
 getServiceLogo(serviceCode: string): string
@@ -125,6 +137,7 @@ getServiceIcon(serviceCode: string): string
 ### 2. **L'ordre n'est PAS fourni par l'API**
 
 L'API ne fournit aucune information sur:
+
 - ❌ Popularité globale
 - ❌ Ordre d'affichage
 - ❌ Catégories
@@ -134,6 +147,7 @@ L'API ne fournit aucune information sur:
 ### 3. **Notre ordre actuel est INCORRECT**
 
 **Ce qu'on affiche maintenant**:
+
 1. WhatsApp (wa)
 2. Telegram (tg)
 3. PayPal (ts)
@@ -141,6 +155,7 @@ L'API ne fournit aucune information sur:
 5. Twitter (tw)
 
 **Ce qu'on DEVRAIT afficher**:
+
 1. Instagram (ig)
 2. WhatsApp (wa)
 3. Telegram (tg)
@@ -154,6 +169,7 @@ L'API ne fournit aucune information sur:
 ### **Solution 1: Ordre des services**
 
 ✅ **DÉJÀ FAIT** dans `sync-sms-activate/index.ts`:
+
 ```typescript
 const smsActivateOrder: Record<string, number> = {
   'ig': 1000,
@@ -168,6 +184,7 @@ const smsActivateOrder: Record<string, number> = {
 ### **Solution 2: Logos des services**
 
 **Option A: Mapping manuel (ACTUEL)**
+
 ```typescript
 // src/lib/logo-service.ts
 const SERVICE_ICONS: Record<string, string> = {
@@ -181,6 +198,7 @@ const SERVICE_ICONS: Record<string, string> = {
 ```
 
 **Option B: Utiliser des URLs d'images**
+
 ```typescript
 const SERVICE_LOGOS: Record<string, string> = {
   wa: 'https://logo.clearbit.com/whatsapp.com',
@@ -191,6 +209,7 @@ const SERVICE_LOGOS: Record<string, string> = {
 ```
 
 **Option C: Logos locaux (MEILLEUR)**
+
 ```
 /public/logos/services/
   - wa.png (WhatsApp)
@@ -232,28 +251,28 @@ servicesToUpsert.push({
 
 Basé sur l'observation du site SMS-Activate:
 
-| Code | Nom            | Icon | Catégorie  | Score |
-|------|----------------|------|------------|-------|
-| ig   | Instagram      | 📷   | social     | 1000  |
-| wa   | WhatsApp       | 💬   | messenger  | 990   |
-| tg   | Telegram       | ✈️   | messenger  | 980   |
-| go   | Google         | 🔍   | tech       | 970   |
-| fb   | Facebook       | 👤   | social     | 960   |
-| vk   | VK             | 🔵   | social     | 950   |
-| tw   | Twitter        | 🐦   | social     | 940   |
-| ok   | OK             | 👌   | social     | 930   |
-| vi   | Viber          | 💜   | messenger  | 920   |
-| ds   | Discord        | 💬   | messenger  | 910   |
-| mb   | Microsoft      | 🪟   | tech       | 900   |
-| am   | Amazon         | 📦   | shopping   | 890   |
-| nf   | Netflix        | 🎬   | streaming  | 880   |
-| ya   | Yandex         | 🟡   | tech       | 870   |
-| ub   | Uber           | 🚗   | transport  | 860   |
-| ym   | YouMail        | 📧   | email      | 850   |
-| tn   | Tinder         | 🔥   | dating     | 840   |
-| bd   | Badoo          | 💕   | dating     | 830   |
-| we   | WeChat         | 💬   | messenger  | 820   |
-| li   | LinkedIn       | 💼   | social     | 810   |
+| Code | Nom       | Icon | Catégorie | Score |
+| ---- | --------- | ---- | --------- | ----- |
+| ig   | Instagram | 📷   | social    | 1000  |
+| wa   | WhatsApp  | 💬   | messenger | 990   |
+| tg   | Telegram  | ✈️   | messenger | 980   |
+| go   | Google    | 🔍   | tech      | 970   |
+| fb   | Facebook  | 👤   | social    | 960   |
+| vk   | VK        | 🔵   | social    | 950   |
+| tw   | Twitter   | 🐦   | social    | 940   |
+| ok   | OK        | 👌   | social    | 930   |
+| vi   | Viber     | 💜   | messenger | 920   |
+| ds   | Discord   | 💬   | messenger | 910   |
+| mb   | Microsoft | 🪟   | tech      | 900   |
+| am   | Amazon    | 📦   | shopping  | 890   |
+| nf   | Netflix   | 🎬   | streaming | 880   |
+| ya   | Yandex    | 🟡   | tech      | 870   |
+| ub   | Uber      | 🚗   | transport | 860   |
+| ym   | YouMail   | 📧   | email     | 850   |
+| tn   | Tinder    | 🔥   | dating    | 840   |
+| bd   | Badoo     | 💕   | dating    | 830   |
+| we   | WeChat    | 💬   | messenger | 820   |
+| li   | LinkedIn  | 💼   | social    | 810   |
 
 ---
 
@@ -287,17 +306,27 @@ servicesToUpsert.push({
 
 ```typescript
 const SERVICE_CATEGORIES: Record<string, string> = {
-  'ig': 'social', 'fb': 'social', 'vk': 'social', 
-  'tw': 'social', 'ok': 'social', 'li': 'social',
-  'wa': 'messenger', 'tg': 'messenger', 'vi': 'messenger',
-  'ds': 'messenger', 'we': 'messenger',
-  'go': 'tech', 'mb': 'tech', 'ya': 'tech',
-  'am': 'shopping',
-  'nf': 'streaming',
-  'ub': 'transport',
-  'ym': 'email',
-  'tn': 'dating', 'bd': 'dating'
-}
+  ig: "social",
+  fb: "social",
+  vk: "social",
+  tw: "social",
+  ok: "social",
+  li: "social",
+  wa: "messenger",
+  tg: "messenger",
+  vi: "messenger",
+  ds: "messenger",
+  we: "messenger",
+  go: "tech",
+  mb: "tech",
+  ya: "tech",
+  am: "shopping",
+  nf: "streaming",
+  ub: "transport",
+  ym: "email",
+  tn: "dating",
+  bd: "dating",
+};
 ```
 
 ### **3. Ajouter getServicesList dans la sync**

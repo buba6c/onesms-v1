@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-12-02T14:09:30.115Z",
+  "score": 98,
+  "stats": {
+    "totalActivations": 161,
+    "totalUsers": 34,
+    "successRate": 18,
+    "totalRevenue": 355.9200000000001
+  },
+  "issues": [],
+  "warnings": [
+    {
+      "type": "RECEIVED_NOT_CHARGED",
+      "count": 19,
+      "suggestion": "Mettre à jour charged=true pour ces activations"
+    },
+    {
+      "type": "POTENTIAL_DUPLICATES",
+      "count": 9
+    },
+    {
+      "type": "OPS_FROZEN_MISMATCH",
+      "expected": 29,
+      "actual": 24
+    },
+    {
+      "type": "ORPHAN_FREEZES",
+      "count": 2
+    }
+  ],
+  "suggestions": [
+    {
+      "priority": "LOW",
+      "action": "Corriger 19 activations received avec charged=false",
+      "sql": "UPDATE activations SET charged = true WHERE status IN ('received', 'completed') AND charged IS NOT TRUE;"
+    }
+  ]
+}

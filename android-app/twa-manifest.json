@@ -1,0 +1,70 @@
+{
+  "host": "onesms-sn.com",
+  "name": "ONE SMS",
+  "launcherName": "ONE SMS",
+  "display": "standalone",
+  "themeColor": "#3B82F6",
+  "navigationColor": "#0F172A",
+  "navigationColorDark": "#0F172A",
+  "navigationDividerColor": "#0F172A",
+  "navigationDividerColorDark": "#0F172A",
+  "backgroundColor": "#0F172A",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://onesms-sn.com/icons/icon-512x512.png",
+  "maskableIconUrl": "https://onesms-sn.com/icons/icon-512x512.png",
+  "monochromeIconUrl": "https://onesms-sn.com/icons/icon-512x512.png",
+  "shortcuts": [
+    {
+      "name": "Acheter un numéro",
+      "shortName": "Acheter",
+      "url": "/services",
+      "icons": [
+        {
+          "src": "https://onesms-sn.com/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Mes activations",
+      "shortName": "Activations",
+      "url": "/activations",
+      "icons": [
+        {
+          "src": "https://onesms-sn.com/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "isChromeOSOnly": false,
+  "signing": {
+    "name": "ONE SMS",
+    "keystore": "./onesms.keystore",
+    "alias": "onesms",
+    "keystorePassword": "",
+    "aliasPassword": ""
+  },
+  "packageId": "com.onesms.app",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "signingMode": "new",
+  "fallbackType": "customtabs",
+  "splashScreenFadeOutDuration": 300,
+  "enableSiteSettingsShortcut": true,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "playBilling": {
+    "enabled": false
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "features": {},
+  "useBrowserOnChromeOS": false,
+  "minSdkVersion": 21,
+  "webManifestUrl": "https://onesms-sn.com/manifest.json"
+}

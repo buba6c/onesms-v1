@@ -1,0 +1,24 @@
+{
+  "date": "2025-12-08T21:33:39.685Z",
+  "tables": {
+    "users": 64,
+    "services": 1684,
+    "activations": 313,
+    "payment_providers": 1,
+    "countries": 337,
+    "system_settings": 43,
+    "service_icons": 32,
+    "popular_services": 10,
+    "promo_codes": 3,
+    "balance_operations": 464,
+    "rental_logs": 72450,
+    "activation_packages": 7,
+    "pricing_rules_archive": 119353,
+    "contact_settings": 1,
+    "email_campaigns": 1
+  },
+  "totalRows": 194763,
+  "functions": 61,
+  "migrations": 34,
+  "users": 64
+}

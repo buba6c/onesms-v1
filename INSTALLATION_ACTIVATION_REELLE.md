@@ -3,16 +3,19 @@
 ## ✅ Ce qui a été créé
 
 ### 1. **Edge Functions Supabase**
+
 - `buy-5sim-number` - Acheter un numéro (facturation différée)
 - `check-5sim-sms` - Vérifier SMS (facture à la réception)
 - `cancel-5sim-order` - Annuler (remboursement automatique)
 
 ### 2. **Migration SQL**
+
 - Table `activations` - Tracer tous les achats
 - RLS Policies - Sécurité
 - Vue `activation_stats` - Statistiques
 
 ### 3. **Frontend Modifié**
+
 - `DashboardPage.tsx` - Intégration API réelle
 - Vérification automatique SMS (5 secondes)
 - Gestion timeout + annulation
@@ -40,9 +43,9 @@
          - Activation: status = received
          - Transaction: status = completed
          - Afficher code SMS
-      
+
       ❌ NON → Continuer vérification
-   
+
    b) TIMEOUT (>20 min)?
       ✅ OUI → REMBOURSER
          - Annuler sur 5sim
@@ -71,6 +74,7 @@
 4. Exécuter
 
 **Vérification:**
+
 ```sql
 SELECT * FROM activations LIMIT 5;
 ```
@@ -91,11 +95,13 @@ supabase functions deploy cancel-5sim-order
 ```
 
 **Vérification:**
+
 ```bash
 supabase functions list
 ```
 
 Devrait afficher:
+
 - ✅ buy-5sim-number
 - ✅ check-5sim-sms
 - ✅ cancel-5sim-order
@@ -127,12 +133,14 @@ supabase secrets set FIVE_SIM_API_KEY=eyJhbGc...votre_token
 ### Test 1: Achat avec SMS reçu (cas nominal)
 
 **Scénario:**
+
 1. Acheter un numéro WhatsApp France
 2. Attendre réception SMS (peut prendre 30s-2min)
 3. Vérifier code affiché
 4. Vérifier solde déduit
 
 **Logs à surveiller:**
+
 ```
 🚀 [ACTIVATE] Début achat...
 ✅ [ACTIVATE] Numéro acheté: +33...
@@ -143,14 +151,15 @@ supabase secrets set FIVE_SIM_API_KEY=eyJhbGc...votre_token
 ```
 
 **Vérification DB:**
+
 ```sql
 -- Activation
 SELECT * FROM activations ORDER BY created_at DESC LIMIT 1;
 -- status devrait être 'received'
 
 -- Transaction
-SELECT * FROM transactions 
-WHERE type = 'number_purchase' 
+SELECT * FROM transactions
+WHERE type = 'number_purchase'
 ORDER BY created_at DESC LIMIT 1;
 -- status devrait être 'completed'
 ```
@@ -158,11 +167,13 @@ ORDER BY created_at DESC LIMIT 1;
 ### Test 2: Timeout sans SMS
 
 **Scénario:**
+
 1. Acheter un service peu populaire
 2. Attendre 20+ minutes sans SMS
 3. Vérifier remboursement automatique
 
 **Logs à surveiller:**
+
 ```
 ⏰ [CHECK] Timeout ! Remboursement automatique...
 ✅ [CHECK] Remboursé automatiquement
@@ -170,6 +181,7 @@ ORDER BY created_at DESC LIMIT 1;
 ```
 
 **Vérification DB:**
+
 ```sql
 -- Activation
 SELECT * FROM activations WHERE status = 'timeout' ORDER BY created_at DESC LIMIT 1;
@@ -182,12 +194,14 @@ SELECT * FROM transactions WHERE status = 'pending';
 ### Test 3: Annulation manuelle
 
 **Scénario:**
+
 1. Acheter un numéro
 2. Attendre 10 secondes
 3. Cliquer sur le bouton X (annuler)
 4. Vérifier remboursement
 
 **Logs à surveiller:**
+
 ```
 🚫 [CANCEL] Annulation commande...
 ✅ [CANCEL] Remboursé (transaction pending supprimée)
@@ -195,6 +209,7 @@ SELECT * FROM transactions WHERE status = 'pending';
 ```
 
 **Vérification DB:**
+
 ```sql
 SELECT * FROM activations WHERE status = 'cancelled' ORDER BY created_at DESC LIMIT 1;
 ```
@@ -202,11 +217,13 @@ SELECT * FROM activations WHERE status = 'cancelled' ORDER BY created_at DESC LI
 ### Test 4: Annulation impossible (SMS déjà reçu)
 
 **Scénario:**
+
 1. Acheter un numéro
 2. Attendre SMS (reçu)
 3. Essayer d'annuler → devrait échouer
 
 **Résultat attendu:**
+
 - Bouton X disparaît après réception SMS
 - Si on tente via API: erreur "Cannot cancel: SMS already received"
 
@@ -227,7 +244,7 @@ supabase functions logs cancel-5sim-order --follow
 
 ```sql
 -- Toutes les activations en attente
-SELECT 
+SELECT
   a.id,
   a.phone,
   a.service_code,
@@ -242,7 +259,7 @@ WHERE a.status = 'pending'
 ORDER BY a.created_at DESC;
 
 -- Statistiques globales
-SELECT 
+SELECT
   status,
   COUNT(*) as count,
   SUM(price) as total_amount
@@ -253,7 +270,7 @@ GROUP BY status;
 ### Voir les transactions en attente
 
 ```sql
-SELECT 
+SELECT
   t.id,
   t.user_id,
   t.type,
@@ -276,6 +293,7 @@ ORDER BY t.created_at DESC;
 **Cause:** Secret FIVE_SIM_API_KEY pas défini
 
 **Solution:**
+
 ```bash
 supabase secrets set FIVE_SIM_API_KEY=eyJhbGc...
 supabase functions deploy buy-5sim-number
@@ -286,10 +304,11 @@ supabase functions deploy buy-5sim-number
 **Cause:** Solde utilisateur insuffisant
 
 **Solution:**
+
 ```sql
 -- Ajouter du crédit manuellement (admin)
-UPDATE users 
-SET balance = balance + 100 
+UPDATE users
+SET balance = balance + 100
 WHERE email = 'test@example.com';
 ```
 
@@ -298,12 +317,14 @@ WHERE email = 'test@example.com';
 **Cause:** Service/Pays pas synchronisé ou stock vide
 
 **Solution:**
+
 1. Admin → Services → Sync avec 5sim
 2. Attendre fin sync (15-18s)
 3. Vérifier stock:
+
 ```sql
-SELECT service_code, country_code, available_count 
-FROM pricing_rules 
+SELECT service_code, country_code, available_count
+FROM pricing_rules
 WHERE service_code = 'whatsapp' AND country_code = 'france';
 ```
 
@@ -312,6 +333,7 @@ WHERE service_code = 'whatsapp' AND country_code = 'france';
 **Cause:** Service 5sim peut avoir problème temporaire
 
 **Solution:**
+
 - Attendre timeout automatique (20 min)
 - Ou annuler manuellement
 - Remboursement automatique dans les 2 cas
@@ -321,6 +343,7 @@ WHERE service_code = 'whatsapp' AND country_code = 'france';
 **Cause:** SMS reçu entre l'affichage et le clic annulation
 
 **Solution:**
+
 - C'est normal ! Le système protège contre double dépense
 - L'utilisateur a déjà été facturé
 - Il possède le code SMS
@@ -332,7 +355,7 @@ WHERE service_code = 'whatsapp' AND country_code = 'france';
 ### Taux de succès des activations
 
 ```sql
-SELECT 
+SELECT
   ROUND(COUNT(*) FILTER (WHERE status = 'received')::DECIMAL / COUNT(*) * 100, 2) as success_rate,
   COUNT(*) FILTER (WHERE status = 'received') as successful,
   COUNT(*) FILTER (WHERE status = 'timeout') as timeout,
@@ -344,7 +367,7 @@ FROM activations;
 ### Revenus générés
 
 ```sql
-SELECT 
+SELECT
   DATE(created_at) as date,
   COUNT(*) FILTER (WHERE status = 'received') as sales,
   SUM(price) FILTER (WHERE status = 'received') as revenue
@@ -356,7 +379,7 @@ ORDER BY date DESC;
 ### Services les plus vendus
 
 ```sql
-SELECT 
+SELECT
   service_code,
   COUNT(*) as total_sales,
   COUNT(*) FILTER (WHERE status = 'received') as successful,

@@ -15,6 +15,7 @@
 2. Clique sur **"Add new secret"**
 
 3. Ajoute **UN SEUL** secret:
+
    ```
    Name:  SMS_ACTIVATE_API_KEY
    Value: d29edd5e1d04c3127d5253d5eAe70de8
@@ -31,6 +32,7 @@
 2. Clique sur **"New repository secret"**
 
 3. Ajoute:
+
    ```
    Name:  SUPABASE_SERVICE_ROLE_KEY
    Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzYyNDgyOCwiZXhwIjoyMDc5MjAwODI4fQ.i31PDBp-K02RqZs35gfqEUQp9OHtxEQ6FqwfBV33wac
@@ -81,6 +83,7 @@ Une fois configuré:
 ## 📊 Vérification
 
 ### Services mis à jour:
+
 ```sql
 SELECT code, name, total_available, updated_at
 FROM services
@@ -90,14 +93,16 @@ LIMIT 10;
 ```
 
 ### Logs de sync:
+
 ```sql
-SELECT * FROM sync_logs 
+SELECT * FROM sync_logs
 WHERE sync_type = 'services'
-ORDER BY started_at DESC 
+ORDER BY started_at DESC
 LIMIT 5;
 ```
 
 ### GitHub Actions:
+
 → https://github.com/buba6c/onesms-v1/actions
 
 ---

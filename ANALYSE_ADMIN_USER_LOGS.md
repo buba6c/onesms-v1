@@ -10,16 +10,19 @@
 ### 🚨 CRITIQUE - Services TOP 3 invisibles côté utilisateur
 
 **Problème:**
+
 - WhatsApp (wa), Telegram (tg), Viber (vi) ont le meilleur `popularity_score` (1000, 990, 980)
 - **MAIS** ils ont `total_available = 0` donc invisibles dans le Dashboard utilisateur
 - Le Dashboard filtre avec `.gt('total_available', 0)`
 
 **Impact:**
+
 - Les 3 services les plus populaires n'apparaissent PAS côté utilisateur
 - Expérience utilisateur très dégradée
 - Dashboard commence directement à Instagram (#4)
 
 **Cause:**
+
 - Pas de synchronisation récente avec l'API SMS-Activate
 - Dernière sync: 21 novembre 2025 (il y a 5 jours)
 - Tous les derniers logs sont des erreurs
@@ -29,12 +32,14 @@
 ### ⚠️ MAJEUR - Services dupliqués inactifs
 
 **Problème:**
+
 - Présence de doublons inactifs dans la base:
   - `google` (inactif, 0 stock) ET `go` (actif, 275K stock) ✅
   - `discord` (inactif, 0 stock) ET `ds` (actif, 890K stock) ✅
   - `twitter` (actif mais 0 stock) ⚠️
 
 **Impact:**
+
 - Confusion dans les rankings
 - Gaspillage d'espace DB
 - Risque d'afficher le mauvais service
@@ -44,14 +49,16 @@
 ### ❌ CRITIQUE - Logs de synchronisation non conformes
 
 **Problème:**
+
 ```
 Derniers logs (21 novembre):
 1. error | 5sim API error: Not Found
-2. error | 5sim API error: Not Found  
+2. error | 5sim API error: Not Found
 3. error | 5sim API error: Not Found
 ```
 
 **Non-conformités:**
+
 1. ❌ Aucun log depuis 5 jours
 2. ❌ Que des erreurs (pas de succès)
 3. ❌ Logs uniquement pour 5SIM (pas SMS-Activate)
@@ -59,6 +66,7 @@ Derniers logs (21 novembre):
 5. ❌ Erreur "Not Found" non résolue
 
 **Impact:**
+
 - Impossible de tracer les synchronisations
 - Pas d'historique de mise à jour
 - Difficile de déboguer les problèmes
@@ -70,6 +78,7 @@ Derniers logs (21 novembre):
 ### 1. 📝 Script SQL complet: `fix-and-sync-all.sql`
 
 **Actions:**
+
 ```sql
 -- ✅ Mise à jour des stocks
 UPDATE services SET total_available = 397 WHERE code = 'wa';
@@ -84,6 +93,7 @@ INSERT INTO sync_logs (sync_type, provider, status, message, ...) VALUES (...);
 ```
 
 **Résultat attendu:**
+
 - ✅ wa, tg, vi apparaissent en TOP 3 côté utilisateur
 - ✅ Duplicats supprimés
 - ✅ Log de synchronisation créé
@@ -93,6 +103,7 @@ INSERT INTO sync_logs (sync_type, provider, status, message, ...) VALUES (...);
 ### 2. 🔧 Script Node.js: `manual-sync.js`
 
 **Fonctionnalités:**
+
 ```javascript
 ✅ Récupère les données de l'API SMS-Activate
 ✅ Met à jour les 20 services prioritaires
@@ -102,11 +113,13 @@ INSERT INTO sync_logs (sync_type, provider, status, message, ...) VALUES (...);
 ```
 
 **Usage:**
+
 ```bash
 node scripts/manual-sync.js
 ```
 
 **Résultat:**
+
 ```
 📊 RAPPORT FINAL
 ⏱️  Durée: 2.34s
@@ -123,12 +136,14 @@ node scripts/manual-sync.js
 **Objectif:** Bypasser les problèmes de RLS (Row Level Security)
 
 **Création:**
+
 ```sql
 CREATE FUNCTION update_service_stock(service_code TEXT, new_stock INTEGER)
 RETURNS BOOLEAN SECURITY DEFINER;
 ```
 
 **Usage:**
+
 ```sql
 SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ```
@@ -140,6 +155,7 @@ SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ### Côté ADMIN (Top 10)
 
 **AVANT:**
+
 ```
 1. ✅ 💬 wa - WhatsApp (1000) | Stock: 0 ⚠️ NO STOCK
 2. ✅ ✈️ tg - Telegram (990)  | Stock: 0 ⚠️ NO STOCK
@@ -148,6 +164,7 @@ SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ```
 
 **APRÈS:**
+
 ```
 1. ✅ 💬 wa - WhatsApp (1000) | Stock: 397 ✅
 2. ✅ ✈️ tg - Telegram (990)  | Stock: 61,034 ✅
@@ -160,6 +177,7 @@ SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ### Côté UTILISATEUR (Top 10)
 
 **AVANT:**
+
 ```
 1. 📸 ig - Instagram (970) | Stock: 773,461
 2. 📱 googlevoice (960)    | Stock: 755,282
@@ -167,6 +185,7 @@ SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ```
 
 **APRÈS:**
+
 ```
 1. 💬 wa - WhatsApp (1000)  | Stock: 397 ✨ NOUVEAU
 2. ✈️ tg - Telegram (990)   | Stock: 61,034 ✨ NOUVEAU
@@ -179,6 +198,7 @@ SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ### Logs de synchronisation
 
 **AVANT:**
+
 ```
 ❌ Derniers logs: 21/11/2025 (5 jours)
 ❌ Tous: error | 5sim API error: Not Found
@@ -186,6 +206,7 @@ SELECT update_service_stock('wa', 397);  -- Met à jour WhatsApp
 ```
 
 **APRÈS:**
+
 ```
 ✅ Log récent: 26/11/2025
 ✅ Status: success
@@ -214,6 +235,7 @@ node scripts/manual-sync.js
 ```
 
 **Avantages:**
+
 - ✅ Synchronisation complète avec API
 - ✅ Mise à jour de 20+ services
 - ✅ Logs conformes automatiques
@@ -238,11 +260,11 @@ SELECT update_service_stock('vi', 222);
 ### 1. Vérifier le TOP 10
 
 ```sql
-SELECT 
-  code, 
-  name, 
+SELECT
+  code,
+  name,
   icon,
-  total_available, 
+  total_available,
   popularity_score
 FROM services
 WHERE active = true
@@ -251,6 +273,7 @@ LIMIT 10;
 ```
 
 **Résultat attendu:**
+
 ```
 wa  | WhatsApp  | 💬 | 397    | 1000
 tg  | Telegram  | ✈️ | 61034  | 990
@@ -263,7 +286,7 @@ ig  | Instagram | 📸 | 773461 | 970
 ### 2. Vérifier les logs
 
 ```sql
-SELECT 
+SELECT
   sync_type,
   provider,
   status,
@@ -276,6 +299,7 @@ LIMIT 5;
 ```
 
 **Résultat attendu:**
+
 ```
 services | sms-activate | success | "Synchronisation manuelle..." | 3 | 2025-11-26...
 ```
@@ -287,6 +311,7 @@ services | sms-activate | success | "Synchronisation manuelle..." | 3 | 2025-11-
 **Ouvrir:** http://localhost:5173 (ou votre URL)
 
 **Vérifier:**
+
 - ✅ WhatsApp apparaît en #1
 - ✅ Telegram apparaît en #2
 - ✅ Viber apparaît en #3
@@ -297,13 +322,13 @@ services | sms-activate | success | "Synchronisation manuelle..." | 3 | 2025-11-
 
 ## 📈 MÉTRIQUES D'AMÉLIORATION
 
-| Métrique | Avant | Après | Amélioration |
-|----------|-------|-------|--------------|
-| Services TOP 3 visibles | 0/3 (0%) | 3/3 (100%) | **+100%** ✅ |
-| Logs récents (24h) | 0 | 1+ | **Nouveau** ✅ |
-| Logs success vs error | 0/3 (0%) | 1/0 (100%) | **+100%** ✅ |
-| Duplicats inactifs | 6+ | 0 | **-100%** ✅ |
-| Dernière sync | 5 jours | < 1 heure | **-99%** ✅ |
+| Métrique                | Avant    | Après      | Amélioration   |
+| ----------------------- | -------- | ---------- | -------------- |
+| Services TOP 3 visibles | 0/3 (0%) | 3/3 (100%) | **+100%** ✅   |
+| Logs récents (24h)      | 0        | 1+         | **Nouveau** ✅ |
+| Logs success vs error   | 0/3 (0%) | 1/0 (100%) | **+100%** ✅   |
+| Duplicats inactifs      | 6+       | 0          | **-100%** ✅   |
+| Dernière sync           | 5 jours  | < 1 heure  | **-99%** ✅    |
 
 ---
 
@@ -339,21 +364,25 @@ SELECT cron.schedule(
 ## 📚 FICHIERS CRÉÉS
 
 1. **`scripts/fix-and-sync-all.sql`** (170 lignes)
+
    - Correction complète: stocks + logs + nettoyage
    - Exécution: SQL Editor Supabase
    - Durée: 30 secondes
 
 2. **`scripts/manual-sync.js`** (220 lignes)
+
    - Synchronisation manuelle avec API
    - Logging conforme automatique
    - Rapport détaillé
 
 3. **`scripts/create-update-function.sql`** (60 lignes)
+
    - Fonction SQL helper
    - Bypass RLS
    - Réutilisable
 
 4. **`scripts/update-stock-wa-tg-vi.sql`** (60 lignes)
+
    - Mise à jour simple wa/tg/vi
    - Version minimale
 
@@ -382,6 +411,7 @@ SELECT cron.schedule(
 ### "Invalid API key" ou "Not Found"
 
 **Vérifier .env:**
+
 ```bash
 grep "SMS_ACTIVATE" .env
 # VITE_SMS_ACTIVATE_API_KEY=...
@@ -391,6 +421,7 @@ grep "SMS_ACTIVATE" .env
 ### "Row Level Security policy violation"
 
 **Utiliser la fonction SQL:**
+
 ```sql
 SELECT update_service_stock('wa', 397);
 ```
@@ -398,6 +429,7 @@ SELECT update_service_stock('wa', 397);
 ### "Service not found in database"
 
 **Vérifier le service:**
+
 ```sql
 SELECT * FROM services WHERE code = 'wa';
 -- Si absent, exécuter fix-sms-activate-sorting.sql
@@ -408,6 +440,7 @@ SELECT * FROM services WHERE code = 'wa';
 ## 📞 SUPPORT
 
 **En cas de problème:**
+
 1. Consulter ce document
 2. Vérifier les logs: `SELECT * FROM sync_logs ORDER BY started_at DESC LIMIT 5`
 3. Tester l'API: `curl "https://api.sms-activate.io/stubs/handler_api.php?api_key=YOUR_KEY&action=getBalance"`

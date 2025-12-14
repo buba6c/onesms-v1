@@ -3,6 +3,7 @@
 ## Configuration Complète
 
 ### 1. Push ton code sur GitHub (si pas déjà fait)
+
 ```bash
 git add .
 git commit -m "Ready for deployment"
@@ -52,6 +53,7 @@ vercel --prod
 ### 3. Configure ton domaine (Optionnel)
 
 Dans Vercel Dashboard :
+
 - Settings → Domains
 - Ajoute ton domaine Hostinger
 - Configure le DNS A record vers l'IP Vercel
@@ -103,6 +105,7 @@ git push origin main
 ## 💰 Coût
 
 - **Vercel Free Tier** :
+
   - 100 GB bandwidth/mois
   - Builds illimités
   - SSL automatique

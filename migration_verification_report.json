@@ -1,0 +1,52 @@
+{
+  "date": "2025-12-08T21:50:55.801Z",
+  "checks": {
+    "data": {
+      "status": "warning",
+      "issues": [
+        "Table balance_operations incomplète (43 lignes manquantes)"
+      ]
+    },
+    "migrations": {
+      "status": "success",
+      "issues": []
+    },
+    "functions": {
+      "status": "success",
+      "issues": []
+    },
+    "crons": {
+      "status": "success",
+      "issues": []
+    },
+    "secrets": {
+      "status": "warning",
+      "issues": [
+        "Secret manquant: SUPABASE_URL",
+        "Secret manquant: SUPABASE_ANON_KEY",
+        "Secret manquant: PAYDUNYA_MASTER_KEY",
+        "Secret manquant: MONEYFUSION_API_URL"
+      ]
+    },
+    "storage": {
+      "status": "success",
+      "issues": []
+    }
+  },
+  "totalScore": 83.33333333333333,
+  "cloudRows": 194763,
+  "coolifyRows": 194733,
+  "missingTables": [],
+  "incompleteTables": [
+    {
+      "table": "balance_operations",
+      "missing": 43,
+      "total": 464
+    }
+  ],
+  "actions": [
+    "2. Compléter l'import des tables: balance_operations",
+    "4. Configurer les secrets manquants (4 secrets)",
+    "   → Dashboard Coolify: Settings → Secrets"
+  ]
+}

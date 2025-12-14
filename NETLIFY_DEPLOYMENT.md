@@ -3,6 +3,7 @@
 ## 🚀 Étapes à Suivre
 
 ### 1. Va sur Netlify Dashboard
+
 https://app.netlify.com/projects/onesms-v1
 
 ### 2. Clique sur "Site configuration" → "Environment variables"
@@ -44,6 +45,7 @@ NODE_VERSION=20
 ### 4. Clique sur "Save"
 
 ### 5. Redéploie le site
+
 - "Deploys" → "Trigger deploy" → "Deploy site"
 
 ---
@@ -89,11 +91,10 @@ git push origin main
   - 100 GB bandwidth/mois
   - Builds illimités
   - SSL automatique
-  
 - **Supabase Free** : Gratuit
   - 500 MB database
   - 2 GB bandwidth/mois
-  
+
 **Total : 0€** jusqu'à beaucoup d'utilisateurs !
 
 ---

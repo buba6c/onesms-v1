@@ -8,10 +8,7 @@
     "build": "vite build",
     "build:check": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "test:wallet": "node tests/wallet-deep-analysis.mjs",
-    "test:wallet:fix": "AUTO_FIX=true node tests/wallet-deep-analysis.mjs",
-    "test:wallet:watch": "watch 'npm run test:wallet' tests/"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.937.0",
@@ -33,9 +30,11 @@
     "axios": "^1.6.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.0",
+    "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "date-fns": "^3.2.0",
     "dotenv": "^17.2.3",
+    "express": "^5.2.1",
     "firebase": "^10.7.2",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",

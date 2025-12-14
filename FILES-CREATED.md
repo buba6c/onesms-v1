@@ -2,33 +2,33 @@
 
 ## ✅ Fichiers principaux
 
-| Fichier | Description | Statut |
-|---------|-------------|--------|
+| Fichier           | Description                                        | Statut  |
+| ----------------- | -------------------------------------------------- | ------- |
 | `import-icons.js` | **Script principal** - Générateur complet d'icônes | ✅ Prêt |
-| `setup-icons.sh` | Script de configuration interactif | ✅ Prêt |
-| `test-icons.js` | Script de test avant import complet | ✅ Prêt |
+| `setup-icons.sh`  | Script de configuration interactif                 | ✅ Prêt |
+| `test-icons.js`   | Script de test avant import complet                | ✅ Prêt |
 
 ## 📚 Documentation
 
-| Fichier | Description |
-|---------|-------------|
-| `README-ICONS.md` | Documentation complète (12 pages) |
-| `QUICKSTART-ICONS.md` | Guide de démarrage rapide (2 pages) |
-| `FILES-CREATED.md` | Ce fichier - Liste de tous les fichiers |
+| Fichier               | Description                             |
+| --------------------- | --------------------------------------- |
+| `README-ICONS.md`     | Documentation complète (12 pages)       |
+| `QUICKSTART-ICONS.md` | Guide de démarrage rapide (2 pages)     |
+| `FILES-CREATED.md`    | Ce fichier - Liste de tous les fichiers |
 
 ## ⚙️ Configuration
 
-| Fichier | Description |
-|---------|-------------|
-| `.env.icons` | Template de configuration (à remplir) |
-| `package-icons.json` | Dépendances Node.js |
-| `s3-bucket.tf` | Configuration Terraform S3 (optionnel) |
-| `cloudfront-cdn.tf` | Configuration CloudFront CDN (optionnel) |
+| Fichier              | Description                              |
+| -------------------- | ---------------------------------------- |
+| `.env.icons`         | Template de configuration (à remplir)    |
+| `package-icons.json` | Dépendances Node.js                      |
+| `s3-bucket.tf`       | Configuration Terraform S3 (optionnel)   |
+| `cloudfront-cdn.tf`  | Configuration CloudFront CDN (optionnel) |
 
 ## 🗄️ Base de données
 
-| Fichier | Description |
-|---------|-------------|
+| Fichier                                                | Description                               |
+| ------------------------------------------------------ | ----------------------------------------- |
 | `supabase/migrations/029_add_icon_url_to_services.sql` | Migration pour ajouter colonne `icon_url` |
 
 ## 📁 Fichiers générés (après exécution)
@@ -55,10 +55,10 @@ services-test.json             # Services de test (créé par test-icons.js)
 
 ## 🔧 Modifications apportées
 
-| Fichier existant | Modification |
-|------------------|--------------|
-| `.gitignore` | Ajout de `.env.icons`, `out-icons/`, `import-results.*` |
-| `package.json` | *(Non modifié - dépendances séparées dans package-icons.json)* |
+| Fichier existant | Modification                                                   |
+| ---------------- | -------------------------------------------------------------- |
+| `.gitignore`     | Ajout de `.env.icons`, `out-icons/`, `import-results.*`        |
+| `package.json`   | _(Non modifié - dépendances séparées dans package-icons.json)_ |
 
 ## 🎯 Architecture du script
 
@@ -158,15 +158,15 @@ npx supabase db push
 
 ```json
 {
-  "simple-icons": "^11.8.0",           // 3000+ logos
-  "string-similarity": "^4.0.4",       // Fuzzy matching
-  "node-fetch": "^3.3.2",              // HTTP client
-  "sharp": "^0.33.1",                  // Image processing
-  "svgo": "^3.2.0",                    // SVG optimization
+  "simple-icons": "^11.8.0", // 3000+ logos
+  "string-similarity": "^4.0.4", // Fuzzy matching
+  "node-fetch": "^3.3.2", // HTTP client
+  "sharp": "^0.33.1", // Image processing
+  "svgo": "^3.2.0", // SVG optimization
   "@thiagoelg/node-potrace": "^2.2.2", // PNG → SVG vectorization
-  "p-limit": "^5.0.0",                 // Concurrency control
-  "@aws-sdk/client-s3": "^3.478.0",    // AWS S3 client
-  "@supabase/supabase-js": "^2.39.3"   // Supabase client
+  "p-limit": "^5.0.0", // Concurrency control
+  "@aws-sdk/client-s3": "^3.478.0", // AWS S3 client
+  "@supabase/supabase-js": "^2.39.3" // Supabase client
 }
 ```
 
@@ -194,11 +194,13 @@ npx supabase db push
 ## 🎨 Formats de sortie
 
 ### SVG
+
 - Optimisé avec SVGO
 - Viewbox standardisé
 - Taille réduite (~40%)
 
 ### PNG
+
 - 32×32 px - Favicon, liste mobile
 - 64×64 px - Liste desktop
 - 128×128 px - Aperçu moyen
@@ -206,6 +208,7 @@ npx supabase db push
 - 512×512 px - Haute résolution
 
 ### Structure S3
+
 ```
 icons/
 └── {service_code}/
@@ -219,24 +222,24 @@ icons/
 
 ## 📈 Performance
 
-| Métrique | Valeur |
-|----------|--------|
-| Services traités | ~1300 |
-| Temps d'exécution | 10-15 minutes |
-| Vitesse moyenne | 1.5-2 services/sec |
-| Taux de succès | 85-95% |
-| Concurrence | 10 (configurable) |
-| Taille totale S3 | ~150 MB |
-| Fichiers générés | ~7800 (1300 × 6) |
+| Métrique          | Valeur             |
+| ----------------- | ------------------ |
+| Services traités  | ~1300              |
+| Temps d'exécution | 10-15 minutes      |
+| Vitesse moyenne   | 1.5-2 services/sec |
+| Taux de succès    | 85-95%             |
+| Concurrence       | 10 (configurable)  |
+| Taille totale S3  | ~150 MB            |
+| Fichiers générés  | ~7800 (1300 × 6)   |
 
 ## 💰 Coûts estimés
 
-| Service | Coût mensuel |
-|---------|--------------|
-| S3 Storage (150 MB) | $0.003 |
-| S3 Requests (7800) | $0.04 |
+| Service                    | Coût mensuel                       |
+| -------------------------- | ---------------------------------- |
+| S3 Storage (150 MB)        | $0.003                             |
+| S3 Requests (7800)         | $0.04                              |
 | Brandfetch API (optionnel) | $0 (gratuit 100/mois) ou $29 (Pro) |
-| CloudFront CDN (optionnel) | +$0.30 vs S3 direct |
+| CloudFront CDN (optionnel) | +$0.30 vs S3 direct                |
 
 **Total minimum**: ~$0.05/mois (sans Brandfetch Pro ni CloudFront)
 
@@ -272,6 +275,7 @@ graph TD
 ## 📞 Support & Dépannage
 
 Consultez dans cet ordre :
+
 1. `QUICKSTART-ICONS.md` - Guide rapide
 2. `README-ICONS.md` - Documentation complète
 3. Logs console pendant l'exécution
@@ -281,27 +285,31 @@ Consultez dans cet ordre :
 ## 🎓 Exemples d'utilisation
 
 ### Modification de la concurrence
+
 ```javascript
 // import-icons.js, ligne 26
-const CONCURRENCY_LIMIT = 20  // Au lieu de 10
+const CONCURRENCY_LIMIT = 20; // Au lieu de 10
 ```
 
 ### Test sur 10 services
+
 ```javascript
 // import-icons.js, ligne ~550
 .limit(10)  // Ajouter après .order()
 ```
 
 ### Tailles PNG personnalisées
+
 ```javascript
 // import-icons.js, ligne 25
-const PNG_SIZES = [64, 128, 256]  // Au lieu de [32, 64, 128, 256, 512]
+const PNG_SIZES = [64, 128, 256]; // Au lieu de [32, 64, 128, 256, 512]
 ```
 
 ### Utiliser Brandfetch en priorité
+
 ```javascript
 // import-icons.js, ligne ~435
-let iconData = 
+let iconData =
   await tryBrandfetch(displayName, code) ||
   await trySimpleIcons(displayName, code) ||
   // ...

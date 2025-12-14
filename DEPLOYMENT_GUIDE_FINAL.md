@@ -54,25 +54,28 @@ curl -s 'https://htfqmamvmhdoixqcbbbw.supabase.co/rest/v1/sync_logs?select=*&ord
 ## 🎨 BADGES DE COULEUR (après sync)
 
 - 🟢 **VERT** : ≥95% (Excellent)
-- 🟡 **JAUNE** : 85-94% (Bon)  
+- 🟡 **JAUNE** : 85-94% (Bon)
 - 🟠 **ORANGE** : 70-84% (Moyen)
 - 🔴 **ROUGE** : <70% (Faible)
 
 ## 📊 TESTS EFFECTUÉS
 
 ### Test API 5sim ✅
+
 ```bash
 curl 'https://5sim.net/v1/guest/prices?country=france&product=google'
 # → 200 OK avec données complètes + rate field
 ```
 
 ### Test Edge Function ✅
+
 ```bash
 curl -X OPTIONS 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-5sim'
 # → 200 OK (fonction déployée)
 ```
 
 ### Test Database ✅
+
 ```bash
 curl 'https://htfqmamvmhdoixqcbbbw.supabase.co/rest/v1/countries?limit=1'
 curl 'https://htfqmamvmhdoixqcbbbw.supabase.co/rest/v1/pricing_rules?select=delivery_rate&limit=1'
@@ -80,6 +83,7 @@ curl 'https://htfqmamvmhdoixqcbbbw.supabase.co/rest/v1/pricing_rules?select=deli
 ```
 
 ### Test Frontend ✅
+
 ```bash
 npm run build && pm2 restart onesms-frontend
 # → Build OK (1,211 kB), PM2 online (2 workers)

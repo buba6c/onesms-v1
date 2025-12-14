@@ -135,6 +135,8 @@ serve(async (req) => {
       
       // 💵 CONVERSION AUTOMATIQUE DES PRIX
       // Prix SMS-Activate en $ → FCFA → Pièces (Ⓐ)
+      // Prix minimum: 5 Ⓐ pour tous les services
+      const MIN_PRICE_COINS = 5
       const priceUSD = countryData.price || 0
       const USD_TO_FCFA = 600  // 1$ = 600 FCFA
       const FCFA_TO_COINS = 100  // 1Ⓐ = 100 FCFA
@@ -145,7 +147,8 @@ serve(async (req) => {
       // Calcul: $0.50 × 600 = 300 FCFA ÷ 100 = 3Ⓐ × 1.3 = 3.9Ⓐ
       const priceFCFA = priceUSD * USD_TO_FCFA
       const priceCoins = (priceFCFA / FCFA_TO_COINS) * marginMultiplier
-      const price = Math.ceil(priceCoins)  // Arrondir au supérieur
+      // Appliquer le prix minimum de 5 Ⓐ
+      const price = Math.max(MIN_PRICE_COINS, Math.ceil(priceCoins))
       const retailPrice = price
       
       // Calcul du score composite

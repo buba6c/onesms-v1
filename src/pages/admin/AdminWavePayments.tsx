@@ -17,7 +17,8 @@ import {
   ExternalLink,
   Search,
   Filter,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react';
 
 interface WavePaymentProof {
@@ -301,6 +302,15 @@ export default function AdminWavePayments() {
           </div>
 
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['wave-payment-proofs'] })}
+              size="sm"
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
             <Button
               variant={statusFilter === 'all' ? 'default' : 'outline'}
               onClick={() => setStatusFilter('all')}

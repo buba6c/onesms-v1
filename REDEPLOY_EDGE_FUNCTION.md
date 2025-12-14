@@ -4,8 +4,9 @@
 
 **Erreur HTTP 546 - WORKER_LIMIT** : L'Edge Function consommait trop de ressources
 
-**Correction appliquée** : 
-- Chunk size réduit de **1000 → 500** 
+**Correction appliquée** :
+
+- Chunk size réduit de **1000 → 500**
 - Suppression du doublon sync_log dans le frontend
 
 ## 📝 MÉTHODE 1: Via Dashboard Supabase (RECOMMANDÉ)
@@ -19,23 +20,31 @@
 3. **Onglet "Code"** → Cliquer "Edit"
 
 4. **Trouver la ligne 179** qui contient :
+
    ```typescript
-   const chunkSize = 1000
+   const chunkSize = 1000;
    ```
 
 5. **Remplacer par** :
+
    ```typescript
-   const chunkSize = 500
+   const chunkSize = 500;
    ```
 
 6. **Trouver la ligne 177** qui contient :
+
    ```typescript
-   console.log(`Inserting ${pricingRulesToInsert.length} pricing rules in chunks of 1000...`)
+   console.log(
+     `Inserting ${pricingRulesToInsert.length} pricing rules in chunks of 1000...`
+   );
    ```
 
 7. **Remplacer par** :
+
    ```typescript
-   console.log(`Inserting ${pricingRulesToInsert.length} pricing rules in chunks of 500...`)
+   console.log(
+     `Inserting ${pricingRulesToInsert.length} pricing rules in chunks of 500...`
+   );
    ```
 
 8. **Cliquer "Deploy"**
@@ -79,12 +88,12 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-5sim' \
 
 ## 🎯 RÉSUMÉ DES CORRECTIONS
 
-| Problème | Solution |
-|----------|----------|
-| ❌ HTTP 546 WORKER_LIMIT | ✅ Chunk 1000 → 500 |
-| ❌ 400 sur sync_logs | ✅ Supprimé doublon frontend |
-| ❌ ti.png 404 | ✅ Ajouté 'tit': 'tt' |
-| ❌ CORS countries | ⏳ Se résoudra après sync |
+| Problème                 | Solution                     |
+| ------------------------ | ---------------------------- |
+| ❌ HTTP 546 WORKER_LIMIT | ✅ Chunk 1000 → 500          |
+| ❌ 400 sur sync_logs     | ✅ Supprimé doublon frontend |
+| ❌ ti.png 404            | ✅ Ajouté 'tit': 'tt'        |
+| ❌ CORS countries        | ⏳ Se résoudra après sync    |
 
 ---
 

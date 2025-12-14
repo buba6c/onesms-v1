@@ -18,14 +18,15 @@
 ## Code frontend analysé :
 
 Le frontend appelle correctement :
+
 ```typescript
-await supabase.functions.invoke('buy-5sim-number', {
+await supabase.functions.invoke("buy-5sim-number", {
   body: {
     country: selectedCountry.code,
-    operator: 'any',
+    operator: "any",
     product: selectedService.code || selectedService.name.toLowerCase(),
-    userId: user.id
-  }
+    userId: user.id,
+  },
 });
 ```
 

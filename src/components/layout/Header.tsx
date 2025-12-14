@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { User, LogOut, Wallet, Clock, HelpCircle, X, Sparkles, ChevronRight, Home, Shield, Globe, Zap, ArrowRight, DollarSign, FileText } from 'lucide-react'
+import { User, LogOut, Wallet, Clock, HelpCircle, X, Sparkles, ChevronRight, Home, Shield, Globe, Zap, ArrowRight, DollarSign, FileText, Gift } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
@@ -14,14 +14,23 @@ function useBrandingSettings() {
   return useQuery({
     queryKey: ['branding-settings'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('system_settings')
-        .select('key, value')
-        .in('key', ['app_logo_url', 'app_favicon_url', 'app_primary_color', 'app_secondary_color', 'app_name']);
-      
-      const settings: Record<string, string> = {};
-      (data as { key: string; value: string }[] | null)?.forEach(s => { settings[s.key] = s.value; });
-      return settings;
+      try {
+        const { data } = await (supabase as any)
+          .from('system_settings')
+          .select('key, value')
+          .in('key', ['app_logo_url', 'app_favicon_url', 'app_primary_color', 'app_secondary_color', 'app_name']);
+        
+        const settings: Record<string, string> = {};
+        (data as { key: string; value: string }[] | null)?.forEach(s => { 
+          // Ignorer les valeurs vides ou null
+          if (s.value && s.value.trim() !== '') {
+            settings[s.key] = s.value; 
+          }
+        });
+        return settings;
+      } catch {
+        return {};
+      }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
@@ -209,9 +218,9 @@ export default function Header() {
       return data as { balance: number; frozen_balance: number } | null;
     },
     enabled: !!user?.id,
-    // Polling plus court pour refresh rapide
-    refetchInterval: 3000,
-    staleTime: 1000,
+    // Polling désactivé - utiliser realtime à la place
+    refetchInterval: false,
+    staleTime: 60000,
   });
 
   // TERMINOLOGIE UNIFIÉE:
@@ -255,7 +264,7 @@ export default function Header() {
           <Link to={logoDestination} className="flex items-center group ml-4 md:ml-8">
             <img 
               src={currentLogoUrl} 
-              alt={appName}
+              alt="ONE SMS - Numéros virtuels pour vérification SMS"
               className="h-12 md:h-16 w-auto object-contain transition-all duration-300 group-hover:scale-105"
               onError={(e) => {
                 // Fallback to OS text on error
@@ -282,6 +291,9 @@ export default function Header() {
                 </Link>
                 <Link to="/settings">
                   <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.account')}</Button>
+                </Link>
+                <Link to="/referral">
+                  <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.referral', 'Parrainage')}</Button>
                 </Link>
                 <Link to="/history">
                   <Button variant="ghost" className={`font-medium ${textColorClass} hover:bg-white/10`}>{t('nav.history')}</Button>
@@ -531,6 +543,21 @@ export default function Header() {
 
               {/* Secondary Links */}
               <div className="space-y-2 mb-6">
+                <Link 
+                  to="/referral" 
+                  className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:bg-white/10 active:scale-98"
+                  onClick={closeMenu}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <Gift className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-medium text-white/90 block">{t('nav.referral', 'Parrainage')}</span>
+                    <span className="text-xs text-cyan-300">🎁 5Ⓐ pour toi + 5Ⓐ pour ton ami</span>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-white/40" />
+                </Link>
+
                 <Link 
                   to="/how-to-use" 
                   className="flex items-center gap-4 px-4 py-3.5 rounded-2xl bg-white/5 border border-white/10 transition-all duration-300 hover:bg-white/10 active:scale-98"

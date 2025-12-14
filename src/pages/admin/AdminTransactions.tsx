@@ -13,6 +13,8 @@ import {
   Search, 
   ChevronLeft, 
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Wallet,
   TrendingUp,
   Users,
@@ -23,11 +25,32 @@ import {
   CreditCard,
   Smartphone,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Calendar,
+  CalendarDays,
+  CalendarRange,
+  LayoutList,
+  Layers,
+  Gift
 } from 'lucide-react'
 import { useSearchParams, Link } from 'react-router-dom'
 
 const ITEMS_PER_PAGE = 25
+
+type ViewMode = 'list' | 'day' | 'week' | 'month' | 'year'
+
+interface GroupedRecharges {
+  key: string;
+  label: string;
+  sublabel?: string;
+  recharges: Recharge[];
+  totalXOF: number;
+  totalCredits: number;
+  completedCount: number;
+  pendingCount: number;
+  failedCount: number;
+  bonusCount: number;
+}
 
 interface Recharge {
   id: string;
@@ -58,6 +81,8 @@ export default function AdminTransactions() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedRecharge, setSelectedRecharge] = useState<Recharge | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // Set search term if user param is present
   useEffect(() => {
@@ -70,7 +95,7 @@ export default function AdminTransactions() {
   }, [userIdFromUrl])
 
   // Fetch ONLY recharges (topup/recharge/credit types)
-  const { data: recharges = [], isLoading, refetch } = useQuery({
+  const { data: recharges = [], isLoading, refetch } = useQuery<Recharge[]>({
     queryKey: ['admin-recharges', statusFilter, methodFilter],
     queryFn: async () => {
       let query = supabase
@@ -79,9 +104,9 @@ export default function AdminTransactions() {
           *,
           user:users(id, email, name)
         `)
-        .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit']) // Inclut deposit pour Moneroo
+        .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit', 'referral_bonus']) // Tous les types de crédit entrant
         .order('created_at', { ascending: false })
-        .limit(500)
+        .limit(2000) // Augmenté pour inclure plus de transactions
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter)
@@ -93,11 +118,13 @@ export default function AdminTransactions() {
       const { data, error } = await query
       if (error) {
         console.error('Error fetching recharges:', error)
+        toast({ title: 'Erreur', description: error?.message || 'Chargement transactions échoué', variant: 'destructive' })
         return []
       }
-      return data || []
+      return (data as Recharge[]) || []
     },
-    refetchInterval: 30000
+    refetchInterval: 30000,
+    initialData: []
   })
 
   // Filter by date
@@ -144,41 +171,192 @@ export default function AdminTransactions() {
   }, [recharges, searchTerm, getDateFilteredRecharges]);
 
   // Helper pour extraire le montant XOF depuis metadata ou amount
-  const getAmountXOF = (r: Recharge) => {
+  const getAmountXOF = useCallback((r: Recharge) => {
+    // Les bonus de parrainage n'ont pas de valeur monétaire réelle (crédits gratuits)
+    if (r.type === 'referral_bonus') return 0;
     return r.metadata?.amount_xof || (r.amount * 100) || 0; // 1 crédit = 100 FCFA par défaut
-  };
+  }, []);
 
   // Helper pour extraire le nombre de crédits
-  const getCredits = (r: Recharge) => {
+  const getCredits = useCallback((r: Recharge) => {
     return r.metadata?.activations || r.amount || 0;
-  };
+  }, []);
+
+  // Helper pour vérifier si c'est un bonus (crédit gratuit)
+  const isBonus = useCallback((r: Recharge) => {
+    return r.type === 'referral_bonus';
+  }, []);
 
   // Helper pour extraire le provider
-  const getProvider = (r: Recharge) => {
+  const getProvider = useCallback((r: Recharge) => {
     return r.metadata?.payment_provider || r.payment_method || 'N/A';
+  }, []);
+
+  // Group recharges by period
+  const groupedRecharges = useMemo((): GroupedRecharges[] => {
+    if (viewMode === 'list') return [];
+    
+    const groups: Map<string, Recharge[]> = new Map();
+    
+    filteredRecharges.forEach(r => {
+      const date = new Date(r.created_at);
+      let key: string;
+      
+      switch (viewMode) {
+        case 'day':
+          key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+          break;
+        case 'week': {
+          // Get ISO week
+          const d = new Date(date);
+          d.setHours(0, 0, 0, 0);
+          d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+          const yearStart = new Date(d.getFullYear(), 0, 1);
+          const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+          key = `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+          break;
+        }
+        case 'month':
+          key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+          break;
+        case 'year':
+          key = date.getFullYear().toString();
+          break;
+        default:
+          key = date.toISOString().split('T')[0];
+      }
+      
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(r);
+    });
+    
+    // Convert to array and sort descending
+    const result: GroupedRecharges[] = Array.from(groups.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, groupRecharges]) => {
+        // Sort recharges within each group by date descending
+        const sortedRecharges = [...groupRecharges].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        const completed = sortedRecharges.filter(r => r.status === 'completed');
+        const pending = sortedRecharges.filter(r => r.status === 'pending');
+        const failed = sortedRecharges.filter(r => r.status === 'failed');
+        
+        let label: string;
+        let sublabel: string | undefined;
+        
+        switch (viewMode) {
+          case 'day': {
+            // Parse YYYY-MM-DD correctly in local timezone
+            const [year, month, day] = key.split('-').map(Number);
+            const dayDate = new Date(year, month - 1, day);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            if (dayDate.getTime() === today.getTime()) {
+              label = "Aujourd'hui";
+            } else if (dayDate.getTime() === yesterday.getTime()) {
+              label = "Hier";
+            } else {
+              label = dayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+            }
+            sublabel = dayDate.toLocaleDateString('fr-FR', { year: 'numeric' });
+            break;
+          }
+          case 'week': {
+            const [year, week] = key.split('-W');
+            label = `Semaine ${week}`;
+            sublabel = year;
+            break;
+          }
+          case 'month': {
+            const monthDate = new Date(key + '-01');
+            label = monthDate.toLocaleDateString('fr-FR', { month: 'long' });
+            sublabel = monthDate.getFullYear().toString();
+            break;
+          }
+          case 'year':
+            label = `Année ${key}`;
+            break;
+          default:
+            label = key;
+        }
+        
+        // Exclure les bonus des totaux XOF (crédits gratuits)
+        const realCompleted = completed.filter(r => r.type !== 'referral_bonus');
+        
+        return {
+          key,
+          label: label.charAt(0).toUpperCase() + label.slice(1),
+          sublabel,
+          recharges: sortedRecharges,
+          totalXOF: realCompleted.reduce((sum, r) => sum + getAmountXOF(r), 0),
+          totalCredits: realCompleted.reduce((sum, r) => sum + getCredits(r), 0),
+          completedCount: realCompleted.length,
+          pendingCount: pending.length,
+          failedCount: failed.length,
+          bonusCount: completed.length - realCompleted.length
+        };
+      });
+    
+    return result;
+  }, [filteredRecharges, viewMode, getAmountXOF, getCredits]);
+
+  // Toggle group expansion
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
 
-  // Stats calculations
+  // Expand all groups
+  const expandAllGroups = () => {
+    setExpandedGroups(new Set(groupedRecharges.map(g => g.key)));
+  };
+
+  // Collapse all groups
+  const collapseAllGroups = () => {
+    setExpandedGroups(new Set());
+  };
+
+  // Stats calculations - EXCLUT les bonus de parrainage des revenus
   const stats = useMemo(() => {
     const completed = filteredRecharges.filter(r => r.status === 'completed');
     const pending = filteredRecharges.filter(r => r.status === 'pending');
     const failed = filteredRecharges.filter(r => r.status === 'failed');
     
-    // Montants en XOF (depuis metadata.amount_xof)
-    const totalCompletedXOF = completed.reduce((sum, r) => sum + getAmountXOF(r), 0);
-    const totalPendingXOF = pending.reduce((sum, r) => sum + getAmountXOF(r), 0);
+    // Séparer les vraies recharges des bonus
+    const realRecharges = completed.filter(r => !isBonus(r));
+    const bonusRecharges = completed.filter(r => isBonus(r));
     
-    // Total crédits
-    const totalCredits = completed.reduce((sum, r) => sum + getCredits(r), 0);
+    // Montants en XOF - UNIQUEMENT les vraies recharges (argent réel reçu)
+    const totalCompletedXOF = realRecharges.reduce((sum, r) => sum + getAmountXOF(r), 0);
+    const totalPendingXOF = pending.filter(r => !isBonus(r)).reduce((sum, r) => sum + getAmountXOF(r), 0);
     
-    const uniqueUsers = new Set(completed.map(r => r.user_id)).size;
-    const avgAmountXOF = completed.length > 0 ? totalCompletedXOF / completed.length : 0;
+    // Total crédits (inclut les bonus pour info)
+    const totalCreditsReal = realRecharges.reduce((sum, r) => sum + getCredits(r), 0);
+    const totalCreditsBonus = bonusRecharges.reduce((sum, r) => sum + getCredits(r), 0);
+    
+    const uniqueUsers = new Set(realRecharges.map(r => r.user_id)).size;
+    const avgAmountXOF = realRecharges.length > 0 ? totalCompletedXOF / realRecharges.length : 0;
     
     return {
       totalRevenueXOF: totalCompletedXOF,
       pendingAmountXOF: totalPendingXOF,
-      totalCredits,
-      completedCount: completed.length,
+      totalCredits: totalCreditsReal,
+      totalCreditsBonus,
+      bonusCount: bonusRecharges.length,
+      completedCount: realRecharges.length,
       pendingCount: pending.length,
       failedCount: failed.length,
       uniqueUsers,
@@ -187,7 +365,7 @@ export default function AdminTransactions() {
         ? ((completed.length / filteredRecharges.length) * 100).toFixed(1) 
         : '0'
     };
-  }, [filteredRecharges]);
+  }, [filteredRecharges, getAmountXOF, getCredits, isBonus]);
 
   // Pagination
   const totalPages = Math.ceil(filteredRecharges.length / ITEMS_PER_PAGE)
@@ -200,6 +378,11 @@ export default function AdminTransactions() {
   useEffect(() => {
     setCurrentPage(1)
   }, [statusFilter, methodFilter, dateFilter, searchTerm])
+
+  // Reset expanded groups when view mode changes
+  useEffect(() => {
+    setExpandedGroups(new Set());
+  }, [viewMode]);
 
   // Export to CSV
   const handleExport = () => {
@@ -320,13 +503,13 @@ export default function AdminTransactions() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Revenue */}
         <Card className="border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-background">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Rechargé</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Revenus Réels</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
                   {formatAmount(stats.totalRevenueXOF)} <span className="text-sm">FCFA</span>
                 </p>
@@ -336,6 +519,26 @@ export default function AdminTransactions() {
               </div>
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bonus (gratuits) */}
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bonus Offerts</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">
+                  {stats.totalCreditsBonus} <span className="text-sm">crédits</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.bonusCount} parrainages
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                <Users className="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -401,6 +604,56 @@ export default function AdminTransactions() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
+          {/* View Mode Tabs */}
+          <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b">
+            <span className="text-sm font-medium text-muted-foreground mr-2">Vue :</span>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="h-8"
+            >
+              <LayoutList className="w-4 h-4 mr-1.5" />
+              Liste
+            </Button>
+            <Button
+              variant={viewMode === 'day' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('day')}
+              className="h-8"
+            >
+              <Calendar className="w-4 h-4 mr-1.5" />
+              Par Jour
+            </Button>
+            <Button
+              variant={viewMode === 'week' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('week')}
+              className="h-8"
+            >
+              <CalendarDays className="w-4 h-4 mr-1.5" />
+              Par Semaine
+            </Button>
+            <Button
+              variant={viewMode === 'month' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('month')}
+              className="h-8"
+            >
+              <CalendarRange className="w-4 h-4 mr-1.5" />
+              Par Mois
+            </Button>
+            <Button
+              variant={viewMode === 'year' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('year')}
+              className="h-8"
+            >
+              <Layers className="w-4 h-4 mr-1.5" />
+              Par Année
+            </Button>
+          </div>
+          
           <div className="flex flex-col lg:flex-row gap-3">
             {/* Search */}
             <div className="flex-1 relative">
@@ -456,6 +709,9 @@ export default function AdminTransactions() {
           {/* Active filters summary */}
           <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
             <span>{filteredRecharges.length} recharges affichées</span>
+            {viewMode !== 'list' && (
+              <span className="text-muted-foreground/60">• {groupedRecharges.length} {viewMode === 'day' ? 'jours' : viewMode === 'week' ? 'semaines' : viewMode === 'month' ? 'mois' : 'années'}</span>
+            )}
             {(statusFilter !== 'all' || methodFilter !== 'all' || dateFilter !== 'all' || searchTerm) && (
               <Button 
                 variant="ghost" 
@@ -475,7 +731,207 @@ export default function AdminTransactions() {
         </CardContent>
       </Card>
 
-      {/* Recharges Table */}
+      {/* Grouped View */}
+      {viewMode !== 'list' && (
+        <div className="space-y-4">
+          {/* Group controls */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              {viewMode === 'day' && <Calendar className="w-5 h-5 text-blue-600" />}
+              {viewMode === 'week' && <CalendarDays className="w-5 h-5 text-purple-600" />}
+              {viewMode === 'month' && <CalendarRange className="w-5 h-5 text-orange-600" />}
+              {viewMode === 'year' && <Layers className="w-5 h-5 text-green-600" />}
+              Recharges par {viewMode === 'day' ? 'jour' : viewMode === 'week' ? 'semaine' : viewMode === 'month' ? 'mois' : 'année'}
+            </h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={expandAllGroups}>
+                <ChevronDown className="w-4 h-4 mr-1" />
+                Tout déplier
+              </Button>
+              <Button variant="outline" size="sm" onClick={collapseAllGroups}>
+                <ChevronUp className="w-4 h-4 mr-1" />
+                Tout replier
+              </Button>
+            </div>
+          </div>
+
+          {/* Grouped Cards */}
+          {groupedRecharges.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Wallet className="w-12 h-12 mx-auto text-muted-foreground/50" />
+                <p className="text-muted-foreground mt-2">Aucune recharge trouvée</p>
+              </CardContent>
+            </Card>
+          ) : (
+            groupedRecharges.map((group) => {
+              const isExpanded = expandedGroups.has(group.key);
+              
+              return (
+                <Card key={group.key} className="overflow-hidden">
+                  {/* Group Header - Clickable */}
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors border-b"
+                    onClick={() => toggleGroup(group.key)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        viewMode === 'day' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                        viewMode === 'week' ? 'bg-purple-100 dark:bg-purple-900/30' :
+                        viewMode === 'month' ? 'bg-orange-100 dark:bg-orange-900/30' :
+                        'bg-green-100 dark:bg-green-900/30'
+                      }`}>
+                        {viewMode === 'day' && <Calendar className="w-5 h-5 text-blue-600" />}
+                        {viewMode === 'week' && <CalendarDays className="w-5 h-5 text-purple-600" />}
+                        {viewMode === 'month' && <CalendarRange className="w-5 h-5 text-orange-600" />}
+                        {viewMode === 'year' && <Layers className="w-5 h-5 text-green-600" />}
+                      </div>
+                      <div>
+                        <p className="font-semibold">{group.label}</p>
+                        {group.sublabel && (
+                          <p className="text-sm text-muted-foreground">{group.sublabel}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Stats summary */}
+                    <div className="flex items-center gap-6">
+                      <div className="text-right hidden sm:block">
+                        <p className="font-bold text-green-600">{formatAmount(group.totalXOF)} FCFA</p>
+                        <p className="text-xs text-muted-foreground">{group.totalCredits} crédits</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {group.completedCount}
+                        </span>
+                        {group.pendingCount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            <Clock className="w-3 h-3" />
+                            {group.pendingCount}
+                          </span>
+                        )}
+                        {group.failedCount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                            <XCircle className="w-3 h-3" />
+                            {group.failedCount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-8 h-8 flex items-center justify-center">
+                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Expanded Content */}
+                  {isExpanded && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted/30 border-b">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Date</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Utilisateur</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Montant</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Provider</th>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Statut</th>
+                            <th className="px-4 py-2 text-center text-xs font-semibold text-muted-foreground uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {group.recharges.map((recharge) => {
+                            const statusConfig = getStatusConfig(recharge.status);
+                            return (
+                              <tr key={recharge.id} className="hover:bg-muted/20 transition-colors">
+                                <td className="px-4 py-2">
+                                  <div className="text-sm">
+                                    {new Date(recharge.created_at).toLocaleTimeString('fr-FR', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </div>
+                                  {viewMode !== 'day' && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {new Date(recharge.created_at).toLocaleDateString('fr-FR', {
+                                        day: '2-digit',
+                                        month: 'short'
+                                      })}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2">
+                                  <Link 
+                                    to={`/admin/users?search=${recharge.user?.email || ''}`}
+                                    className="hover:text-primary transition-colors"
+                                  >
+                                    <div className="font-medium text-sm truncate max-w-[150px]">
+                                      {recharge.user?.name || 'Utilisateur'}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                      {recharge.user?.email || 'N/A'}
+                                    </div>
+                                  </Link>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="font-bold text-green-600">{formatAmount(getAmountXOF(recharge))} FCFA</div>
+                                  <div className="text-xs text-blue-600">{getCredits(recharge)} crédits</div>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center gap-2">
+                                    {getMethodIcon(getProvider(recharge))}
+                                    <span className="text-sm capitalize">{getProvider(recharge).replace('_', ' ')}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                                    {statusConfig.icon}
+                                    {statusConfig.label}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedRecharge(recharge);
+                                    }}
+                                    className="h-7 w-7 p-0"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        {/* Group Total Row */}
+                        <tfoot className="bg-muted/50 border-t-2">
+                          <tr>
+                            <td colSpan={2} className="px-4 py-3 font-semibold text-sm">
+                              Total {group.label}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-green-600">{formatAmount(group.totalXOF)} FCFA</div>
+                              <div className="text-xs text-blue-600">{group.totalCredits} crédits</div>
+                            </td>
+                            <td colSpan={3} className="px-4 py-3 text-right text-sm text-muted-foreground">
+                              {group.recharges.length} transaction{group.recharges.length > 1 ? 's' : ''}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Recharges Table (List View) */}
+      {viewMode === 'list' && (
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -691,6 +1147,7 @@ export default function AdminTransactions() {
           </div>
         )}
       </Card>
+      )}
 
       {/* Recharge Details Modal */}
       {selectedRecharge && (

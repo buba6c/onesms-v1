@@ -5,6 +5,7 @@
 ### 1. 🎯 TRI DES SERVICES (Popularity Score)
 
 **❌ PROBLÈME:**
+
 - Les services sont triés par `popularity_score` (valeur manuelle)
 - Les scores ne reflètent PAS la réalité
 - Exemple choquant:
@@ -13,6 +14,7 @@
   - **AOL**: 2.5M numéros → Score: 0
 
 **💡 SOLUTION CRÉÉE:**
+
 - Fonction Edge: `update-popularity-scores`
 - Calcul automatique basé sur:
   - **40%** Stock disponible
@@ -27,12 +29,14 @@
 ### 2. 💰 SYSTÈME DE PRIX (₽ vs Ⓐ)
 
 **❌ PROBLÈME:**
+
 - 5sim utilise **Roubles (₽)**
 - Notre app utilise **Pièces (Ⓐ)**
 - Conversion actuelle: **1₽ = 1Ⓐ** (direct)
 - Marge appliquée: **20%**
 
 **Exemple confus:**
+
 ```
 Sur 5sim: Google = 15₽
 Sur notre app: Google = 18Ⓐ
@@ -40,11 +44,13 @@ Utilisateur: "Pourquoi 3Ⓐ de différence?"
 ```
 
 **💡 SOLUTIONS PROPOSÉES:**
+
 1. **Option 1** (Simple): Définir clairement 1Ⓐ = 1₽
 2. **Option 2** (Flexible): Taux configurable dans .env
 3. **Option 3** (Transparent): Afficher les deux devises
 
 **⭐ RECOMMANDATION:** Option 1 + 3 Hybride
+
 - Définir 1Ⓐ = 1₽ officiellement
 - Afficher "18Ⓐ (15₽ + 20%)" dans l'admin
 - Expliquer dans page "À Propos"
@@ -56,12 +62,14 @@ Utilisateur: "Pourquoi 3Ⓐ de différence?"
 ### 3. 🌍 TRI DES PAYS (Success Rate)
 
 **❌ PROBLÈME:**
+
 - **TOUS** les pays ont `success_rate = 99%`
 - Aucune différenciation
 - Le tri ne sert à rien si tous égaux
 - Pas de données réelles utilisées
 
 **💡 SOLUTION CRÉÉE:**
+
 - Fonction Edge: `update-success-rates`
 - Calcul depuis historique réel:
   - Commandes réussies vs totales (90 jours)
@@ -142,6 +150,7 @@ curl -X POST \
 ## 📈 RÉSULTATS ATTENDUS
 
 ### Avant
+
 ```
 Services:
 1. WhatsApp (Pop: 100) - 1.2M nums
@@ -156,6 +165,7 @@ Pays:
 ```
 
 ### Après
+
 ```
 Services:
 1. Apple (Pop: 95) - 2.7M nums + 98% delivery + 450 orders
@@ -175,12 +185,15 @@ Pays:
 ## 🔧 MAINTENANCE
 
 ### Automatique (Cron)
+
 - ✅ Popularity scores: Chaque heure
 - ✅ Success rates: Chaque 6 heures
 - ✅ Sync 5sim: Chaque 1 heure (existant)
 
 ### Manuel (Admin Panel)
+
 Ajouter boutons dans AdminServices.tsx:
+
 - "♻️ Recalculer Scores"
 - "📊 Mettre à Jour Stats"
 
@@ -212,11 +225,13 @@ Ajouter boutons dans AdminServices.tsx:
 ## 🎓 POUR L'UTILISATEUR
 
 ### Ce Qui Va Changer
+
 1. **Meilleur tri des services** → Les plus performants en premier
 2. **Prix transparents** → Comprendre d'où vient le coût
 3. **Pays fiables** → Voir les vrais taux de succès
 
 ### Aucun Impact Négatif
+
 - ✅ Pas de changement de prix
 - ✅ Pas de perte de données
 - ✅ Interface identique

@@ -16,18 +16,22 @@ Le provider Google n'est **pas activé** dans votre projet Supabase.
 ### Étape 1: Activer Google Provider dans Supabase
 
 1. **Ouvrez Supabase Dashboard:**
+
    - Allez sur: https://app.supabase.com/
    - Connectez-vous
 
 2. **Sélectionnez votre projet:**
+
    - Projet: `ONE SMS V1` ou `gqvxrvxmfvlnhukbpdjb`
 
 3. **Navigation:**
+
    ```
    Sidebar → Authentication → Providers
    ```
 
 4. **Trouvez "Google":**
+
    - Scrollez dans la liste des providers
    - Cliquez sur **"Google"**
 
@@ -43,6 +47,7 @@ Le provider Google n'est **pas activé** dans votre projet Supabase.
 **Sans créer de projet Google Cloud**, vous pouvez utiliser les credentials de test:
 
 1. Dans Supabase, section Google Provider:
+
    - Laissez les champs **Client ID** et **Client Secret** vides
    - Activez simplement le toggle
    - Cliquez **"Save"**
@@ -50,6 +55,7 @@ Le provider Google n'est **pas activé** dans votre projet Supabase.
 2. Supabase utilisera ses propres credentials de test (limités mais fonctionnels)
 
 ⚠️ **Limitations du mode test:**
+
 - Maximum 100 utilisateurs
 - Logo "Test App" affiché
 - Ne fonctionne qu'avec les domaines autorisés par Supabase
@@ -63,12 +69,14 @@ Si vous voulez votre propre configuration:
 #### 1. Google Cloud Console
 
 **A. Créer un projet:**
+
 - Allez sur: https://console.cloud.google.com/
 - Cliquez **"Select a project"** → **"New Project"**
 - Nom: `ONE SMS V1`
 - Cliquez **"Create"**
 
 **B. OAuth Consent Screen:**
+
 - Menu → **APIs & Services** → **OAuth consent screen**
 - Type: **"External"**
 - App name: `ONE SMS V1`
@@ -77,12 +85,14 @@ Si vous voulez votre propre configuration:
 - Cliquez **"Save and Continue"** (3 fois)
 
 **C. Créer les credentials:**
+
 - Menu → **APIs & Services** → **Credentials**
 - **"+ Create Credentials"** → **"OAuth 2.0 Client IDs"**
 - Type: **"Web application"**
 - Name: `ONE SMS V1 Web`
 
 **D. Authorized redirect URIs:**
+
 ```
 https://gqvxrvxmfvlnhukbpdjb.supabase.co/auth/v1/callback
 ```
@@ -93,6 +103,7 @@ https://gqvxrvxmfvlnhukbpdjb.supabase.co/auth/v1/callback
 
 **E. Copier les credentials:**
 Vous obtenez:
+
 ```
 Client ID: 123456789-abc123.apps.googleusercontent.com
 Client Secret: GOCSPX-xxxxxxxxxxxxxx
@@ -111,6 +122,7 @@ Client Secret: GOCSPX-xxxxxxxxxxxxxx
 ### 1. Vérifier que le provider est activé
 
 Dans Supabase Dashboard → Authentication → Providers:
+
 - Google doit avoir un badge ✅ **"Enabled"**
 
 ### 2. Tester l'authentification
@@ -129,6 +141,7 @@ npm run dev
 ### 3. Vérifier la redirection
 
 Après authentification Google:
+
 - ✅ Redirection vers `/dashboard`
 - ✅ Utilisateur créé dans Supabase
 - ✅ Profile créé dans table `users`
@@ -140,6 +153,7 @@ Après authentification Google:
 ### A. Dans Supabase Dashboard
 
 **Authentication → Users:**
+
 ```
 ✅ Nouvel utilisateur visible
 ✅ Email vérifié automatiquement
@@ -148,11 +162,13 @@ Après authentification Google:
 ```
 
 **Table Editor → users:**
+
 ```sql
 SELECT * FROM users WHERE email = 'votre-email@gmail.com';
 ```
 
 Devrait retourner:
+
 ```
 id: uuid
 email: votre-email@gmail.com
@@ -172,6 +188,7 @@ created_at: timestamp
 **Cause:** L'URL de redirection n'est pas autorisée
 
 **Solution:**
+
 1. Google Cloud Console → Credentials → Votre OAuth Client
 2. Authorized redirect URIs doit contenir:
    ```
@@ -186,6 +203,7 @@ created_at: timestamp
 **Cause:** OAuth Consent Screen mal configuré
 
 **Solution:**
+
 1. Google Cloud Console → OAuth consent screen
 2. Vérifiez les scopes:
    - ✅ `.../auth/userinfo.email`
@@ -200,6 +218,7 @@ created_at: timestamp
 **Cause:** Trigger Supabase manquant
 
 **Solution:**
+
 ```sql
 -- Exécuter dans Supabase SQL Editor
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -239,6 +258,7 @@ Avant de tester:
 - [ ] Bouton Google visible
 
 Pour production:
+
 - [ ] Client ID et Secret configurés
 - [ ] Redirect URI ajoutée dans Google Cloud Console
 - [ ] OAuth Consent Screen configuré

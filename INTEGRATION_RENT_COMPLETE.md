@@ -5,6 +5,7 @@
 ### 1. Edge Functions déployées ✅
 
 **`buy-sms-activate-rent`** - Achat de numéros en location
+
 - ✅ Durées disponibles : 4h, 1 jour, 1 semaine, 1 mois
 - ✅ Sélection automatique de l'opérateur (pas de choix manuel)
 - ✅ Calcul automatique du prix selon la durée
@@ -12,6 +13,7 @@
 - ✅ Enregistrement dans la table `rentals`
 
 **`check-sms-activate-rent`** - Vérification du statut et inbox
+
 - ✅ Récupère tous les SMS reçus sur le numéro loué
 - ✅ Met à jour le statut (active/expired)
 - ✅ Enregistre les messages dans `sms_messages`
@@ -19,19 +21,22 @@
 ### 2. Interface Dashboard intégrée ✅
 
 **Toggle Activation/Rent**
+
 - ✅ Boutons pour choisir entre Activation et Location
 - ✅ Même flux pour les deux modes (pas de page séparée)
 
 **Sélecteur de durée** (mode Rent uniquement)
+
 - ✅ 4 options en grille 2×2 :
   - 4 Hours : prix × 1
-  - 1 Day : prix × 3  
+  - 1 Day : prix × 3
   - 1 Week : prix × 15
   - 1 Month : prix × 50
 - ✅ Prix calculés dynamiquement selon la durée
 - ✅ Affichage du prix final sur le bouton de confirmation
 
 **Fonction handleActivate unifiée**
+
 - ✅ Détecte automatiquement le mode (activation ou rent)
 - ✅ Appelle la bonne Edge Function selon le mode
 - ✅ Calcule le prix selon la durée choisie
@@ -40,6 +45,7 @@
 ### 3. Prix et Durées
 
 **Multiplicateurs de prix pour la location :**
+
 ```typescript
 4 hours  → prix de base × 1  (ex: 4Ⓐ → 4Ⓐ)
 1 day    → prix de base × 3  (ex: 4Ⓐ → 12Ⓐ)
@@ -48,6 +54,7 @@
 ```
 
 **Calcul du prix final :**
+
 1. Prix SMS-Activate en USD → FCFA (× 600)
 2. FCFA → Pièces (÷ 100)
 3. Application de la marge (× 1.3 par défaut)
@@ -63,6 +70,7 @@
 ## 🔧 Fonctionnement
 
 ### Mode Activation (existant)
+
 1. Sélectionner service
 2. Sélectionner pays
 3. Confirmer
@@ -70,6 +78,7 @@
 5. Attente du SMS unique
 
 ### Mode Rent (nouveau)
+
 1. Activer le toggle "Rent"
 2. Sélectionner service
 3. Sélectionner pays
@@ -81,6 +90,7 @@
 ## 🎨 Différences visuelles
 
 ### Toggle mode
+
 ```
 ┌─────────────────────────────────┐
 │ [Activation] │    Rent         │  ← Mode Activation (défaut)
@@ -92,6 +102,7 @@
 ```
 
 ### Sélecteur de durée (rent uniquement)
+
 ```
 ┌──────────────┬──────────────┐
 │  4 Hours     │   1 Day      │
@@ -103,6 +114,7 @@
 ```
 
 ### Bouton de confirmation
+
 ```
 Activation mode:
 ┌────────────────────────────────────┐
@@ -118,13 +130,16 @@ Rent mode (1 week sélectionné):
 ## 🔄 API SMS-Activate utilisées
 
 ### Pour Rent
+
 - `getRentServicesAndCountries` - Récupère les options disponibles et prix
 - `getRentNumber` - Loue un numéro (opérateur auto)
 - `getRentStatus` - Vérifie le statut et récupère les SMS
 - `setRentStatus` - Annule ou termine la location
 
 ### Opérateur automatique
+
 Contrairement à 5sim, SMS-Activate sélectionne **automatiquement** le meilleur opérateur :
+
 - ✅ Pas de liste déroulante nécessaire
 - ✅ Pas de choix manuel
 - ✅ L'API choisit l'opérateur optimal selon disponibilité et qualité
@@ -132,6 +147,7 @@ Contrairement à 5sim, SMS-Activate sélectionne **automatiquement** le meilleur
 ## ⚙️ Configuration supplémentaire
 
 ### SQL à exécuter (optionnel)
+
 Pour activer l'ajustement de la marge depuis l'admin :
 
 ```sql
@@ -161,7 +177,9 @@ Voir fichier `INSERT_MARGIN_SETTING.md` pour plus de détails.
 ## 📱 Prochaines étapes
 
 ### Pour afficher les locations actives
+
 Il faudra ajouter :
+
 1. Modifier la query des "Active numbers" pour inclure les rentals
 2. Ajouter un indicateur visuel (badge "Rent" vs "Activation")
 3. Afficher le temps restant différemment (durée de location)
@@ -169,6 +187,7 @@ Il faudra ajouter :
 5. Polling automatique pour check-sms-activate-rent
 
 ### Interface inbox SMS (futur)
+
 ```
 📱 +1234567890 (Rent - 6h remaining)
 ┌─────────────────────────────────────┐
@@ -186,6 +205,7 @@ Il faudra ajouter :
 ## 🎯 Résumé
 
 ✅ **Système de location complètement intégré**
+
 - Même interface que les activations
 - Sélection automatique d'opérateur
 - 4 durées disponibles avec prix adaptatifs
@@ -193,6 +213,7 @@ Il faudra ajouter :
 - Edge Functions déployées et fonctionnelles
 
 ✅ **Build #138 déployé**
+
 - Frontend prêt
 - Tout dans le même endroit
 - Pas de page séparée

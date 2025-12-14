@@ -335,7 +335,7 @@ export default function WavePaymentProof() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* WhatsApp */}
             <a
-              href="https://wa.me/221768661175"
+              href="https://wa.me/16837770410"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg hover:shadow-md transition-shadow border border-gray-200 dark:border-gray-700"

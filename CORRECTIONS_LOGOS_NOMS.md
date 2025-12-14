@@ -5,11 +5,13 @@
 ### **1️⃣ Noms de services différents entre Admin et Utilisateur**
 
 **Problème** :
+
 - Admin affiche : "Instagram + Threads", "Google, YouTube, Gmail", etc. (via `display_name`)
 - Utilisateur affiche : "instagram", "google", etc. (via `name`)
 - Incohérence visuelle
 
 **✅ Solution** :
+
 ```typescript
 // AVANT (DashboardPage.tsx)
 .select('id, name, icon, total_available')
@@ -30,6 +32,7 @@ const mapped = data?.map(s => ({
 ```
 
 **Résultat** :
+
 - ✅ Dashboard utilisateur affiche "Instagram + Threads" comme admin
 - ✅ Noms cohérents partout
 - ✅ `code` utilisé pour requêtes API (ex: "instagram")
@@ -40,6 +43,7 @@ const mapped = data?.map(s => ({
 ### **2️⃣ Logos manquants (Nike, Adidas, etc.)**
 
 **Problème** :
+
 - Certains services populaires n'avaient pas de mapping de domaine
 - Logo s'affichait en blanc (1×1 transparent GIF)
 - Services concernés : Nike, Adidas, McDonald's, Starbucks, Samsung, etc.
@@ -103,6 +107,7 @@ const serviceDomains = {
 ```
 
 **Emojis fallback ajoutés** :
+
 ```typescript
 const iconMap = {
   ...
@@ -124,6 +129,7 @@ const iconMap = {
 ```
 
 **Résultat** :
+
 - ✅ Nike affiche maintenant le logo swoosh
 - ✅ Adidas affiche les 3 bandes
 - ✅ McDonald's affiche le M doré
@@ -136,10 +142,12 @@ const iconMap = {
 ### **3️⃣ Admin Users - Affichage des vrais utilisateurs**
 
 **Problème** :
+
 - Mention "(données de test)" dans l'interface
 - Pas clair si ce sont de vrais utilisateurs ou fake data
 
 **✅ Solution** :
+
 ```typescript
 // AVANT
 <p className="text-gray-500">
@@ -153,6 +161,7 @@ const iconMap = {
 ```
 
 **Fonctionnalités confirmées** :
+
 - ✅ Charge les VRAIS utilisateurs de la base de données
 - ✅ Bouton "Ajouter crédit" fonctionnel (💰 Coins)
 - ✅ Bouton "Bannir/Débannir" fonctionnel (🚫 Ban / 🛡️ Shield)
@@ -165,6 +174,7 @@ const iconMap = {
 ### **4️⃣ Utilisation cohérente du code service**
 
 **Problème** :
+
 - `name` utilisé partout = bugs potentiels
 - Exemple : service "Instagram + Threads" cherché comme "instagram + threads" au lieu de "instagram"
 
@@ -188,6 +198,7 @@ interface Service {
 ```
 
 **Résultat** :
+
 - ✅ Requêtes API utilisent le bon code
 - ✅ Affichage utilise le nom lisible
 - ✅ Pas de confusion entre "instagram" et "Instagram + Threads"
@@ -199,12 +210,14 @@ interface Service {
 ### **Fichiers modifiés**
 
 1. **`src/pages/DashboardPage.tsx`**
+
    - Ajout de `code` et `display_name` dans la requête
    - Utilisation de `display_name` pour affichage
    - Utilisation de `code` pour requêtes API et logos
    - Interface `Service` étendue
 
 2. **`src/lib/logo-service.ts`**
+
    - Ajout de 50+ nouveaux domaines de services
    - Ajout de 30+ nouveaux emojis fallback
    - Couverture : 40 → 90+ services
@@ -218,27 +231,35 @@ interface Service {
 ## 🎯 SERVICES AVEC LOGOS AJOUTÉS
 
 ### **Sport & Mode**
+
 - ✅ Nike, Adidas
 
 ### **Retail**
+
 - ✅ Walmart, Target, IKEA
 
 ### **Tech**
+
 - ✅ Tesla, Samsung, Sony
 
 ### **Food & Drinks**
+
 - ✅ McDonald's, Starbucks, Coca-Cola, Pepsi
 
 ### **Gaming**
+
 - ✅ Nintendo, PlayStation, Xbox, Steam, EA, Riot Games, Epic Games, Blizzard, Rockstar, Valve, Ubisoft
 
 ### **Outils Dev**
+
 - ✅ GitHub, GitLab, Slack, Notion, Trello, Asana, Monday
 
 ### **E-commerce**
+
 - ✅ Shopify, WordPress, Wix, Squarespace
 
 ### **Réseaux sociaux russes**
+
 - ✅ VK, OK (Odnoklassniki), Yandex, Mail.ru
 
 ---
@@ -246,6 +267,7 @@ interface Service {
 ## 🧪 TESTS À EFFECTUER
 
 ### **1. Noms de services cohérents**
+
 ```
 ✅ Admin → Services → Vérifier noms (ex: "Instagram + Threads")
 ✅ Dashboard utilisateur → Vérifier MÊMES noms
@@ -253,6 +275,7 @@ interface Service {
 ```
 
 ### **2. Logos affichés correctement**
+
 ```
 ✅ Chercher "Nike" dans dashboard → Logo swoosh visible
 ✅ Chercher "McDonald" → Logo M doré visible
@@ -262,6 +285,7 @@ interface Service {
 ```
 
 ### **3. Admin Users fonctionnel**
+
 ```
 ✅ Admin → Users Management
 ✅ Vérifier compteur : "X users (Y active, Z banned)"
@@ -275,19 +299,20 @@ interface Service {
 
 ## 📈 STATISTIQUES
 
-| Aspect | Avant | Après |
-|--------|-------|-------|
-| Services avec logos | 40 | 90+ |
-| Emojis fallback | 20 | 50+ |
-| Noms cohérents | ❌ Non | ✅ Oui |
-| Code/Display séparés | ❌ Non | ✅ Oui |
-| Admin Users clair | ❌ "Test" | ✅ Vrais users |
+| Aspect               | Avant     | Après          |
+| -------------------- | --------- | -------------- |
+| Services avec logos  | 40        | 90+            |
+| Emojis fallback      | 20        | 50+            |
+| Noms cohérents       | ❌ Non    | ✅ Oui         |
+| Code/Display séparés | ❌ Non    | ✅ Oui         |
+| Admin Users clair    | ❌ "Test" | ✅ Vrais users |
 
 ---
 
 ## ✅ STATUT FINAL
 
 ### Corrections appliquées
+
 - ✅ Noms de services identiques Admin/Utilisateur (via `display_name`)
 - ✅ 50+ nouveaux logos de services ajoutés (Nike, Adidas, McDonald's, etc.)
 - ✅ 30+ nouveaux emojis fallback
@@ -297,9 +322,11 @@ interface Service {
 - ✅ Frontend rebuild et PM2 redémarré
 
 ### Action restante
+
 1. **Exécuter FIX_ZERO_NUMBERS.sql** pour corriger les compteurs "0 numbers"
 
 ### Prochains tests
+
 1. Vérifier que Nike, Adidas, McDonald's affichent leurs logos
 2. Vérifier que les noms sont identiques admin/utilisateur
 3. Tester Admin Users Management avec vrais utilisateurs

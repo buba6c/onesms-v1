@@ -1,6 +1,7 @@
 # 🏠 ANALYSE COMPLÈTE: Fonctionnement du Mode RENT
 
 ## 📋 Table des Matières
+
 1. [Vue d'ensemble](#vue-densemble)
 2. [Différences Activation vs Rent](#différences-activation-vs-rent)
 3. [Flow Complet du Processus Rent](#flow-complet-du-processus-rent)
@@ -15,17 +16,19 @@
 ## 🎯 Vue d'ensemble
 
 ### Qu'est-ce que le mode RENT ?
+
 Le mode **RENT** (Location) permet aux utilisateurs de **louer un numéro** pour une **durée déterminée** (4h, 1 jour, 1 semaine, 1 mois) et **recevoir plusieurs SMS** sur ce numéro pendant toute la durée de location.
 
 ### Différences clés vs Activation
-| Critère | Activation (SMS unique) | Rent (Location) |
-|---------|------------------------|-----------------|
-| **Durée** | 20 minutes | 4h à 1 mois |
-| **SMS** | 1 seul SMS attendu | Multiple SMS possibles |
-| **Prix** | Prix de base | Prix x multiplicateur selon durée |
-| **Utilisation** | Vérification compte unique | Tests multiples, développement |
-| **Statut** | pending → received → completed | active → expired/cancelled |
-| **API** | `getNumber` | `getRentNumber` |
+
+| Critère         | Activation (SMS unique)        | Rent (Location)                   |
+| --------------- | ------------------------------ | --------------------------------- |
+| **Durée**       | 20 minutes                     | 4h à 1 mois                       |
+| **SMS**         | 1 seul SMS attendu             | Multiple SMS possibles            |
+| **Prix**        | Prix de base                   | Prix x multiplicateur selon durée |
+| **Utilisation** | Vérification compte unique     | Tests multiples, développement    |
+| **Statut**      | pending → received → completed | active → expired/cancelled        |
+| **API**         | `getNumber`                    | `getRentNumber`                   |
 
 ---
 
@@ -247,6 +250,7 @@ Le mode **RENT** (Location) permet aux utilisateurs de **louer un numéro** pour
 ## 🔧 Services Spéciaux
 
 ### 1️⃣ "Any other" (code: `any`)
+
 **Cas d'usage:** Service non listé dans la liste populaire
 
 ```javascript
@@ -260,12 +264,14 @@ Le mode **RENT** (Location) permet aux utilisateurs de **louer un numéro** pour
 ```
 
 **Comportement:**
+
 - Disponible uniquement en mode RENT
 - API SMS-Activate utilise le service "any other" spécial
 - Prix généralement plus bas que services spécifiques
 - Utile pour services rares ou nouveaux
 
 ### 2️⃣ "Full rent" (code: `rent` ou `full`)
+
 **Cas d'usage:** Location du numéro pour TOUS les services
 
 ```javascript
@@ -279,12 +285,14 @@ Le mode **RENT** (Location) permet aux utilisateurs de **louer un numéro** pour
 ```
 
 **Comportement:**
+
 - Le numéro peut recevoir SMS de TOUS les services
 - Prix plus élevé (prix de base × multiplicateur élevé)
 - Idéal pour développeurs qui testent plusieurs services
 - Maximum de flexibilité
 
 **Exemple prix:**
+
 ```
 Full rent - Kazakhstan - 4 hours: 42.93 Ⓐ
 Full rent - Kazakhstan - 1 day: 128.79 Ⓐ
@@ -295,33 +303,36 @@ Full rent - Kazakhstan - 1 day: 128.79 Ⓐ
 ## ⏱️ Durées de Location
 
 ### Mapping durées → heures
+
 ```typescript
 const RENT_DURATIONS = {
-  '4hours': 4,      // Minimum
-  '1day': 24,       // 1 jour
-  '1week': 168,     // 7 jours
-  '1month': 720     // 30 jours
-}
+  "4hours": 4, // Minimum
+  "1day": 24, // 1 jour
+  "1week": 168, // 7 jours
+  "1month": 720, // 30 jours
+};
 ```
 
 ### Calcul des prix
+
 ```typescript
 // Prix de base retourné par getRentServicesAndCountries pour 4h
-const basePrice = 15.00
+const basePrice = 15.0;
 
 // Multiplicateurs (estimés basés sur l'observation)
 const priceMultipliers = {
-  '4hours': 1,      // 15 Ⓐ
-  '1day': 3,        // 45 Ⓐ
-  '1week': 15,      // 225 Ⓐ
-  '1month': 50      // 750 Ⓐ
-}
+  "4hours": 1, // 15 Ⓐ
+  "1day": 3, // 45 Ⓐ
+  "1week": 15, // 225 Ⓐ
+  "1month": 50, // 750 Ⓐ
+};
 
 // Affichage dans l'interface
-const displayPrice = Math.ceil(basePrice * multiplier)
+const displayPrice = Math.ceil(basePrice * multiplier);
 ```
 
 ### Limites SMS-Activate
+
 - **Minimum:** 2 heures
 - **Maximum:** 1344 heures (56 jours)
 - **Validation:** `if (hours < 2 || hours > 1344) → INVALID_TIME`
@@ -331,6 +342,7 @@ const displayPrice = Math.ceil(basePrice * multiplier)
 ## 🔌 API SMS-Activate pour Rent
 
 ### 1. getRentServicesAndCountries
+
 **Récupère les options disponibles et prix**
 
 ```http
@@ -344,20 +356,22 @@ GET /stubs/handler_api.php
 ```
 
 **Réponse:**
+
 ```json
 {
   "countries": [2, 6, 7],
   "operators": ["any", "beeline", "altel"],
   "services": {
-    "ig": { "cost": 15.50, "quant": 120 },
-    "wa": { "cost": 12.00, "quant": 250 },
+    "ig": { "cost": 15.5, "quant": 120 },
+    "wa": { "cost": 12.0, "quant": 250 },
     "full": { "cost": 42.93, "quant": 20 }
   },
-  "currency": 840  // ISO 4217 (USD)
+  "currency": 840 // ISO 4217 (USD)
 }
 ```
 
 ### 2. getRentNumber
+
 **Loue un numéro**
 
 ```http
@@ -372,11 +386,12 @@ GET /stubs/handler_api.php
 ```
 
 **Réponse succès:**
+
 ```json
 {
   "status": "success",
   "phone": {
-    "id": 1049,                      // rental_id (à conserver!)
+    "id": 1049, // rental_id (à conserver!)
     "number": "79959707564",
     "endDate": "2025-11-25T16:01:52"
   }
@@ -384,6 +399,7 @@ GET /stubs/handler_api.php
 ```
 
 **Erreurs possibles:**
+
 ```json
 { "status": "error", "message": "NO_BALANCE" }
 { "status": "error", "message": "NO_NUMBERS" }
@@ -391,6 +407,7 @@ GET /stubs/handler_api.php
 ```
 
 ### 3. getRentStatus
+
 **Récupère les SMS reçus**
 
 ```http
@@ -403,6 +420,7 @@ GET /stubs/handler_api.php
 ```
 
 **Réponse:**
+
 ```json
 {
   "status": "success",
@@ -425,12 +443,14 @@ GET /stubs/handler_api.php
 ```
 
 **Status possibles:**
+
 - `STATUS_WAIT_CODE` - En attente du premier SMS
 - `STATUS_FINISH` - Location terminée normalement
 - `STATUS_CANCEL` - Location annulée avec remboursement
 - `STATUS_REVOKE` - Numéro bloqué, fonds retournés
 
 ### 4. setRentStatus
+
 **Modifie le statut de la location**
 
 ```http
@@ -442,12 +462,14 @@ GET /stubs/handler_api.php
 ```
 
 **Status codes:**
+
 - `1` = Finish (terminer normalement, PAS de remboursement)
 - `2` = Cancel (annuler, remboursement si < 20 min)
 
 **⚠️ Important:** L'annulation avec remboursement n'est possible que dans les 20 premières minutes!
 
 ### 5. continueRentNumber
+
 **Prolonge la location**
 
 ```http
@@ -459,13 +481,14 @@ GET /stubs/handler_api.php
 ```
 
 **Réponse:**
+
 ```json
 {
   "status": "success",
   "phone": {
-    "id": 1049,  // Même ID si prolongation d'une location active
+    "id": 1049, // Même ID si prolongation d'une location active
     "number": "79959707564",
-    "endDate": "2025-11-25T20:01:52"  // Nouvelle date
+    "endDate": "2025-11-25T20:01:52" // Nouvelle date
   }
 }
 ```
@@ -473,6 +496,7 @@ GET /stubs/handler_api.php
 **⚠️ Note:** Si la location est déjà terminée (finished), une NOUVELLE location sera créée avec un NOUVEL ID!
 
 ### 6. continueRentInfo
+
 **Obtient le prix de prolongation**
 
 ```http
@@ -485,10 +509,11 @@ GET /stubs/handler_api.php
 ```
 
 **Réponse:**
+
 ```json
 {
   "status": "success",
-  "price": 15.50,
+  "price": 15.5,
   "currency": 840,
   "hours": 4,
   "history": [
@@ -506,6 +531,7 @@ GET /stubs/handler_api.php
 ## 💾 Structure de Données
 
 ### Table: `rentals`
+
 ```sql
 CREATE TABLE rentals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -527,6 +553,7 @@ CREATE TABLE rentals (
 ```
 
 ### Format SMS reçus (JSONB)
+
 ```json
 [
   {
@@ -547,213 +574,239 @@ CREATE TABLE rentals (
 ### Frontend: DashboardPage.tsx
 
 #### État initial
+
 ```typescript
-const [mode, setMode] = useState<'activation' | 'rent'>('activation')
-const [rentDuration, setRentDuration] = useState<'4hours' | '1day' | '1week' | '1month'>('4hours')
-const [selectedService, setSelectedService] = useState<Service | null>(null)
-const [selectedCountry, setSelectedCountry] = useState<Country | null>(null)
+const [mode, setMode] = useState<"activation" | "rent">("activation");
+const [rentDuration, setRentDuration] = useState<
+  "4hours" | "1day" | "1week" | "1month"
+>("4hours");
+const [selectedService, setSelectedService] = useState<Service | null>(null);
+const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
 ```
 
 #### Affichage services spéciaux (mode RENT uniquement)
-```tsx
-{mode === 'rent' && (
-  <div className="mb-4">
-    <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">
-      IF THE REQUIRED SERVICE IS NOT IN THE LIST
-    </p>
-    <div className="space-y-2 mb-4">
-      {/* Any other */}
-      <div onClick={() => handleServiceSelect({
-        id: 'any',
-        name: 'Any other',
-        code: 'any',
-        count: 3249,
-        icon: '❓'
-      })}>
-        ❓ Any other - 3249 numbers
-      </div>
 
-      {/* Full rent */}
-      <div onClick={() => handleServiceSelect({
-        id: 'rent',
-        name: 'Full rent',
-        code: 'full',
-        count: 597,
-        icon: '🏠'
-      })}>
-        🏠 Full rent - 597 numbers
+```tsx
+{
+  mode === "rent" && (
+    <div className="mb-4">
+      <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">
+        IF THE REQUIRED SERVICE IS NOT IN THE LIST
+      </p>
+      <div className="space-y-2 mb-4">
+        {/* Any other */}
+        <div
+          onClick={() =>
+            handleServiceSelect({
+              id: "any",
+              name: "Any other",
+              code: "any",
+              count: 3249,
+              icon: "❓",
+            })
+          }
+        >
+          ❓ Any other - 3249 numbers
+        </div>
+
+        {/* Full rent */}
+        <div
+          onClick={() =>
+            handleServiceSelect({
+              id: "rent",
+              name: "Full rent",
+              code: "full",
+              count: 597,
+              icon: "🏠",
+            })
+          }
+        >
+          🏠 Full rent - 597 numbers
+        </div>
       </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 #### Sélection durée (mode RENT uniquement)
+
 ```tsx
-{mode === 'rent' && (
-  <div className="mb-6">
-    <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">
-      DURATION
-    </p>
-    <div className="grid grid-cols-2 gap-2">
-      {[
-        { value: '4hours', label: '4 Hours', multiplier: 1 },
-        { value: '1day', label: '1 Day', multiplier: 3 },
-        { value: '1week', label: '1 Week', multiplier: 15 },
-        { value: '1month', label: '1 Month', multiplier: 50 }
-      ].map(option => (
-        <button
-          key={option.value}
-          onClick={() => setRentDuration(option.value)}
-          className={rentDuration === option.value ? 'selected' : ''}
-        >
-          <div>{option.label}</div>
-          <div>{Math.ceil(selectedCountry.price * option.multiplier)} Ⓐ</div>
-        </button>
-      ))}
+{
+  mode === "rent" && (
+    <div className="mb-6">
+      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">
+        DURATION
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { value: "4hours", label: "4 Hours", multiplier: 1 },
+          { value: "1day", label: "1 Day", multiplier: 3 },
+          { value: "1week", label: "1 Week", multiplier: 15 },
+          { value: "1month", label: "1 Month", multiplier: 50 },
+        ].map((option) => (
+          <button
+            key={option.value}
+            onClick={() => setRentDuration(option.value)}
+            className={rentDuration === option.value ? "selected" : ""}
+          >
+            <div>{option.label}</div>
+            <div>{Math.ceil(selectedCountry.price * option.multiplier)} Ⓐ</div>
+          </button>
+        ))}
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 #### Appel API pour louer
+
 ```typescript
 const handleActivate = async () => {
-  if (mode === 'rent') {
+  if (mode === "rent") {
     // Louer un numéro
-    const { data, error } = await supabase.functions.invoke('buy-sms-activate-rent', {
-      body: {
-        country: selectedCountry.code,
-        product: selectedService.code,
-        userId: user.id,
-        duration: rentDuration  // '4hours', '1day', etc.
+    const { data, error } = await supabase.functions.invoke(
+      "buy-sms-activate-rent",
+      {
+        body: {
+          country: selectedCountry.code,
+          product: selectedService.code,
+          userId: user.id,
+          duration: rentDuration, // '4hours', '1day', etc.
+        },
       }
-    })
+    );
 
     if (error) {
-      toast({ title: 'Erreur', description: error.message })
-      return
+      toast({ title: "Erreur", description: error.message });
+      return;
     }
 
     toast({
-      title: 'Numéro loué!',
-      description: `${data.phone} pour ${rentDuration}`
-    })
+      title: "Numéro loué!",
+      description: `${data.phone} pour ${rentDuration}`,
+    });
 
     // Rafraîchir la liste des locations actives
-    refetchRentals()
+    refetchRentals();
   }
-}
+};
 ```
 
 ### Backend: buy-sms-activate-rent Edge Function
 
 #### 1. Vérification balance
+
 ```typescript
 const { data: userProfile } = await supabase
-  .from('users')
-  .select('balance')
-  .eq('id', userId)
-  .single()
+  .from("users")
+  .select("balance")
+  .eq("id", userId)
+  .single();
 
 if (userProfile.balance < price) {
-  throw new Error(`Insufficient balance. Required: ${price}Ⓐ`)
+  throw new Error(`Insufficient balance. Required: ${price}Ⓐ`);
 }
 ```
 
 #### 2. Appel API getRentNumber
-```typescript
-const rentTime = RENT_DURATIONS[duration] || 4  // 4, 24, 168, 720
 
-const rentUrl = `${SMS_ACTIVATE_BASE_URL}?` +
+```typescript
+const rentTime = RENT_DURATIONS[duration] || 4; // 4, 24, 168, 720
+
+const rentUrl =
+  `${SMS_ACTIVATE_BASE_URL}?` +
   `api_key=${SMS_ACTIVATE_API_KEY}` +
   `&action=getRentNumber` +
   `&service=${smsActivateService}` +
   `&country=${smsActivateCountry}` +
   `&rent_time=${rentTime}` +
-  `&operator=any`
+  `&operator=any`;
 
-const response = await fetch(rentUrl)
-const data = await response.json()
+const response = await fetch(rentUrl);
+const data = await response.json();
 
-if (data.status !== 'success') {
-  throw new Error(data.message || 'Failed to rent number')
+if (data.status !== "success") {
+  throw new Error(data.message || "Failed to rent number");
 }
 ```
 
 #### 3. Sauvegarde dans DB
+
 ```typescript
 const { data: rental, error } = await supabase
-  .from('rentals')
+  .from("rentals")
   .insert({
     user_id: userId,
     rental_id: data.phone.id.toString(),
     phone: data.phone.number,
     service_code: product,
     country_code: country,
-    operator: 'auto',
+    operator: "auto",
     price: price,
-    status: 'active',
+    status: "active",
     expires_at: data.phone.endDate,
     duration_hours: rentTime,
-    provider: 'sms-activate'
+    provider: "sms-activate",
   })
   .select()
-  .single()
+  .single();
 ```
 
 #### 4. Déduction balance + Transaction
+
 ```typescript
 await supabase
-  .from('users')
+  .from("users")
   .update({ balance: userProfile.balance - price })
-  .eq('id', userId)
+  .eq("id", userId);
 
-await supabase
-  .from('transactions')
-  .insert({
-    user_id: userId,
-    type: 'rental',
-    amount: -price,
-    description: `Rent ${service.name} in ${country} for ${duration}`,
-    status: 'completed'
-  })
+await supabase.from("transactions").insert({
+  user_id: userId,
+  type: "rental",
+  amount: -price,
+  description: `Rent ${service.name} in ${country} for ${duration}`,
+  status: "completed",
+});
 ```
 
 ### Polling SMS (Frontend)
 
 #### Hook personnalisé pour récupérer les SMS
+
 ```typescript
 const useRentPolling = (rentalId: string) => {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const pollSms = async () => {
-      const { data } = await supabase.functions.invoke('get-rent-sms', {
-        body: { rentalId }
-      })
+      const { data } = await supabase.functions.invoke("get-rent-sms", {
+        body: { rentalId },
+      });
 
       if (data?.sms?.length > 0) {
         // Mettre à jour la DB locale
         await supabase
-          .from('rentals')
+          .from("rentals")
           .update({ sms_received: data.sms })
-          .eq('rental_id', rentalId)
+          .eq("rental_id", rentalId);
 
         // Rafraîchir l'interface
-        queryClient.invalidateQueries(['rentals'])
+        queryClient.invalidateQueries(["rentals"]);
       }
-    }
+    };
 
     // Polling toutes les 5 secondes
-    const interval = setInterval(pollSms, 5000)
+    const interval = setInterval(pollSms, 5000);
 
-    return () => clearInterval(interval)
-  }, [rentalId])
-}
+    return () => clearInterval(interval);
+  }, [rentalId]);
+};
 ```
 
 ### Affichage SMS reçus
+
 ```tsx
 <div className="rental-card">
   <div className="header">
@@ -775,9 +828,7 @@ const useRentPolling = (rentalId: string) => {
       ))}
     </div>
   ) : (
-    <div className="waiting">
-      📨 Waiting for SMS...
-    </div>
+    <div className="waiting">📨 Waiting for SMS...</div>
   )}
 
   <div className="timer">
@@ -785,12 +836,8 @@ const useRentPolling = (rentalId: string) => {
   </div>
 
   <div className="actions">
-    <button onClick={() => extendRental(rental.id)}>
-      🔄 Extend
-    </button>
-    <button onClick={() => finishRental(rental.id)}>
-      ✅ Finish
-    </button>
+    <button onClick={() => extendRental(rental.id)}>🔄 Extend</button>
+    <button onClick={() => finishRental(rental.id)}>✅ Finish</button>
   </div>
 </div>
 ```
@@ -800,43 +847,45 @@ const useRentPolling = (rentalId: string) => {
 ## 🔐 Sécurité & Validation
 
 ### Validation côté backend
+
 ```typescript
 // Durée valide
 if (rentTime < 2 || rentTime > 1344) {
-  throw new Error('INVALID_TIME: Duration must be between 2 and 1344 hours')
+  throw new Error("INVALID_TIME: Duration must be between 2 and 1344 hours");
 }
 
 // Service existe
 const service = await supabase
-  .from('services')
-  .select('*')
-  .eq('code', product)
-  .single()
+  .from("services")
+  .select("*")
+  .eq("code", product)
+  .single();
 
 if (!service) {
-  throw new Error('BAD_SERVICE: Service not found')
+  throw new Error("BAD_SERVICE: Service not found");
 }
 
 // Balance suffisant
 if (userBalance < estimatedPrice) {
-  throw new Error('NO_BALANCE: Insufficient funds')
+  throw new Error("NO_BALANCE: Insufficient funds");
 }
 ```
 
 ### Gestion erreurs API
+
 ```typescript
 const handleApiError = (error: string) => {
   const errorMessages = {
-    'NO_BALANCE': 'Insufficient balance. Please top up.',
-    'NO_NUMBERS': 'No numbers available for this service/country.',
-    'BAD_SERVICE': 'Service not available for rent.',
-    'INVALID_TIME': 'Invalid rental duration.',
-    'CANT_CANCEL': 'Cannot cancel after 20 minutes.',
-    'CHANNELS_LIMIT': 'Account blocked. Contact support.'
-  }
+    NO_BALANCE: "Insufficient balance. Please top up.",
+    NO_NUMBERS: "No numbers available for this service/country.",
+    BAD_SERVICE: "Service not available for rent.",
+    INVALID_TIME: "Invalid rental duration.",
+    CANT_CANCEL: "Cannot cancel after 20 minutes.",
+    CHANNELS_LIMIT: "Account blocked. Contact support.",
+  };
 
-  return errorMessages[error] || 'An error occurred. Please try again.'
-}
+  return errorMessages[error] || "An error occurred. Please try again.";
+};
 ```
 
 ---
@@ -844,6 +893,7 @@ const handleApiError = (error: string) => {
 ## 📊 Cas d'usage pratiques
 
 ### 1. Développeur testant Instagram API
+
 ```
 Service: Instagram + Threads
 Pays: Kazakhstan
@@ -859,6 +909,7 @@ Scénario:
 ```
 
 ### 2. Testeur QA avec "Full rent"
+
 ```
 Service: Full rent
 Pays: Indonesia
@@ -872,6 +923,7 @@ Scénario:
 ```
 
 ### 3. Utilisateur avec service rare
+
 ```
 Service: Any other
 Pays: Malaysia
@@ -890,49 +942,51 @@ Scénario:
 
 ### ⚠️ Différences critiques vs Activation
 
-| Point | Activation | Rent |
-|-------|-----------|------|
-| **Remboursement** | Oui (si pas de SMS) | Non (sauf < 20min) |
-| **Durée fixe** | 20 min | Variable (4h-1mois) |
-| **Prix** | Prix de base | Prix × multiplicateur |
-| **SMS multiples** | Non attendu | Oui, illimité |
-| **ID API** | activationId | rentalId |
-| **Table DB** | activations | rentals |
-| **Statut** | pending/received/completed | active/finished/expired |
+| Point             | Activation                 | Rent                    |
+| ----------------- | -------------------------- | ----------------------- |
+| **Remboursement** | Oui (si pas de SMS)        | Non (sauf < 20min)      |
+| **Durée fixe**    | 20 min                     | Variable (4h-1mois)     |
+| **Prix**          | Prix de base               | Prix × multiplicateur   |
+| **SMS multiples** | Non attendu                | Oui, illimité           |
+| **ID API**        | activationId               | rentalId                |
+| **Table DB**      | activations                | rentals                 |
+| **Statut**        | pending/received/completed | active/finished/expired |
 
 ### 🔄 Gestion du temps restant
+
 ```typescript
 const calculateTimeRemaining = (expiresAt: string) => {
-  const now = Date.now()
-  const expiresAtMs = new Date(expiresAt).getTime()
-  const remainingMs = expiresAtMs - now
+  const now = Date.now();
+  const expiresAtMs = new Date(expiresAt).getTime();
+  const remainingMs = expiresAtMs - now;
 
-  if (remainingMs <= 0) return '⏱️ Expired'
+  if (remainingMs <= 0) return "⏱️ Expired";
 
-  const hours = Math.floor(remainingMs / (1000 * 60 * 60))
-  const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60))
+  const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+  const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
 
-  return `⏰ ${hours}h ${minutes}m remaining`
-}
+  return `⏰ ${hours}h ${minutes}m remaining`;
+};
 ```
 
 ### 📱 Format numéro
+
 ```typescript
 // SMS-Activate retourne: "79959707564"
 // Affichage souhaité: "+7 995 970 75 64"
 
 const formatRentPhone = (phone: string) => {
   // Extraire le code pays (premier chiffre(s))
-  if (phone.startsWith('7')) {
+  if (phone.startsWith("7")) {
     // Russie/Kazakhstan: +7 XXX XXX XX XX
-    return phone.replace(/^7(\d{3})(\d{3})(\d{2})(\d{2})$/, '+7 $1 $2 $3 $4')
-  } else if (phone.startsWith('62')) {
+    return phone.replace(/^7(\d{3})(\d{3})(\d{2})(\d{2})$/, "+7 $1 $2 $3 $4");
+  } else if (phone.startsWith("62")) {
     // Indonésie: +62 XXX XXXX XXXX
-    return phone.replace(/^62(\d{3})(\d{4})(\d{4})$/, '+62 $1 $2 $3')
+    return phone.replace(/^62(\d{3})(\d{4})(\d{4})$/, "+62 $1 $2 $3");
   }
   // Format générique
-  return '+' + phone
-}
+  return "+" + phone;
+};
 ```
 
 ---
@@ -996,6 +1050,7 @@ API: getRentStatus(rentalId)
 ## ✅ Checklist d'implémentation
 
 ### Frontend
+
 - [ ] Afficher services spéciaux (Any other, Full rent) en mode RENT
 - [ ] Sélecteur de durée (4h, 1j, 1sem, 1mois)
 - [ ] Calcul prix avec multiplicateurs
@@ -1004,6 +1059,7 @@ API: getRentStatus(rentalId)
 - [ ] Actions: Extend, Finish, Copy
 
 ### Backend
+
 - [ ] Edge Function: buy-sms-activate-rent
 - [ ] Edge Function: get-rent-sms (polling)
 - [ ] Edge Function: extend-rent
@@ -1012,12 +1068,14 @@ API: getRentStatus(rentalId)
 - [ ] Cron job: vérifier expirations et mettre status='expired'
 
 ### Base de données
+
 - [ ] Table `rentals` avec tous les champs nécessaires
 - [ ] Index sur user_id, rental_id, status, expires_at
 - [ ] RLS policies (users can only see their own rentals)
 - [ ] Trigger pour updated_at
 
 ### Sécurité
+
 - [ ] Validation durée (2-1344 heures)
 - [ ] Vérification balance avant location
 - [ ] Vérification ownership avant actions (extend, finish)
@@ -1027,9 +1085,11 @@ API: getRentStatus(rentalId)
 ---
 
 ## 📚 Documentation API complète
+
 Voir: `/sms activate help/API_ANALYSIS_COMPLETE.md` section "Rent Api"
 
 **URLs clés:**
+
 - getRentServicesAndCountries: Liste services/pays/prix disponibles
 - getRentNumber: Louer un numéro
 - getRentStatus: Récupérer les SMS reçus

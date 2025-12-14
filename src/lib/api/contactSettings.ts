@@ -4,6 +4,7 @@ export interface ContactSettings {
   id: string;
   email: string;
   whatsapp: string;
+  instagram?: string;
   address: string;
   address_detail: string;
   hours_weekday: string;
@@ -11,13 +12,16 @@ export interface ContactSettings {
   hours_sunday: string;
   email_response_time: string;
   whatsapp_hours: string;
+  support_title?: string;
+  support_subtitle?: string;
   created_at: string;
   updated_at: string;
 }
 
 const DEFAULT_SETTINGS: Omit<ContactSettings, 'id' | 'created_at' | 'updated_at'> = {
   email: 'support@onesms-sn.com',
-  whatsapp: '+221 77 123 45 67',
+  whatsapp: '+1 683 777 0410',
+  instagram: '@onesms.sn',
   address: 'Dakar, Sénégal',
   address_detail: "Afrique de l'Ouest",
   hours_weekday: 'Lundi - Vendredi: 9h - 18h',
@@ -25,6 +29,8 @@ const DEFAULT_SETTINGS: Omit<ContactSettings, 'id' | 'created_at' | 'updated_at'
   hours_sunday: 'Dimanche: Fermé',
   email_response_time: 'Réponse sous 24h',
   whatsapp_hours: 'Lun-Sam, 9h-18h',
+  support_title: undefined,
+  support_subtitle: undefined,
 };
 
 export const contactSettingsApi = {
@@ -70,12 +76,13 @@ export const contactSettingsApi = {
 
   // Update contact settings (admin only)
   async updateSettings(settings: Partial<ContactSettings>): Promise<ContactSettings> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, created_at: _created, updated_at: _updated, ...updateData } = settings as ContactSettings;
+    void _id;
+    void _created;
+    void _updated;
 
     try {
       // First try to get existing settings
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: existing } = await (supabase as any)
         .from('contact_settings')
         .select('id')
@@ -84,7 +91,6 @@ export const contactSettingsApi = {
 
       if (existing && existing.id) {
         // Update existing
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase as any)
           .from('contact_settings')
           .update(updateData)
@@ -96,7 +102,6 @@ export const contactSettingsApi = {
         return data as ContactSettings;
       } else {
         // Insert new
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase as any)
           .from('contact_settings')
           .insert([updateData])

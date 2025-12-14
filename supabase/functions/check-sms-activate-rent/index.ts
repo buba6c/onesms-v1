@@ -14,6 +14,18 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // ❌ Deprecated: use get-rent-status (atomic + refunds)
+  return new Response(
+    JSON.stringify({
+      error: 'Deprecated endpoint. Please use get-rent-status.',
+      hint: 'This function is disabled to prevent unsafe balance handling.'
+    }),
+    {
+      status: 410,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  )
+
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

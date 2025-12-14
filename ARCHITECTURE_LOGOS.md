@@ -21,7 +21,7 @@
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
     📱 DashboardPage.tsx charge les services depuis Supabase
-    
+
     useEffect(() => {
       const { data } = await supabase
         .from('services')
@@ -37,9 +37,9 @@
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
     🎨 Pour chaque service dans la liste:
-    
+
     {services.map((service) => (
-      <img 
+      <img
         src={getServiceLogo(service.code)}  // ← GÉNÉRATION URL
         alt={service.name}
         onError={(e) => handleLogoError(e, service.code)}
@@ -52,15 +52,15 @@
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
     🌐 logo-service.ts → getServiceLogo(code)
-    
+
     Exemple: service.code = "wa" (WhatsApp)
-    
+
     1. Mapping dans SERVICE_DOMAINS:
        'wa' → 'whatsapp.com'
-    
+
     2. Construction URL Logo.dev:
        https://img.logo.dev/whatsapp.com?token=pk_acOeajbNRKGsSDnJvJrcfw&size=200
-    
+
     3. Retour de l'URL au composant <img>
 
                                 ↓
@@ -69,9 +69,9 @@
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
     🖼️ Le navigateur (Chrome/Firefox/Safari) fait une requête HTTP:
-    
+
     GET https://img.logo.dev/whatsapp.com?token=xxx&size=200
-    
+
     → Logo.dev API cherche le logo de whatsapp.com dans sa base
     → Retourne l'image PNG/SVG (200x200px)
     → Navigateur affiche l'image dans le <img>
@@ -82,13 +82,13 @@
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
     ❌ Si Logo.dev échoue (404, timeout, bloqué...):
-    
+
     onError={(e) => {
       e.currentTarget.src = getServiceLogoFallback(service.code)
     }}
-    
+
     → Génère SVG inline avec emoji:
-    
+
     <svg>
       <rect fill="linear-gradient(#4f46e5, #7c3aed)" />
       <text>💬</text>  ← Emoji WhatsApp
@@ -102,26 +102,26 @@
 
 ### État Actuel (2,429 services actifs)
 
-| Métrique | Valeur | Pourcentage |
-|----------|--------|-------------|
-| **Total services actifs** | 2,429 | 100% |
-| **Avec `icon_url` (DB)** | 995 | **41%** |
-| **Sans `icon_url` (Logo.dev)** | 1,434 | **59%** |
+| Métrique                       | Valeur | Pourcentage |
+| ------------------------------ | ------ | ----------- |
+| **Total services actifs**      | 2,429  | 100%        |
+| **Avec `icon_url` (DB)**       | 995    | **41%**     |
+| **Sans `icon_url` (Logo.dev)** | 1,434  | **59%**     |
 
 ### TOP 10 Services (par popularité)
 
-| Rank | Service | Source Logo |
-|------|---------|-------------|
-| 1 | WhatsApp | Logo.dev API (mapping `wa` → `whatsapp.com`) |
-| 2 | Telegram | Logo.dev API (mapping `tg` → `telegram.org`) |
-| 3 | Viber | Logo.dev API (mapping `vi` → `viber.com`) |
-| 4 | Instagram | Logo.dev API (mapping `ig` → `instagram.com`) |
-| 5 | googlevoice | **icon_url (DB)** → S3 bucket |
-| 6 | Facebook | Logo.dev API (mapping `fb` → `facebook.com`) |
-| 7 | Twitter | Logo.dev API (mapping `tw` → `x.com`) |
-| 8 | Discord | Logo.dev API (mapping `ds` → `discord.com`) |
-| 9 | VKontakte | Logo.dev API (mapping `vk` → `vk.com`) |
-| 10 | MM | Logo.dev API (fallback `mm.com`) |
+| Rank | Service     | Source Logo                                   |
+| ---- | ----------- | --------------------------------------------- |
+| 1    | WhatsApp    | Logo.dev API (mapping `wa` → `whatsapp.com`)  |
+| 2    | Telegram    | Logo.dev API (mapping `tg` → `telegram.org`)  |
+| 3    | Viber       | Logo.dev API (mapping `vi` → `viber.com`)     |
+| 4    | Instagram   | Logo.dev API (mapping `ig` → `instagram.com`) |
+| 5    | googlevoice | **icon_url (DB)** → S3 bucket                 |
+| 6    | Facebook    | Logo.dev API (mapping `fb` → `facebook.com`)  |
+| 7    | Twitter     | Logo.dev API (mapping `tw` → `x.com`)         |
+| 8    | Discord     | Logo.dev API (mapping `ds` → `discord.com`)   |
+| 9    | VKontakte   | Logo.dev API (mapping `vk` → `vk.com`)        |
+| 10   | MM          | Logo.dev API (fallback `mm.com`)              |
 
 ---
 
@@ -138,48 +138,49 @@ Service centralisé gérant TOUS les logos de la plateforme.
  */
 
 // 🔑 Token Logo.dev API
-const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
+const LOGO_DEV_TOKEN = "pk_acOeajbNRKGsSDnJvJrcfw";
 
 // 🗺️ Mapping codes SMS-Activate → Domaines
 const SERVICE_DOMAINS: Record<string, string> = {
-  'whatsapp': 'whatsapp.com',
-  'wa': 'whatsapp.com',         // Code SMS-Activate
-  'telegram': 'telegram.org',
-  'tg': 'telegram.org',         // Code SMS-Activate
-  'instagram': 'instagram.com',
-  'ig': 'instagram.com',        // Code SMS-Activate
-  'oi': 'tinder.com',           // Code SMS-Activate pour Tinder
-  'qv': 'badoo.com',            // Code SMS-Activate pour Badoo
+  whatsapp: "whatsapp.com",
+  wa: "whatsapp.com", // Code SMS-Activate
+  telegram: "telegram.org",
+  tg: "telegram.org", // Code SMS-Activate
+  instagram: "instagram.com",
+  ig: "instagram.com", // Code SMS-Activate
+  oi: "tinder.com", // Code SMS-Activate pour Tinder
+  qv: "badoo.com", // Code SMS-Activate pour Badoo
   // ... 50+ services mappés
-}
+};
 
 // 📡 Fonction principale: génère URL Logo.dev
 export const getServiceLogo = (serviceCode: string): string => {
-  const code = serviceCode.toLowerCase().trim()
-  const domain = SERVICE_DOMAINS[code] || `${code}.com`
-  return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
-}
+  const code = serviceCode.toLowerCase().trim();
+  const domain = SERVICE_DOMAINS[code] || `${code}.com`;
+  return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`;
+};
 
 // 🔄 Fallback SVG avec emoji
 export const getServiceLogoFallback = (serviceCode: string): string => {
-  return generateFallbackLogo(serviceCode)
-}
+  return generateFallbackLogo(serviceCode);
+};
 
 // 😊 Mapping emoji pour fallback
 export const getServiceIcon = (serviceCode: string): string => {
   const iconMap = {
-    'whatsapp': '💬',
-    'telegram': '✈️',
-    'instagram': '📸',
-    'oi': '❤️',  // Tinder
-    'qv': '💙',  // Badoo
+    whatsapp: "💬",
+    telegram: "✈️",
+    instagram: "📸",
+    oi: "❤️", // Tinder
+    qv: "💙", // Badoo
     // ... 20+ emojis
-  }
-  return iconMap[serviceCode] || '📱'
-}
+  };
+  return iconMap[serviceCode] || "📱";
+};
 ```
 
 **Fonctionnalités:**
+
 - ✅ Mapping intelligent code → domaine
 - ✅ Génération URL Logo.dev avec token
 - ✅ Fallback SVG avec gradient + emoji
@@ -193,25 +194,32 @@ export const getServiceIcon = (serviceCode: string): string => {
 Interface principale où les logos sont affichés.
 
 ```typescript
-import { getServiceLogo, getServiceLogoFallback, getServiceIcon } from '@/lib/logo-service'
+import {
+  getServiceLogo,
+  getServiceLogoFallback,
+  getServiceIcon,
+} from "@/lib/logo-service";
 
 // ... ligne 970
-<img 
+<img
   src={getServiceLogo(service.code || service.name)}
   alt={service.name}
   className="w-12 h-12 rounded-lg object-cover"
   onError={(e) => {
-    const target = e.currentTarget
+    const target = e.currentTarget;
     // Fallback vers SVG avec emoji
-    target.src = getServiceLogoFallback(service.code || service.name)
+    target.src = getServiceLogoFallback(service.code || service.name);
   }}
-/>
+/>;
 
-{/* Emoji caché pour accessibilité */}
-<span className="hidden">{getServiceIcon(service.code)}</span>
+{
+  /* Emoji caché pour accessibilité */
+}
+<span className="hidden">{getServiceIcon(service.code)}</span>;
 ```
 
 **Workflow:**
+
 1. **Chargement services** → `useEffect(() => loadServices())`
 2. **Rendu liste** → `services.map(service => <ServiceCard />)`
 3. **Génération URL** → `getServiceLogo(service.code)`
@@ -223,15 +231,15 @@ import { getServiceLogo, getServiceLogoFallback, getServiceIcon } from '@/lib/lo
 ### 3. **`src/pages/HistoryPage.tsx`** (similaire)
 
 ```typescript
-import { getServiceLogo, getServiceLogoFallback } from '@/lib/logo-service'
+import { getServiceLogo, getServiceLogoFallback } from "@/lib/logo-service";
 
 // ligne 323
-<img 
+<img
   src={getServiceLogo(order.service_code)}
   onError={(e) => {
-    e.currentTarget.src = getServiceLogoFallback(order.service_code)
+    e.currentTarget.src = getServiceLogoFallback(order.service_code);
   }}
-/>
+/>;
 ```
 
 ---
@@ -241,9 +249,9 @@ import { getServiceLogo, getServiceLogoFallback } from '@/lib/logo-service'
 ### Option 1: `icon_url` dans la base de données (995 services - 41%)
 
 ```sql
-SELECT code, name, icon_url 
-FROM services 
-WHERE icon_url IS NOT NULL 
+SELECT code, name, icon_url
+FROM services
+WHERE icon_url IS NOT NULL
 LIMIT 5;
 
 -- Résultat:
@@ -253,11 +261,13 @@ LIMIT 5;
 ```
 
 **Avantages:**
+
 - ✅ Logos personnalisés (uploadés manuellement)
 - ✅ Contrôle total sur l'apparence
 - ✅ Pas de dépendance API externe
 
 **Inconvénients:**
+
 - ❌ Maintenance manuelle (upload 1 par 1)
 - ❌ Stockage S3 requis (coûts)
 - ❌ Mise à jour manuelle si logo change
@@ -265,17 +275,19 @@ LIMIT 5;
 ### Option 2: Logo.dev API (1,434 services - 59%)
 
 ```typescript
-getServiceLogo('wa')
+getServiceLogo("wa");
 // → https://img.logo.dev/whatsapp.com?token=xxx&size=200
 ```
 
 **Avantages:**
+
 - ✅ **Zéro maintenance** (automatique)
 - ✅ Toujours à jour (Logo.dev met à jour)
 - ✅ Pas de stockage requis
 - ✅ Rapide à implémenter
 
 **Inconvénients:**
+
 - ❌ Dépendance API externe (si Logo.dev down, fallback SVG)
 - ❌ Limites token (1M requêtes/mois)
 
@@ -288,15 +300,16 @@ getServiceLogo('wa')
 const getLogoUrl = (service) => {
   // 1. Si icon_url existe en DB → priorité
   if (service.icon_url) {
-    return service.icon_url
+    return service.icon_url;
   }
-  
+
   // 2. Sinon → Logo.dev API avec mapping
-  return getServiceLogo(service.code)
-}
+  return getServiceLogo(service.code);
+};
 ```
 
 **Cascade de fallback:**
+
 ```
 1. icon_url (DB) → S3 bucket
        ↓ (si null)
@@ -314,6 +327,7 @@ const getLogoUrl = (service) => {
 ### 🔥 Priorité HAUTE
 
 1. **Migrer vers 100% Logo.dev API** (supprimer `icon_url`)
+
    - **Gain:** Réduction maintenance, suppression coûts S3
    - **Action:** Script SQL `UPDATE services SET icon_url = NULL`
    - **Durée:** 5 min
@@ -326,6 +340,7 @@ const getLogoUrl = (service) => {
 ### 🟡 Priorité MOYENNE
 
 3. **Précharger logos TOP 20**
+
    - **Technique:** `<link rel="preload" as="image" href="https://img.logo.dev/whatsapp.com?..." />`
    - **Gain:** Dashboard charge 200ms plus vite
    - **Durée:** 30 min
@@ -338,6 +353,7 @@ const getLogoUrl = (service) => {
 ### 🟢 Priorité BASSE
 
 5. **Monitoring Logo.dev uptime**
+
    - **Outil:** UptimeRobot surveiller https://img.logo.dev
    - **Alertes:** Email si downtime > 5 min
 
@@ -365,8 +381,8 @@ curl -I "https://img.logo.dev/whatsapp.com?token=pk_acOeajbNRKGsSDnJvJrcfw&size=
 
 ```javascript
 // Dans Console DevTools
-const url = getServiceLogoFallback('wa')
-console.log(url)
+const url = getServiceLogoFallback("wa");
+console.log(url);
 
 // ✅ Attendu:
 // data:image/svg+xml,%3Csvg...%3C/svg%3E
@@ -376,8 +392,8 @@ console.log(url)
 
 ```sql
 -- Dans Supabase SQL Editor
-SELECT 
-  CASE 
+SELECT
+  CASE
     WHEN icon_url IS NOT NULL THEN 'icon_url (DB)'
     ELSE 'Logo.dev API'
   END AS source,
@@ -398,6 +414,7 @@ GROUP BY source;
 ### Problème: Logo ne s'affiche pas (carré gris)
 
 **Diagnostic:**
+
 1. Ouvrir DevTools → Network
 2. Chercher requête `logo.dev`
 3. Vérifier status code:
@@ -406,12 +423,13 @@ GROUP BY source;
    - **500** → Logo.dev down (fallback SVG devrait s'activer)
 
 **Solution:**
+
 ```typescript
 // Ajouter mapping dans logo-service.ts
 const SERVICE_DOMAINS = {
   // ...
-  'nouveauservice': 'domaine-correct.com',  // ← Ajouter ici
-}
+  nouveauservice: "domaine-correct.com", // ← Ajouter ici
+};
 ```
 
 ### Problème: SVG fallback ne s'affiche pas
@@ -419,9 +437,12 @@ const SERVICE_DOMAINS = {
 **Cause:** Navigateur bloque `data:` URIs (CSP)
 
 **Solution:** Ajouter dans `index.html`:
+
 ```html
-<meta http-equiv="Content-Security-Policy" 
-      content="img-src 'self' data: https://img.logo.dev https://*.amazonaws.com;">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="img-src 'self' data: https://img.logo.dev https://*.amazonaws.com;"
+/>
 ```
 
 ### Problème: Emoji non supporté (⬜)
@@ -429,9 +450,11 @@ const SERVICE_DOMAINS = {
 **Cause:** Système sans support Unicode 13.0+
 
 **Solution:** Fallback vers première lettre:
+
 ```typescript
-const emoji = getServiceIcon(code)
-const fallbackText = emoji.codePointAt(0) > 0x1F600 ? code.charAt(0).toUpperCase() : emoji
+const emoji = getServiceIcon(code);
+const fallbackText =
+  emoji.codePointAt(0) > 0x1f600 ? code.charAt(0).toUpperCase() : emoji;
 ```
 
 ---
@@ -439,12 +462,14 @@ const fallbackText = emoji.codePointAt(0) > 0x1F600 ? code.charAt(0).toUpperCase
 ## 📝 Changelog
 
 ### Version Actuelle (2025)
+
 - ✅ Logo.dev API comme source principale
 - ✅ 50 services mappés (wa, tg, ig, oi, qv...)
 - ✅ Fallback SVG avec emoji et gradient
 - ✅ Support hybride (icon_url DB + Logo.dev)
 
 ### Historique
+
 - **2024 Q4:** Migration Clearbit → Logo.dev (Clearbit arrêté)
 - **2024 Q3:** Tests DuckDuckGo API (qualité insuffisante)
 - **2024 Q2:** Système icon_url S3 (995 logos uploadés)

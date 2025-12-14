@@ -14,6 +14,7 @@ POST https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-top-countries-by-
 **2 problèmes combinés** :
 
 1. **❌ Codes incorrects dans la DB `services`** :
+
    - **Tinder** : `code = "tinder"` ❌ (devrait être `"oi"`)
    - **Badoo** : `code = "badoo"` ❌ (devrait être `"qv"`)
 
@@ -33,6 +34,7 @@ POST https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-top-countries-by-
 ```
 
 **L'API SMS-Activate utilise des codes courts** :
+
 - ✅ `"oi"` pour Tinder
 - ✅ `"qv"` pour Badoo
 - ❌ PAS `"tinder"` ni `"badoo"`
@@ -44,23 +46,29 @@ POST https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-top-countries-by-
 ### 1. **Code Fix: DashboardPage.tsx**
 
 **Avant (ligne 263-278)** :
+
 ```typescript
 const serviceCodeMapping: Record<string, string> = {
-  'whatsapp': 'wa',
-  'telegram': 'tg',
+  whatsapp: "wa",
+  telegram: "tg",
   // ... seulement 15 services
 };
 
-const apiServiceCode = serviceCodeMapping[selectedService.code.toLowerCase()] || selectedService.code;
+const apiServiceCode =
+  serviceCodeMapping[selectedService.code.toLowerCase()] ||
+  selectedService.code;
 ```
 
 **Après (ligne 263-266)** :
+
 ```typescript
 // ✅ Les services.code dans la DB contiennent déjà les codes SMS-Activate
 // Pas besoin de mapping manuel qui serait incomplet (1000+ services)
 const apiServiceCode = selectedService.code;
 
-console.log(`📝 [LIVE] Service: ${selectedService.name} → API code: ${apiServiceCode}`);
+console.log(
+  `📝 [LIVE] Service: ${selectedService.name} → API code: ${apiServiceCode}`
+);
 ```
 
 **Changement** : Suppression du mapping manuel incomplet → utilisation directe du code DB
@@ -73,12 +81,13 @@ console.log(`📝 [LIVE] Service: ${selectedService.name} → API code: ${apiSer
 
 **Changements requis** :
 
-| Service | Ancien Code | Nouveau Code | Statut |
-|---------|-------------|--------------|--------|
+| Service | Ancien Code | Nouveau Code | Statut        |
+| ------- | ----------- | ------------ | ------------- |
 | Tinder  | `"tinder"`  | `"oi"`       | ✅ À corriger |
 | Badoo   | `"badoo"`   | `"qv"`       | ✅ À corriger |
 
 **SQL à exécuter dans Supabase Dashboard** :
+
 ```sql
 -- 1️⃣ Corriger Tinder
 UPDATE services SET code = 'oi' WHERE name = 'Tinder' AND code = 'tinder' AND active = true;
@@ -100,6 +109,7 @@ SELECT name, code, active FROM services WHERE name IN ('Tinder', 'Badoo') ORDER 
 ### Script: `verify_tinder_badoo_fix.mjs`
 
 **Résultats AVANT correction** :
+
 ```
 ❌ Tinder (code: tinder) → 500 Error
 ❌ Badoo (code: badoo) → 500 Error
@@ -107,6 +117,7 @@ SELECT name, code, active FROM services WHERE name IN ('Tinder', 'Badoo') ORDER 
 ```
 
 **Résultats ATTENDUS APRÈS correction** :
+
 ```
 ✅ Tinder (code: oi) → 52+ pays disponibles
 ✅ Badoo (code: qv) → 43 pays disponibles
@@ -117,16 +128,19 @@ SELECT name, code, active FROM services WHERE name IN ('Tinder', 'Badoo') ORDER 
 ## 📋 Checklist d'Exécution
 
 ### ✅ Étape 1 : Code Frontend (FAIT)
+
 - [x] Suppression du `serviceCodeMapping` incomplet dans `DashboardPage.tsx`
 - [x] Utilisation directe de `selectedService.code`
 
 ### ⚠️ Étape 2 : Base de Données (À FAIRE MANUELLEMENT)
+
 - [ ] Aller sur https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/sql/new
 - [ ] Copier le contenu de `FIX_TINDER_BADOO_RUN_IN_DASHBOARD.sql`
 - [ ] Exécuter le SQL
 - [ ] Vérifier les résultats
 
 ### ⚠️ Étape 3 : Test Final (APRÈS correction DB)
+
 ```bash
 # Vérifier que les codes sont corrigés
 node verify_tinder_badoo_fix.mjs
@@ -146,16 +160,19 @@ node verify_tinder_badoo_fix.mjs
 **Question** : Y a-t-il d'autres services avec des codes incorrects ?
 
 **Méthode** :
+
 ```bash
 node generate_service_mapping.mjs  # Liste tous les services DB
 ```
 
-**Résultat** : 
+**Résultat** :
+
 - ✅ 1000 services dans la DB
 - ✅ La plupart utilisent déjà les codes SMS-Activate corrects
 - ❌ 2 services identifiés avec codes longs : **Tinder** & **Badoo**
 
 **Services vérifiés sans problème** :
+
 - WhatsApp (`wa`) ✅
 - Telegram (`tg`) ✅
 - Instagram (`ig`) ✅
@@ -170,11 +187,13 @@ node generate_service_mapping.mjs  # Liste tous les services DB
 ## 📊 Impact
 
 ### Avant Fix
+
 - ❌ Tinder : 500 Error → 0 activations possibles
 - ❌ Badoo : 500 Error → 0 activations possibles
 - ⚠️ 2 services majeurs (dating) non fonctionnels
 
 ### Après Fix
+
 - ✅ Tinder : 52+ pays disponibles → Activations fonctionnelles
 - ✅ Badoo : 43 pays disponibles → Activations fonctionnelles
 - ✅ 100% des services dating opérationnels
@@ -198,14 +217,14 @@ node generate_service_mapping.mjs  # Liste tous les services DB
 
 ## 📁 Fichiers Créés/Modifiés
 
-| Fichier | Action | Description |
-|---------|--------|-------------|
-| `src/pages/DashboardPage.tsx` | ✅ Modifié | Suppression mapping incomplet ligne 263-278 |
-| `FIX_TINDER_BADOO_RUN_IN_DASHBOARD.sql` | ✅ Créé | SQL pour corriger codes DB |
-| `verify_tinder_badoo_fix.mjs` | ✅ Créé | Script de vérification |
-| `diagnose_tinder_badoo.mjs` | ✅ Créé | Diagnostic initial |
-| `generate_service_mapping.mjs` | ✅ Créé | Analyse 1000 services |
-| `SOLUTION_TINDER_BADOO_FIX.md` | ✅ Créé | Ce document |
+| Fichier                                 | Action     | Description                                 |
+| --------------------------------------- | ---------- | ------------------------------------------- |
+| `src/pages/DashboardPage.tsx`           | ✅ Modifié | Suppression mapping incomplet ligne 263-278 |
+| `FIX_TINDER_BADOO_RUN_IN_DASHBOARD.sql` | ✅ Créé    | SQL pour corriger codes DB                  |
+| `verify_tinder_badoo_fix.mjs`           | ✅ Créé    | Script de vérification                      |
+| `diagnose_tinder_badoo.mjs`             | ✅ Créé    | Diagnostic initial                          |
+| `generate_service_mapping.mjs`          | ✅ Créé    | Analyse 1000 services                       |
+| `SOLUTION_TINDER_BADOO_FIX.md`          | ✅ Créé    | Ce document                                 |
 
 ---
 

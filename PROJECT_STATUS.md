@@ -6,18 +6,21 @@
 ## ✅ Fonctionnalités Complètes
 
 ### 1. Système de Prix ✅
+
 - **Conversion automatique** : $ (SMS-Activate) → FCFA → Pièces (Ⓐ)
 - **Taux:** 1$ = 600 FCFA, 1Ⓐ = 100 FCFA
 - **Marge dynamique:** 30% par défaut, ajustable depuis admin
 - **Affichage correct:** Plus de "0 Ⓐ", tous les prix convertis
 
 ### 2. Affichage des Pays ✅
+
 - **Tri intelligent:** Score composite (rank + disponibilité + prix)
 - **Quantité réelle:** Nombre de numéros disponibles depuis API
 - **Badges supprimés:** Plus de badges de taux de succès trompeurs
 - **Interface claire:** Nom, drapeau, quantité, prix
 
 ### 3. Système d'Activation ✅
+
 - **SMS-Activate API:** Intégration complète
 - **Opérateur automatique:** Pas de sélection manuelle
 - **Durée:** 20 minutes pour recevoir le SMS
@@ -26,6 +29,7 @@
 - **Transaction:** Freeze du solde, remboursement si échec
 
 ### 4. Système de Location (NEW) ✅
+
 - **Interface intégrée:** Même page que activation avec toggle
 - **4 durées disponibles:**
   - 4 heures (prix × 1)
@@ -53,6 +57,7 @@ supabase/functions/
 ## 🎨 Interface Dashboard
 
 ### Mode Activation (défaut)
+
 ```
 Service → Pays → Confirmation → Acheter (4Ⓐ)
 ↓
@@ -60,6 +65,7 @@ Numéro actif 20 minutes → Reçoit 1 SMS → Terminé
 ```
 
 ### Mode Rent (nouveau)
+
 ```
 [Toggle Rent] → Service → Pays → Durée (4h/1j/1sem/1mois) → Louer (4-200Ⓐ)
 ↓
@@ -69,11 +75,13 @@ Numéro actif selon durée → Reçoit plusieurs SMS → Expire
 ## 🔧 Configuration
 
 ### Variables d'environnement (Supabase)
+
 - ✅ `SMS_ACTIVATE_API_KEY` - Clé API SMS-Activate
 - ✅ `SUPABASE_URL` - URL du projet
 - ✅ `SUPABASE_SERVICE_ROLE_KEY` - Clé service
 
 ### Base de données
+
 - ✅ Table `services` - Services disponibles
 - ✅ Table `activations` - Activations en cours
 - ✅ Table `rentals` - Locations en cours
@@ -82,6 +90,7 @@ Numéro actif selon durée → Reçoit plusieurs SMS → Expire
 - ⏳ Table `system_settings` - Paramètres (marge à ajouter)
 
 ### SQL à exécuter (optionnel)
+
 ```sql
 -- Ajouter paramètre de marge ajustable
 INSERT INTO system_settings (key, value, category, description)
@@ -97,6 +106,7 @@ Voir `INSERT_MARGIN_SETTING.md` pour détails.
 ## 🧪 Tests Requis
 
 ### Activation
+
 - [ ] Sélectionner service et pays
 - [ ] Vérifier prix calculé correctement
 - [ ] Acheter numéro
@@ -105,6 +115,7 @@ Voir `INSERT_MARGIN_SETTING.md` pour détails.
 - [ ] Vérifier transaction "completed"
 
 ### Location
+
 - [ ] Toggle vers mode Rent
 - [ ] Sélectionner service et pays
 - [ ] Choisir durée (4h, 1j, 1sem, 1mois)
@@ -116,6 +127,7 @@ Voir `INSERT_MARGIN_SETTING.md` pour détails.
 - [ ] Attendre expiration
 
 ### Admin
+
 - [ ] Exécuter SQL pour ajouter marge
 - [ ] Aller dans Settings → Pricing
 - [ ] Modifier marge (ex: 40%)
@@ -147,12 +159,14 @@ Commits:
 ## 🚀 Déploiement
 
 ### Frontend
+
 ```bash
 npm run build  # ✅ Build #138 OK
 # Déployer dist/ sur votre hébergeur
 ```
 
 ### Edge Functions
+
 ```bash
 npx supabase functions deploy buy-sms-activate-rent       # ✅ Déployé
 npx supabase functions deploy check-sms-activate-rent     # ✅ Déployé
@@ -161,29 +175,32 @@ npx supabase functions deploy get-top-countries-by-service  # ✅ Déployé
 
 ## 📝 Historique des Builds
 
-| Build | Commit | Description |
-|-------|--------|-------------|
-| #130 | 73aaa43 | Fix badges taux de succès |
-| #134 | - | Fix affichage quantité |
-| #136 | c4ab6eb | Conversion prix $ → Ⓐ |
-| #137 | 4db2ec6 | Système marge dynamique |
-| #138 | becc7bf | **Intégration location complète** |
+| Build | Commit  | Description                       |
+| ----- | ------- | --------------------------------- |
+| #130  | 73aaa43 | Fix badges taux de succès         |
+| #134  | -       | Fix affichage quantité            |
+| #136  | c4ab6eb | Conversion prix $ → Ⓐ             |
+| #137  | 4db2ec6 | Système marge dynamique           |
+| #138  | becc7bf | **Intégration location complète** |
 
 ## 🎯 Prochaines Améliorations
 
 ### Court terme
+
 1. Afficher les locations dans "Active numbers"
 2. Ajouter badge "Rent" vs "Activation"
 3. Interface inbox SMS pour locations
 4. Polling automatique pour locations
 
 ### Moyen terme
+
 1. Historique des SMS reçus en location
 2. Statistiques par service/pays
 3. Auto-renouvellement de location
 4. Notifications push pour nouveaux SMS
 
 ### Long terme
+
 1. API publique pour clients
 2. Webhooks pour nouveaux SMS
 3. Support multi-provider (5sim, etc.)
@@ -198,6 +215,7 @@ npx supabase functions deploy get-top-countries-by-service  # ✅ Déployé
 ## 🎊 Résumé
 
 ✅ **Build #138 = LOCATION OPÉRATIONNELLE**
+
 - 2 Edge Functions déployées
 - Interface complète et intégrée
 - Sélection automatique d'opérateur

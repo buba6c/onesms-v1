@@ -3,40 +3,48 @@
 ## ✅ Ce qui a été fait
 
 ### 1. **Nouveau service de logos** (`src/lib/logo-service.ts`)
-   - **Service Logos**: Utilise Clearbit Logo API (gratuit)
-     - URL: `https://logo.clearbit.com/{domain}?size=64`
-     - Exemples: Instagram, WhatsApp, Google, etc.
-   
-   - **Country Flags**: Utilise Flagcdn (gratuit CDN)
-     - URL: `https://flagcdn.com/64x48/{iso_code}.png`
-     - Support de 100+ pays avec mapping des codes 5sim vers ISO
-   
-   - **Fallback**: Emojis si les images ne chargent pas
+
+- **Service Logos**: Utilise Clearbit Logo API (gratuit)
+
+  - URL: `https://logo.clearbit.com/{domain}?size=64`
+  - Exemples: Instagram, WhatsApp, Google, etc.
+
+- **Country Flags**: Utilise Flagcdn (gratuit CDN)
+
+  - URL: `https://flagcdn.com/64x48/{iso_code}.png`
+  - Support de 100+ pays avec mapping des codes 5sim vers ISO
+
+- **Fallback**: Emojis si les images ne chargent pas
 
 ### 2. **Composants mis à jour**
 
 #### AdminServices.tsx
+
 - ✅ Affiche les vrais logos des services
 - ✅ Fallback automatique vers emoji si échec
 - ✅ Design professionnel avec border et padding
 
 #### AdminCountries.tsx
+
 - ✅ Affiche les vrais drapeaux des pays
 - ✅ Fallback automatique vers emoji si échec
 - ✅ Format 64x48px adapté aux drapeaux
 
 #### DashboardPage.tsx
+
 - ✅ Logos services dans la sélection
 - ✅ Drapeaux pays dans la sélection
 - ✅ Service sélectionné avec vrai logo
 - ✅ Même système de fallback
 
 ### 3. **Database**
+
 - ✅ Ajout colonne `flag_url` à `countries`
 - ✅ Table `service_icons` existe déjà
 - ✅ Index créés pour performance
 
 ### 4. **SQL Script** (`RUN_THIS_SQL.sql`)
+
 - ✅ Section 1: Fix RLS Users (500 error)
 - ✅ Section 2: success_rate + service_icons
 - ✅ Section 3: Fix CORS countries/sync_logs
@@ -45,6 +53,7 @@
 ## 📋 Instructions d'exécution
 
 ### Étape 1: Exécuter le SQL
+
 ```bash
 1. Ouvrir: https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/sql
 2. Copier TOUT le contenu de RUN_THIS_SQL.sql
@@ -54,6 +63,7 @@
 ```
 
 ### Étape 2: Rebuild et redémarrer
+
 ```bash
 cd "/Users/mac/Desktop/ONE SMS V1"
 npm run build
@@ -61,6 +71,7 @@ pm2 restart all
 ```
 
 ### Étape 3: Tester
+
 1. Ouvrir l'app: http://localhost:3000
 2. Login en admin
 3. Aller dans Admin → Services
@@ -71,12 +82,14 @@ pm2 restart all
 ## 🖼️ APIs utilisées
 
 ### Clearbit Logo API (GRATUIT)
+
 - **URL**: `https://logo.clearbit.com/{domain}?size=64`
 - **Limite**: "Raisonnable usage" (pas de quota strict)
 - **Qualité**: Excellente, PNG transparent
 - **Exemple**: `https://logo.clearbit.com/instagram.com?size=64`
 
 ### Flagcdn (GRATUIT)
+
 - **URL**: `https://flagcdn.com/64x48/{code}.png`
 - **Limite**: Illimité
 - **Format**: PNG, SVG disponible
@@ -85,6 +98,7 @@ pm2 restart all
 ## 🔄 Comment ça marche
 
 ### Pour les services:
+
 ```typescript
 // 1. Essaie de charger le vrai logo
 <img src={getServiceLogo('instagram')} />
@@ -94,6 +108,7 @@ onError={() => showEmoji('📷')}
 ```
 
 ### Pour les pays:
+
 ```typescript
 // 1. Essaie de charger le vrai drapeau
 <img src={getCountryFlag('france')} />
@@ -105,11 +120,13 @@ onError={() => showEmoji('🇫🇷')}
 ## 📊 Mapping des codes
 
 ### Services (80+ mappés)
+
 - `instagram` → `instagram.com` → Logo Instagram
 - `whatsapp` → `whatsapp.com` → Logo WhatsApp
 - etc.
 
 ### Pays (100+ mappés)
+
 - `france` → `fr` → Drapeau France 🇫🇷
 - `russia` → `ru` → Drapeau Russie 🇷🇺
 - `usa` → `us` → Drapeau USA 🇺🇸
@@ -118,6 +135,7 @@ onError={() => showEmoji('🇫🇷')}
 ## 🎯 Résultat attendu
 
 ### Avant (emojis):
+
 ```
 📷 Instagram
 💬 WhatsApp
@@ -126,6 +144,7 @@ onError={() => showEmoji('🇫🇷')}
 ```
 
 ### Après (vrais logos/drapeaux):
+
 ```
 [Logo Instagram] Instagram
 [Logo WhatsApp] WhatsApp
@@ -136,12 +155,14 @@ onError={() => showEmoji('🇫🇷')}
 ## 🐛 Dépannage
 
 ### Si les logos ne s'affichent pas:
+
 1. Vérifier la console navigateur (F12)
 2. Chercher erreurs CORS
 3. Si CORS error: Les APIs sont publiques, pas de CORS normalement
 4. Si 404: Le service n'existe pas dans Clearbit → fallback emoji
 
 ### Si les drapeaux ne s'affichent pas:
+
 1. Vérifier mapping du code pays dans `logo-service.ts`
 2. Ajouter le code manquant si besoin
 3. Fallback emoji s'active automatiquement

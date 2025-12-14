@@ -5,6 +5,7 @@
 ### 1. **`total_available` JAMAIS MIS À JOUR**
 
 **Le problème**:
+
 ```typescript
 // supabase/functions/sync-sms-activate/index.ts (ligne 258)
 servicesToUpsert.push({
@@ -15,11 +16,12 @@ servicesToUpsert.push({
   icon: icon,
   active: true,
   popularity_score: popularityScore,
-  total_available: 0  // ❌ TOUJOURS 0 !
-})
+  total_available: 0, // ❌ TOUJOURS 0 !
+});
 ```
 
 **Impact**:
+
 - Les services ont `total_available: 0` même quand il y a des pricing_rules
 - Le Dashboard filtre `.gt('total_available', 0)` donc **les services ne s'affichent PAS**
 - Les stats affichent 0 numéros disponibles
@@ -29,6 +31,7 @@ servicesToUpsert.push({
 ### 2. **Fonction SQL `calculate_service_totals()` NON APPELÉE**
 
 **La fonction existe** (migration 027):
+
 ```sql
 CREATE OR REPLACE FUNCTION calculate_service_totals()
 RETURNS void
@@ -57,6 +60,7 @@ $$;
 ### 3. **Flux de Synchronisation Incomplet**
 
 **Flux actuel**:
+
 ```
 1. Fetch prices from SMS-Activate API ✅
 2. Create pricing_rules ✅
@@ -65,6 +69,7 @@ $$;
 ```
 
 **Flux correct**:
+
 ```
 1. Fetch prices from SMS-Activate API
 2. Create pricing_rules
@@ -84,13 +89,14 @@ Ajouter à la fin de la sync:
 
 ```typescript
 // 7. Update total_available for all services
-const { error: updateError } = await supabaseClient
-  .rpc('calculate_service_totals')
+const { error: updateError } = await supabaseClient.rpc(
+  "calculate_service_totals"
+);
 
 if (updateError) {
-  console.error('❌ [SYNC-SMS-ACTIVATE] Failed to update totals:', updateError)
+  console.error("❌ [SYNC-SMS-ACTIVATE] Failed to update totals:", updateError);
 } else {
-  console.log('✅ [SYNC-SMS-ACTIVATE] Updated service totals')
+  console.log("✅ [SYNC-SMS-ACTIVATE] Updated service totals");
 }
 ```
 
@@ -98,13 +104,13 @@ if (updateError) {
 
 ```typescript
 // Calculer le total_available pour chaque service
-const serviceTotals: Record<string, number> = {}
+const serviceTotals: Record<string, number> = {};
 
 for (const rule of pricingRulesToUpsert) {
   if (!serviceTotals[rule.service_code]) {
-    serviceTotals[rule.service_code] = 0
+    serviceTotals[rule.service_code] = 0;
   }
-  serviceTotals[rule.service_code] += rule.available_count
+  serviceTotals[rule.service_code] += rule.available_count;
 }
 
 // Utiliser les totaux calculés
@@ -116,8 +122,8 @@ servicesToUpsert.push({
   icon: icon,
   active: true,
   popularity_score: popularityScore,
-  total_available: serviceTotals[serviceCode] || 0  // ✅ Valeur réelle
-})
+  total_available: serviceTotals[serviceCode] || 0, // ✅ Valeur réelle
+});
 ```
 
 ---
@@ -209,7 +215,7 @@ npx supabase functions deploy sync-sms-activate
 ### **1. Vérifier les services avec total_available = 0**
 
 ```sql
-SELECT 
+SELECT
   s.code,
   s.name,
   s.total_available as service_total,
@@ -227,7 +233,7 @@ LIMIT 20;
 ### **2. Vérifier les pricing_rules SMS-Activate**
 
 ```sql
-SELECT 
+SELECT
   provider,
   COUNT(*) as total_rules,
   SUM(available_count) as total_numbers,
@@ -241,7 +247,7 @@ GROUP BY provider;
 ### **3. Top services avec nombres disponibles**
 
 ```sql
-SELECT 
+SELECT
   s.code,
   s.name,
   s.popularity_score,
@@ -261,13 +267,14 @@ LIMIT 10;
 ## 🎯 IMPACT DES CORRECTIONS
 
 ### **Avant**:
+
 ```json
 {
   "services": [
     {
       "code": "ig",
       "name": "Instagram",
-      "total_available": 0,  // ❌
+      "total_available": 0, // ❌
       "active": true
     }
   ]
@@ -275,13 +282,14 @@ LIMIT 10;
 ```
 
 ### **Après**:
+
 ```json
 {
   "services": [
     {
       "code": "ig",
       "name": "Instagram",
-      "total_available": 350000,  // ✅
+      "total_available": 350000, // ✅
       "active": true
     }
   ]
@@ -305,7 +313,10 @@ LIMIT 10;
 
 ```typescript
 // src/lib/sync-service.ts - getServiceStats()
-const totalAvailable = allPricing.reduce((sum, p) => sum + (p.available_count || 0), 0)
+const totalAvailable = allPricing.reduce(
+  (sum, p) => sum + (p.available_count || 0),
+  0
+);
 ```
 
 **Solution**: Déjà corrigé avec pagination.

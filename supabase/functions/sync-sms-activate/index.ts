@@ -9,6 +9,89 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/**
+ * ORDRE OFFICIEL SMS-ACTIVATE - HOMEPAGE 2025
+ * Source: https://sms-activate.io/ - Section "We provide phone numbers for all popular services"
+ * 
+ * L'ordre suit exactement la grille de services affichée sur leur homepage:
+ * Row 1: Snapchat, WeChat, Google, TikTok, Facebook, OpenAI, VK, Instagram, Viber, WhatsApp
+ * Row 2: Amazon, Netflix, PayPal, Grindr, Telegram, Discord, Twitter, Tinder, Uber, Apple
+ * etc.
+ */
+const SMS_ACTIVATE_HOMEPAGE_ORDER: Record<string, number> = {
+  // TOP 1-10 - Homepage Row 1 (Services les plus mis en avant)
+  'fu': 1000,   // Snapchat
+  'wb': 990,    // WeChat
+  'go': 980,    // Google
+  'lf': 970,    // TikTok
+  'fb': 960,    // Facebook
+  'dr': 950,    // OpenAI (ChatGPT)
+  'vk': 940,    // VKontakte
+  'ig': 930,    // Instagram
+  'vi': 920,    // Viber
+  'wa': 910,    // WhatsApp
+  
+  // TOP 11-20 - Homepage Row 2
+  'am': 900,    // Amazon
+  'nf': 890,    // Netflix
+  'ts': 880,    // PayPal
+  'gr': 870,    // Grindr
+  'tg': 860,    // Telegram
+  'ds': 850,    // Discord
+  'tw': 840,    // Twitter
+  'oi': 830,    // Tinder
+  'ub': 820,    // Uber
+  'wx': 810,    // Apple
+  
+  // TOP 21-30
+  'mm': 800,    // Microsoft
+  'mt': 790,    // Steam
+  'aon': 780,   // Binance
+  're': 770,    // Coinbase
+  'tn': 760,    // LinkedIn
+  'aiw': 750,   // Roblox
+  'alj': 740,   // Spotify
+  'hb': 730,    // Twitch
+  'ep': 720,    // Temu
+  'hx': 710,    // AliExpress
+  
+  // TOP 31-40
+  'ka': 700,    // Shopee
+  'aez': 690,   // Shein
+  'ij': 680,    // Revolut
+  'bo': 670,    // Wise
+  'ti': 660,    // Crypto.com
+  'nc': 650,    // Payoneer
+  'mo': 640,    // Bumble
+  'qv': 630,    // Badoo
+  'vz': 620,    // Hinge
+  'df': 610,    // Happn
+  
+  // TOP 41-50
+  'jg': 600,    // Grab
+  'ac': 590,    // DoorDash
+  'aq': 580,    // Glovo
+  'nz': 570,    // Foodpanda
+  'rr': 560,    // Wolt
+  'dl': 550,    // Lazada
+  'xt': 540,    // Flipkart
+  'blm': 530,   // Epic Games
+  'bz': 520,    // Blizzard
+  'ah': 510,    // Escape From Tarkov
+  
+  // 51-60
+  'bnl': 500,   // Reddit
+  'mb': 490,    // Yahoo
+  'pm': 480,    // AOL
+  'ok': 470,    // Odnoklassniki
+  'ln': 460,    // Line
+  'kk': 450,    // KakaoTalk
+  'sg': 440,    // Signal
+  'zm': 430,    // Zoom
+  'sk': 420,    // Skype
+  'sl': 410,    // Slack
+}
+
 // Helper function: Detect service icon based on name/code
 function detectServiceIcon(code: string, name: string): string {
   const lowerCode = code.toLowerCase()
@@ -212,17 +295,23 @@ serve(async (req) => {
   }
 
   try {
+    // Use SERVICE_ROLE_KEY for admin access (bypass RLS)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
     console.log('🔄 [SYNC-SMS-ACTIVATE] Starting sync...')
+    
+    // 💰 Récupérer la marge système depuis system_settings
+    const { data: marginSetting } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pricing_margin_percentage')
+      .single()
+    
+    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30
+    console.log(`💰 [SYNC-SMS-ACTIVATE] System margin: ${marginPercentage}%`)
 
     // 0. Fetch master service list from SMS-Activate (defines official order)
     const servicesListUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getServicesList`
@@ -377,10 +466,16 @@ serve(async (req) => {
       if (!servicesSeen.has(serviceCode)) {
         servicesSeen.add(serviceCode)
         
-        // Use popularity_score from master service list API (getServicesList)
-        // Try both normalized code and original code
-        const popularityScore = masterServiceOrder.get(serviceCode) || 
-                               masterServiceOrder.get(smsActivateService) || 5
+        // PRIORITY ORDER for popularity_score:
+        // 1. SMS_ACTIVATE_HOMEPAGE_ORDER (official homepage order) - scores 400-1000
+        // 2. Default score of 5 for services NOT in our homepage mapping
+        // This ensures homepage services ALWAYS appear first
+        const homepageScore = SMS_ACTIVATE_HOMEPAGE_ORDER[serviceCode] || 
+                             SMS_ACTIVATE_HOMEPAGE_ORDER[smsActivateService]
+        
+        // If service is in homepage mapping, use that score
+        // Otherwise, give a LOW score (5) so it appears AFTER homepage services
+        const popularityScore = homepageScore || 5
         
         // Use display name from API, or fallback to capitalized code
         const displayName = serviceDisplayNames.get(serviceCode) || 
@@ -406,32 +501,42 @@ serve(async (req) => {
       }
 
       // Add pricing rule - SMS-Activate peut retourner plusieurs formats
-      let cost = 0
+      let costUSD = 0
       let count = 0
       
       // Essayer différents formats de prix
       if (typeof priceInfo === 'object') {
-        cost = parseFloat(priceInfo.retail_cost || priceInfo.cost || priceInfo.price || '0')
+        costUSD = parseFloat(priceInfo.retail_cost || priceInfo.cost || priceInfo.price || '0')
         count = parseInt(priceInfo.count || priceInfo.quantity || '0', 10)
       } else if (typeof priceInfo === 'number') {
-        cost = priceInfo
+        costUSD = priceInfo
         count = 100 // Default si pas de count
       }
 
-      console.log(`💵 [PRICING] ${serviceCode}@${countryCode}: cost=${cost}, count=${count}`)
-
-      if (cost > 0 && count > 0) {
+      if (costUSD > 0 && count > 0) {
+        // 💵 CONVERSION UNIFIÉE: USD → FCFA → Coins (Ⓐ) + marge système
+        const USD_TO_FCFA = 600  // 1 USD = 600 FCFA
+        const FCFA_TO_COINS = 100  // 1 Coin (Ⓐ) = 100 FCFA
+        
+        const priceFCFA = costUSD * USD_TO_FCFA
+        const priceCoins = priceFCFA / FCFA_TO_COINS
+        const priceWithMargin = priceCoins * (1 + marginPercentage / 100)
+        const activationPrice = Math.ceil(priceWithMargin) // Arrondir au supérieur
+        
+        console.log(`💵 [PRICING] ${serviceCode}@${countryCode}: $${costUSD} → ${priceFCFA}F → ${priceCoins}Ⓐ → ${activationPrice}Ⓐ (${count} available)`)
+        
         pricingRulesToUpsert.push({
           service_code: serviceCode,
           country_code: countryCode,
           operator: 'any',
-          activation_cost: cost * 0.8, // 20% margin
-          activation_price: cost,
+          activation_cost: costUSD * 0.7, // Notre coût (30% marge brute)
+          activation_price: activationPrice, // Prix de vente en coins
           rent_cost: 0,
           rent_price: 0,
           available_count: count,
           active: count > 0,
           provider: 'sms-activate',
+          margin_percentage: marginPercentage,
           last_synced_at: new Date().toISOString()
         })
       }
@@ -449,6 +554,20 @@ serve(async (req) => {
         console.log(`✅ [SYNC-SMS-ACTIVATE] Synced ${servicesToUpsert.length} services`)
       }
     }
+
+    // 5.1 Force update popularity_score based on SMS_ACTIVATE_HOMEPAGE_ORDER
+    // This ensures the homepage order is always applied, overriding any API values
+    console.log('🔄 [SYNC-SMS-ACTIVATE] Applying official SMS-Activate homepage order...')
+    let updatedScores = 0
+    for (const [code, score] of Object.entries(SMS_ACTIVATE_HOMEPAGE_ORDER)) {
+      const { error } = await supabaseClient
+        .from('services')
+        .update({ popularity_score: score })
+        .eq('code', code)
+      
+      if (!error) updatedScores++
+    }
+    console.log(`✅ [SYNC-SMS-ACTIVATE] Updated ${updatedScores}/${Object.keys(SMS_ACTIVATE_HOMEPAGE_ORDER).length} services with homepage order`)
 
     // 6. Batch insert pricing rules
     if (pricingRulesToUpsert.length > 0) {
@@ -474,15 +593,39 @@ serve(async (req) => {
       console.log(`✅ [SYNC-SMS-ACTIVATE] Synced ${pricingRulesToUpsert.length} pricing rules`)
     }
 
-    // 7. Update service totals from pricing_rules
+    // 7. Update service totals - calculate directly from pricing_rules
+    // (Fallback since calculate_service_totals() SQL function may not exist)
     console.log('🔄 [SYNC-SMS-ACTIVATE] Calculating service totals...')
-    const { error: totalsError } = await supabaseClient
-      .rpc('calculate_service_totals')
-
-    if (totalsError) {
-      console.error('❌ [SYNC-SMS-ACTIVATE] Totals calculation error:', totalsError)
+    
+    // First, try the RPC function
+    const { error: rpcError } = await supabaseClient.rpc('calculate_service_totals')
+    
+    if (rpcError) {
+      console.warn('⚠️ [SYNC-SMS-ACTIVATE] RPC calculate_service_totals not available, using manual calculation')
+      
+      // Calculate totals manually from pricing_rules
+      const serviceTotals: Record<string, number> = {}
+      for (const rule of pricingRulesToUpsert) {
+        if (!serviceTotals[rule.service_code]) {
+          serviceTotals[rule.service_code] = 0
+        }
+        serviceTotals[rule.service_code] += rule.available_count
+      }
+      
+      // Update each service's total_available
+      let updatedCount = 0
+      for (const [serviceCode, total] of Object.entries(serviceTotals)) {
+        const { error } = await supabaseClient
+          .from('services')
+          .update({ total_available: total })
+          .eq('code', serviceCode)
+        
+        if (!error) updatedCount++
+      }
+      
+      console.log(`✅ [SYNC-SMS-ACTIVATE] Updated ${updatedCount} services with total_available`)
     } else {
-      console.log('✅ [SYNC-SMS-ACTIVATE] Service totals updated')
+      console.log('✅ [SYNC-SMS-ACTIVATE] Service totals updated via RPC')
     }
 
     console.log('✅ [SYNC-SMS-ACTIVATE] Sync completed successfully')

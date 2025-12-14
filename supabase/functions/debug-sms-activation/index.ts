@@ -60,7 +60,7 @@ serve(async (req) => {
     // V2 API
     console.log('🌐 [DEBUG-SMS] Testing V2 API...')
     try {
-      const v2Url = `https://api.sms-activate.io/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${orderId}`
+      const v2Url = `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${orderId}`
       const v2Response = await fetch(v2Url)
       const v2Text = await v2Response.text()
       console.log('   V2 Response:', v2Text)
@@ -78,7 +78,7 @@ serve(async (req) => {
     // V1 API
     console.log('🌐 [DEBUG-SMS] Testing V1 API...')
     try {
-      const v1Url = `https://api.sms-activate.io/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${orderId}`
+      const v1Url = `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${orderId}`
       const v1Response = await fetch(v1Url)
       const v1Text = await v1Response.text()
       console.log('   V1 Response:', v1Text)
@@ -98,7 +98,7 @@ serve(async (req) => {
     // History API
     console.log('🌐 [DEBUG-SMS] Testing History API...')
     try {
-      const historyUrl = `https://api.sms-activate.io/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getFullSms&id=${orderId}`
+      const historyUrl = `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getFullSms&id=${orderId}`
       const historyResponse = await fetch(historyUrl)
       const historyText = await historyResponse.text()
       console.log('   History Response:', historyText)

@@ -125,6 +125,22 @@ export const getSession = async () => {
 }
 
 export const resetPasswordForEmail = async (email: string) => {
+  // Vérifier d'abord si l'email existe dans la base de données
+  const { data: userData, error: checkError } = await supabase
+    .from('users')
+    .select('id, email')
+    .eq('email', email)
+    .single()
+
+  if (checkError || !userData) {
+    return { 
+      data: null, 
+      error: { 
+        message: 'Aucun compte trouvé avec cette adresse email.' 
+      } 
+    }
+  }
+
   const baseUrl = window.location.origin.includes('localhost') 
     ? window.location.origin 
     : 'https://onesms-sn.com';

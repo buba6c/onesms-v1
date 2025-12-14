@@ -1,0 +1,32 @@
+🚀 BACKUP COMPLET & MIGRATION VERS COOLIFY
+============================================================
+📅 2025-12-14T15:18:12.717Z
+
+📦 ÉTAPE 1: BACKUP DE SUPABASE CLOUD
+==================================================
+   📥 countries... 337 enregistrements
+   📥 services... 1684 enregistrements
+   📥 payment_providers... 4 enregistrements
+   📥 promo_codes... 4 enregistrements
+   📥 email_campaigns... 2 enregistrements
+   📥 users... 1346 enregistrements
+   📥 activations... 462 enregistrements
+   📥 rentals... 78 enregistrements
+   📥 transactions... 1956 enregistrements
+   📥 sms_messages... 0 enregistrements
+   📥 wave_payments...    ⚠️ Table wave_payments: Could not find the table 'public.wave_payments' in the schema cache
+0 enregistrements
+   📥 contact_messages... 14 enregistrements
+   📥 logs_provider... 4395 enregistrements
+   📥 sync_history...    ⚠️ Table sync_history: Could not find the table 'public.sync_history' in the schema cache
+0 enregistrements
+   📥 referral_earnings...    ⚠️ Table referral_earnings: Could not find the table 'public.referral_earnings' in the schema cache
+0 enregistrements
+   📥 auth.users... 
+50 utilisateurs
+
+   ✅ Total: 10282 enregistrements + 50 auth users
+   💾 Sauvegardé dans: backup_complete_2025-12-14.json
+
+🔧 ÉTAPE 2: PRÉPARATION DE COOLIFY
+==================================================

@@ -1,8 +1,9 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 if (!SMS_ACTIVATE_API_KEY) {
   console.error('❌ [CHECK-SMS-ACTIVATE] SMS_ACTIVATE_API_KEY environment variable is missing')
@@ -28,13 +29,15 @@ serve(async (req) => {
       )
     }
 
+    // Use SERVICE_ROLE_KEY to bypass RLS for database operations
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
-        global: {
-          headers: { Authorization: authHeader },
-        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
       }
     )
 
@@ -92,7 +95,86 @@ serve(async (req) => {
       status: activation.status
     })
 
-    // 2. Check SMS-Activate API using V2 (returns full SMS text)
+    // Centralized, idempotent charge path using atomic_commit (ledger-first)
+    const chargeWithAtomicCommit = async (smsCode: string, smsText: string) => {
+      // Persist SMS on the activation first
+      await supabaseClient
+        .from('activations')
+        .update({
+          status: 'received',
+          sms_code: smsCode,
+          sms_text: smsText,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', activationId)
+
+      // Locate pending transaction if it exists
+      const { data: transaction } = await supabaseClient
+        .from('transactions')
+        .select('id')
+        .eq('related_activation_id', activationId)
+        .eq('status', 'pending')
+        .single()
+
+      // If no freeze remains (refunded ou jamais gelé), regeler avant commit pour éviter un service gratuit
+      if (!activation.charged && (activation.frozen_amount ?? 0) <= 0) {
+        const { data: freezeResult, error: freezeError } = await supabaseClient.rpc('atomic_freeze', {
+          p_user_id: activation.user_id,
+          p_amount: activation.price,
+          p_transaction_id: transaction?.id ?? null,
+          p_activation_id: activationId,
+          p_rental_id: null,
+          p_reason: 'Late SMS - freeze before commit'
+        })
+
+        if (freezeError) {
+          throw new Error(`atomic_freeze failed: ${freezeError.message}`)
+        }
+
+        console.log('🧊 [CHECK-SMS-ACTIVATE] Funds refrozen before commit:', freezeResult)
+        // Mémoriser localement pour que le commit ne soit pas court-circuité par v_frozen_amount=0
+        activation.frozen_amount = activation.price
+      }
+
+      // Commit via database function (handles idempotency + guard)
+      const { data: commitResult, error: commitError } = await supabaseClient.rpc('atomic_commit', {
+        p_user_id: activation.user_id,
+        p_activation_id: activationId,
+        p_rental_id: null,
+        p_transaction_id: transaction?.id ?? null,
+        p_reason: 'SMS received - auto charge'
+      })
+
+      if (commitError) {
+        throw commitError
+      }
+
+      console.log('✅ [CHECK-SMS-ACTIVATE] atomic_commit success:', commitResult)
+
+      // Mark complete on provider side (best-effort)
+      await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=6`)
+
+      return commitResult
+    }
+
+    // 2. Idempotent shortcut if already charged
+    if (activation.charged && activation.status === 'received') {
+      console.log('ℹ️ [CHECK-SMS-ACTIVATE] Activation already charged and received; returning cached SMS')
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            status: 'received',
+            sms_code: activation.sms_code,
+            sms_text: activation.sms_text,
+            charged: true
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 3. Check SMS-Activate API using V2 (returns full SMS text)
     const apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatusV2&id=${activation.order_id}`
     console.log('🌐 [CHECK-SMS-ACTIVATE] API Call V2:', apiUrl.replace(SMS_ACTIVATE_API_KEY!, 'KEY_HIDDEN'))
 
@@ -277,48 +359,17 @@ serve(async (req) => {
         }
       }
 
-      // STEP 3: Update activation based on what we found
+      // STEP 3: Update activation based on what we found (atomic + idempotent)
       if (smsCode && smsText) {
-        // SMS FOUND! Charge user
-        await supabaseClient
-          .from('activations')
-          .update({
-            status: 'received',
-            sms_code: smsCode,
-            sms_text: smsText
-          })
-          .eq('id', activationId)
-
-        const { data: transaction } = await supabaseClient
-          .from('transactions')
-          .select('*')
-          .eq('related_activation_id', activationId)
-          .eq('status', 'pending')
-          .single()
-
-        if (transaction) {
-          await supabaseClient
-            .from('transactions')
-            .update({ status: 'completed' })
-            .eq('id', transaction.id)
-
-          const { data: user } = await supabaseClient
-            .from('users')
-            .select('balance, frozen_balance')
-            .eq('id', activation.user_id)
-            .single()
-
-          if (user) {
-            await supabaseClient
-              .from('users')
-              .update({
-                balance: user.balance - activation.price,
-                frozen_balance: Math.max(0, user.frozen_balance - activation.price)
-              })
-              .eq('id', activation.user_id)
-
-            console.log('💰 [CHECK-SMS-ACTIVATE] User charged:', activation.price)
-          }
+        try {
+          await chargeWithAtomicCommit(smsCode, smsText)
+          newStatus = 'received'
+        } catch (e) {
+          console.error('❌ [CHECK-SMS-ACTIVATE] atomic_commit failed after recovery:', e)
+          return new Response(
+            JSON.stringify({ success: false, error: 'atomic_commit failed after recovery' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
 
         return new Response(
@@ -337,46 +388,58 @@ serve(async (req) => {
           }
         )
       } else {
-        // NO SMS FOUND - Refund user
+        // NO SMS FOUND - cancel or timeout only if explicit cancel/invalid id/expired; use atomic_refund
+        const now = new Date()
+        const expiresAt = new Date(activation.expires_at)
+        const shouldCancel = isStatusCancel || isWrongActivationId || now > expiresAt
+
+        if (!shouldCancel) {
+          console.log('⏳ [CHECK-SMS-ACTIVATE] No SMS yet, not cancelled (still before expiry)')
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                status: activation.status,
+                sms_code: null,
+                sms_text: null,
+                charged: false
+              }
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200,
+            }
+          )
+        }
+
+        const statusToSet = now > expiresAt ? 'timeout' : 'cancelled'
+        const reason = now > expiresAt ? 'Timeout expired (check-sms)' : 'API Cancelled (check-sms)'
+
         await supabaseClient
           .from('activations')
-          .update({ status: 'cancelled' })
+          .update({ status: statusToSet, charged: false, updated_at: new Date().toISOString() })
           .eq('id', activationId)
 
-        const { data: transaction } = await supabaseClient
-          .from('transactions')
-          .select('*')
-          .eq('related_activation_id', activationId)
-          .eq('status', 'pending')
-          .single()
+        const { data: refundResult, error: refundError } = await supabaseClient
+          .rpc('atomic_refund', {
+            p_user_id: activation.user_id,
+            p_activation_id: activationId,
+            p_rental_id: null,
+            p_transaction_id: null,
+            p_reason: reason
+          })
 
-        if (transaction) {
-          await supabaseClient
-            .from('transactions')
-            .update({ status: 'refunded' })
-            .eq('id', transaction.id)
-
-          const { data: user } = await supabaseClient
-            .from('users')
-            .select('frozen_balance')
-            .eq('id', activation.user_id)
-            .single()
-
-          if (user) {
-            await supabaseClient
-              .from('users')
-              .update({ frozen_balance: Math.max(0, user.frozen_balance - activation.price) })
-              .eq('id', activation.user_id)
-
-            console.log('💰 [CHECK-SMS-ACTIVATE] Refunded:', activation.price)
-          }
+        if (refundError) {
+          console.error('❌ [CHECK-SMS-ACTIVATE] Refund error (atomic_refund):', refundError)
+        } else {
+          console.log('✅ [CHECK-SMS-ACTIVATE] Refund via atomic_refund:', refundResult)
         }
 
         return new Response(
           JSON.stringify({
             success: true,
             data: {
-              status: 'cancelled',
+              status: statusToSet,
               sms_code: null,
               sms_text: null,
               charged: false
@@ -430,64 +493,18 @@ serve(async (req) => {
       }
     }
 
-    // Process SMS if received
+    // Process SMS if received (use centralized atomic path)
     if (smsCode && smsText) {
-
-      // Update activation
-      await supabaseClient
-        .from('activations')
-        .update({
-          status: 'received',
-          sms_code: smsCode,
-          sms_text: smsText
-        })
-        .eq('id', activationId)
-
-      // Charge user (complete transaction)
-      const { data: transaction } = await supabaseClient
-        .from('transactions')
-        .select('*')
-        .eq('related_activation_id', activationId)
-        .eq('status', 'pending')
-        .single()
-
-      if (transaction) {
-        // Mark transaction as completed
-        await supabaseClient
-          .from('transactions')
-          .update({ status: 'completed' })
-          .eq('id', transaction.id)
-
-        // Update user balance (deduct from balance, reduce frozen)
-        const { data: user } = await supabaseClient
-          .from('users')
-          .select('balance, frozen_balance')
-          .eq('id', activation.user_id)
-          .single()
-
-        if (user) {
-          const newBalance = user.balance - activation.price
-          const newFrozenBalance = Math.max(0, user.frozen_balance - activation.price)
-
-          await supabaseClient
-            .from('users')
-            .update({
-              balance: newBalance,
-              frozen_balance: newFrozenBalance
-            })
-            .eq('id', activation.user_id)
-
-          console.log('💰 [CHECK-SMS-ACTIVATE] User charged:', {
-            price: activation.price,
-            newBalance,
-            newFrozenBalance
-          })
-        }
+      try {
+        await chargeWithAtomicCommit(smsCode, smsText)
+        newStatus = 'received'
+      } catch (e) {
+        console.error('❌ [CHECK-SMS-ACTIVATE] atomic_commit failed:', e)
+        return new Response(
+          JSON.stringify({ success: false, error: 'atomic_commit failed' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-
-      // Mark as complete on SMS-Activate
-      await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=6`)
-
     } else {
       // No SMS yet - check if still waiting or cancelled
       
@@ -500,33 +517,18 @@ serve(async (req) => {
           .update({ status: 'cancelled' })
           .eq('id', activationId)
 
-        // Refund user
-        const { data: transaction } = await supabaseClient
-          .from('transactions')
-          .select('*')
-          .eq('related_activation_id', activationId)
-          .eq('status', 'pending')
-          .single()
+        // Call atomic_refund to properly handle frozen funds
+        const { data: refundResult, error: refundError } = await supabaseClient
+          .rpc('atomic_refund', {
+            p_user_id: activation.user_id,
+            p_activation_id: activationId,
+            p_reason: 'API Cancelled (CANCEL_CODE)'
+          })
 
-        if (transaction) {
-          await supabaseClient
-            .from('transactions')
-            .update({ status: 'refunded' })
-            .eq('id', transaction.id)
-
-          const { data: user } = await supabaseClient
-            .from('users')
-            .select('frozen_balance')
-            .eq('id', activation.user_id)
-            .single()
-
-          if (user) {
-            const newFrozenBalance = Math.max(0, user.frozen_balance - activation.price)
-            await supabaseClient
-              .from('users')
-              .update({ frozen_balance: newFrozenBalance })
-              .eq('id', activation.user_id)
-          }
+        if (refundError) {
+          console.error('❌ [CHECK-SMS-ACTIVATE] Refund error:', refundError)
+        } else {
+          console.log('✅ [CHECK-SMS-ACTIVATE] Refund successful:', refundResult)
         }
 
         newStatus = 'cancelled'
@@ -542,39 +544,18 @@ serve(async (req) => {
           // Cancel on SMS-Activate
           await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`)
 
-          // Update activation status
-          await supabaseClient
-            .from('activations')
-            .update({ status: 'timeout' })
-            .eq('id', activationId)
+          // Call atomic_refund to properly handle frozen funds
+          const { data: refundResult, error: refundError } = await supabaseClient
+            .rpc('atomic_refund', {
+              p_user_id: activation.user_id,
+              p_activation_id: activationId,
+              p_reason: 'Timeout expired'
+            })
 
-          // Refund user
-          const { data: transaction } = await supabaseClient
-            .from('transactions')
-            .select('*')
-            .eq('related_activation_id', activationId)
-            .eq('status', 'pending')
-            .single()
-
-          if (transaction) {
-            await supabaseClient
-              .from('transactions')
-              .update({ status: 'refunded' })
-              .eq('id', transaction.id)
-
-            const { data: user } = await supabaseClient
-              .from('users')
-              .select('frozen_balance')
-              .eq('id', activation.user_id)
-              .single()
-
-            if (user) {
-              const newFrozenBalance = Math.max(0, user.frozen_balance - activation.price)
-              await supabaseClient
-                .from('users')
-                .update({ frozen_balance: newFrozenBalance })
-                .eq('id', activation.user_id)
-            }
+          if (refundError) {
+            console.error('❌ [CHECK-SMS-ACTIVATE] Refund error:', refundError)
+          } else {
+            console.log('✅ [CHECK-SMS-ACTIVATE] Refund successful:', refundResult)
           }
 
           newStatus = 'timeout'
@@ -588,7 +569,8 @@ serve(async (req) => {
         data: {
           status: newStatus,
           sms_code: smsCode,
-          sms_text: smsText
+          sms_text: smsText,
+          charged: newStatus === 'received'
         }
       }),
       {

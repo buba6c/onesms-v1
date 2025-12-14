@@ -1,0 +1,28 @@
+#!/usr/bin/expect -f
+
+# Script automatique pour migration complète vers Coolify
+set timeout -1
+set password "Bouba@2307##"
+set server "root@46.202.171.108"
+
+# 1. TRANSFÉRER LES MIGRATIONS SQL
+puts "\n🔄 1. TRANSFERT DES MIGRATIONS SQL..."
+spawn scp -r supabase/migrations $server:/tmp/
+expect "password:"
+send "$password\r"
+expect eof
+
+# 2. APPLIQUER TOUTES LES MIGRATIONS
+puts "\n📝 2. APPLICATION DES MIGRATIONS..."
+spawn ssh $server
+expect "password:"
+send "$password\r"
+
+expect "#"
+send "cd /tmp/migrations && for file in *.sql; do echo \"Applying \$file...\"; docker exec -i supabase-db-h888cc0ck4w4o0kgw4kg84ks psql -U postgres -d postgres < \"\$file\" 2>&1 | tail -5; done\r"
+
+expect "#"
+send "exit\r"
+expect eof
+
+puts "\n✅ Migrations appliquées avec succès!"

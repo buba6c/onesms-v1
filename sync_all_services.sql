@@ -248,7 +248,7 @@ INSERT INTO services (code, name, category, icon, popularity, created_at, update
 ('vz', 'Hinge', 'dating', '💕', 820, NOW(), NOW()),
 ('df', 'Happn', 'dating', '💜', 800, NOW(), NOW()),
 ('qv', 'Badoo', 'dating', '💙', 780, NOW(), NOW()),
-('yw', 'Grindr', 'dating', '🟡', 760, NOW(), NOW()),
+('gr', 'Grindr', 'dating', '🟡', 760, NOW(), NOW()),
 ('vm', 'OkCupid', 'dating', '💚', 740, NOW(), NOW()),
 ('pf', 'POF', 'dating', '🐠', 720, NOW(), NOW()),
 ('fd', 'Mamba', 'dating', '💜', 700, NOW(), NOW()),

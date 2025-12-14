@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -387,6 +388,30 @@ export default function HistoryPage() {
     }
   };
 
+  const checkActivationStatus = async (activationId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-sms-activate-status', {
+        body: { activationId, userId: user?.id }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Statut vérifié',
+        description: data?.smsCode ? 'SMS reçu !' : 'Toujours en attente...'
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['activations-history', user?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['orders-history', user?.id] });
+    } catch (e: any) {
+      toast({
+        title: 'Erreur',
+        description: e?.message || 'Impossible de vérifier le statut',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const formatTime = (seconds: number) => {
     if (seconds <= 0) return '0 min';
     const mins = Math.floor(seconds / 60);
@@ -710,6 +735,37 @@ export default function HistoryPage() {
     return countryMap[code.toLowerCase()] || countryMap[code] || code.toUpperCase();
   };
 
+  // Normaliser un label de rent venu de SMS-Activate en français
+  const formatRentalLabel = (serviceCode: string, durationHours?: number, countryCode?: string): string => {
+    if (!serviceCode) return 'Location';
+
+    // Exemple attendu: "Rent Google,youtube,Gmail in 6 for 4hours"
+    const rentPattern = /^rent\s+(.+?)(?:\s+in\s+([^\s]+))?\s+for\s+(\d+)\s*hours?/i;
+    const match = rentPattern.exec(serviceCode);
+
+    if (match) {
+      const services = match[1]
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+        .join(', ');
+      const hours = Number(match[3]) || durationHours;
+      const durationText = hours ? `${hours}h` : '';
+      const countryHint = match[2] || countryCode;
+      const countryLabel = countryHint ? getCountryName(countryHint) : '';
+      const countryText = countryLabel ? ` (${countryLabel})` : '';
+
+      return `Location ${services}${countryText}${durationText ? ` pendant ${durationText}` : ''}`;
+    }
+
+    const normalized = serviceCode.toLowerCase();
+    if (normalized === 'full') return 'Location multi-service';
+    if (normalized === 'ot') return 'Location autre service';
+
+    return `Location ${getServiceName(serviceCode)}`;
+  };
+
   // Pagination for orders (combined activations + rentals)
   const totalOrdersPages = Math.ceil(combinedOrders.length / itemsPerPage);
   const paginatedOrders = combinedOrders.slice(
@@ -781,6 +837,7 @@ export default function HistoryPage() {
                   const actualStatus = getItemStatus(item);
                   const timeRemaining = getTimeRemaining(item.expiresAt);
                   const isRental = item.type === 'rental';
+                  const hasSms = !!item.smsCode;
                   
                   return (
                   <div
@@ -826,7 +883,7 @@ export default function HistoryPage() {
                           {/* Service Name */}
                           <div>
                             <p className="font-semibold text-sm text-foreground leading-tight">
-                              {getServiceName(item.serviceCode)}
+                              {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
                             </p>
                             <p className="text-xs text-muted-foreground">{getCountryName(item.countryCode)}</p>
                           </div>
@@ -837,33 +894,72 @@ export default function HistoryPage() {
                             <span className="text-xs font-semibold">{Math.floor(item.price)}</span>
                             <span className="text-[10px] ml-0.5">Ⓐ</span>
                           </div>
-                          {!isRental && actualStatus !== 'received' && actualStatus !== 'cancelled' && actualStatus !== 'timeout' && (
+                          {!isRental ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="p-1.5 hover:bg-muted rounded-lg transition-colors">
                                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
-                                {canCancelActivation(item.expiresAt) ? (
+                              <DropdownMenuContent align="end" className="w-44">
+                                {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') && (
                                   <DropdownMenuItem
-                                    onClick={() => cancelActivation(item.id, item.orderId)}
-                                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                    onClick={() => checkActivationStatus(item.id)}
+                                    className="cursor-pointer text-sm"
                                   >
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    {t('dashboard.cancel')}
+                                    <RefreshCw className="h-4 w-4 mr-2 text-blue-500" />
+                                    Vérifier SMS
                                   </DropdownMenuItem>
-                                ) : (
+                                )}
+
+                                {hasSms && (
                                   <DropdownMenuItem
-                                    disabled
-                                    className="cursor-not-allowed opacity-50 text-xs"
+                                    onClick={() => {
+                                      const cleanCode = item.smsCode?.includes('STATUS_OK:') 
+                                        ? item.smsCode.split(':')[1] 
+                                        : item.smsCode || '';
+                                      copyToClipboard(cleanCode);
+                                    }}
+                                    className="cursor-pointer text-sm"
                                   >
-                                    <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                                    <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copier le code
+                                  </DropdownMenuItem>
+                                )}
+
+                                {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') ? (
+                                  canCancelActivation(item.expiresAt) ? (
+                                    <DropdownMenuItem
+                                      onClick={() => cancelActivation(item.id, item.orderId)}
+                                      className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                    >
+                                      <XCircle className="h-4 w-4 mr-2" />
+                                      {t('dashboard.cancel')}
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      disabled
+                                      className="cursor-not-allowed opacity-50 text-xs"
+                                    >
+                                      <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                                      <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
+                                    </DropdownMenuItem>
+                                  )
+                                ) : null}
+
+                                {(actualStatus === 'cancelled' || actualStatus === 'timeout') && (
+                                  <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
+                                    <X className="h-4 w-4 mr-2 text-gray-400" />
+                                    <span>{actualStatus === 'cancelled' ? t('history.cancelled') : t('history.timeout')}</span>
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
+                          ) : (
+                            // Placeholder bouton désactivé pour garder l'UI cohérente
+                            <button className="p-1.5 rounded-lg opacity-50 cursor-not-allowed" disabled>
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -997,7 +1093,7 @@ export default function HistoryPage() {
                       <div className="w-[130px] flex-shrink-0">
                         <div className="flex items-center gap-1">
                           <p className="font-semibold text-sm text-foreground leading-tight truncate">
-                            {getServiceName(item.serviceCode)}
+                            {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
                           </p>
                           {isRental && <Home className="w-3 h-3 text-purple-500 flex-shrink-0" />}
                         </div>
@@ -1113,8 +1209,8 @@ export default function HistoryPage() {
                           <span className="text-[10px] ml-0.5">Ⓐ</span>
                         </div>
 
-                        {/* Menu dropdown - Only show for active activations */}
-                        {!isRental && (actualStatus === 'waiting' || actualStatus === 'pending') ? (
+                        {/* Menu dropdown - Aligné sur le comportement du dashboard (attente SMS) */}
+                        {!isRental ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button className="p-1.5 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
@@ -1122,28 +1218,64 @@ export default function HistoryPage() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" sideOffset={5} className="w-44">
-                              {canCancelActivation(item.expiresAt) ? (
+                              {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') && (
                                 <DropdownMenuItem
-                                  onClick={() => cancelActivation(item.id, item.orderId)}
-                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                  onClick={() => checkActivationStatus(item.id)}
+                                  className="cursor-pointer text-sm"
                                 >
-                                  <XCircle className="h-4 w-4 mr-2" />
-                                  {t('dashboard.cancel')}
+                                  <RefreshCw className="h-4 w-4 mr-2 text-blue-500" />
+                                  Vérifier SMS
                                 </DropdownMenuItem>
-                              ) : (
+                              )}
+
+                              {hasSms && (
                                 <DropdownMenuItem
-                                  disabled
-                                  className="cursor-not-allowed opacity-50 text-xs"
+                                  onClick={() => {
+                                    const cleanCode = item.smsCode?.includes('STATUS_OK:') 
+                                      ? item.smsCode.split(':')[1] 
+                                      : item.smsCode || '';
+                                    copyToClipboard(cleanCode);
+                                  }}
+                                  className="cursor-pointer text-sm"
                                 >
-                                  <Clock className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                                  <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copier le code
+                                </DropdownMenuItem>
+                              )}
+
+                              {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') ? (
+                                canCancelActivation(item.expiresAt) ? (
+                                  <DropdownMenuItem
+                                    onClick={() => cancelActivation(item.id, item.orderId)}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                  >
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    {t('dashboard.cancel')}
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    disabled
+                                    className="cursor-not-allowed opacity-50 text-xs"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                                    <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
+                                  </DropdownMenuItem>
+                                )
+                              ) : null}
+
+                              {(actualStatus === 'cancelled' || actualStatus === 'timeout') && (
+                                <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
+                                  <X className="h-4 w-4 mr-2 text-gray-400" />
+                                  <span>{actualStatus === 'cancelled' ? t('history.cancelled') : t('history.timeout')}</span>
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : (
-                          /* Placeholder pour garder l'alignement */
-                          <div className="w-7 flex-shrink-0"></div>
+                          // Bouton désactivé pour garder l'alignement (même visuel que menu)
+                          <button className="p-1.5 rounded-lg opacity-50 cursor-not-allowed flex-shrink-0" disabled>
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1224,6 +1356,7 @@ export default function HistoryPage() {
                       case 'purchase':
                         return <ShoppingCart className="w-5 h-5 text-blue-600" />;
                       case 'rent':
+                      case 'rental':
                         return <Phone className="w-5 h-5 text-purple-600" />;
                       case 'topup':
                       case 'credit':
@@ -1240,6 +1373,14 @@ export default function HistoryPage() {
                   };
 
                   const getTransactionLabel = () => {
+                    if (payment.type === 'rent' || payment.type === 'rental') {
+                      return formatRentalLabel(
+                        payment.description || payment.metadata?.service_code || 'rent',
+                        payment.metadata?.rent_hours || payment.metadata?.duration_hours,
+                        payment.metadata?.country_code
+                      );
+                    }
+
                     const typeKey = `history.transactionTypes.${payment.type}`;
                     const translated = t(typeKey);
                     // Si la traduction n'existe pas, retourner le type brut formaté
@@ -1301,7 +1442,13 @@ export default function HistoryPage() {
                                 {getTransactionLabel()}
                               </p>
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                {payment.description || '-'}
+                                {(payment.type === 'rent' || payment.type === 'rental')
+                                  ? formatRentalLabel(
+                                      payment.description || payment.metadata?.service_code || 'rent',
+                                      payment.metadata?.rent_hours || payment.metadata?.duration_hours,
+                                      payment.metadata?.country_code
+                                    )
+                                  : (payment.description || '-')}
                               </p>
                             </div>
                             {/* Montant */}

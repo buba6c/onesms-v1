@@ -25,6 +25,7 @@ Pour activer la gestion des packages de recharge, vous devez exécuter la migrat
 Après l'exécution, vérifiez que tout fonctionne :
 
 1. Allez sur http://localhost:3000/top-up
+
    - Les packages doivent s'afficher dynamiquement depuis la base de données
 
 2. Connectez-vous en tant qu'admin et allez sur http://localhost:3000/admin/packages
@@ -39,6 +40,7 @@ Après l'exécution, vérifiez que tout fonctionne :
 ## Fonctionnalités ajoutées
 
 ### Page TopUp (/top-up)
+
 - ✅ Chargement dynamique des packages depuis la base de données
 - ✅ Support de 3 devises : XOF, EUR, USD
 - ✅ Design responsive (mobile, tablet, desktop)
@@ -46,6 +48,7 @@ Après l'exécution, vérifiez que tout fonctionne :
 - ✅ Affichage intelligent du prix par activation
 
 ### Page Admin (/admin/packages)
+
 - ✅ Gestion complète des packages
 - ✅ Création/Modification/Suppression
 - ✅ Toggle actif/inactif en temps réel
@@ -72,18 +75,19 @@ activation_packages (
 
 ## Packages par défaut
 
-| Activations | XOF   | EUR   | USD   | Populaire | Économie |
-|------------|-------|-------|-------|-----------|----------|
-| 5          | 2,000 | 2.99  | 3.29  | Non       | 0%       |
-| 10         | 3,500 | 4.99  | 5.49  | **Oui**   | 10%      |
-| 20         | 6,000 | 8.99  | 9.89  | Non       | 15%      |
-| 50         | 13,000| 19.99 | 21.99 | Non       | 20%      |
-| 100        | 23,000| 34.99 | 38.49 | Non       | 25%      |
-| 200        | 40,000| 59.99 | 65.99 | Non       | 30%      |
+| Activations | XOF    | EUR   | USD   | Populaire | Économie |
+| ----------- | ------ | ----- | ----- | --------- | -------- |
+| 5           | 2,000  | 2.99  | 3.29  | Non       | 0%       |
+| 10          | 3,500  | 4.99  | 5.49  | **Oui**   | 10%      |
+| 20          | 6,000  | 8.99  | 9.89  | Non       | 15%      |
+| 50          | 13,000 | 19.99 | 21.99 | Non       | 20%      |
+| 100         | 23,000 | 34.99 | 38.49 | Non       | 25%      |
+| 200         | 40,000 | 59.99 | 65.99 | Non       | 30%      |
 
 ## Support
 
 Si vous rencontrez des problèmes, vérifiez :
+
 1. La connexion à Supabase
 2. Les permissions RLS (Row Level Security)
 3. Les logs dans l'éditeur SQL

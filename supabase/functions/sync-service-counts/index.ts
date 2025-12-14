@@ -37,41 +37,45 @@ serve(async (req) => {
 
     console.log('🔄 [SYNC-COUNTS] Démarrage de la synchronisation des counts...')
     
-    // TOP pays à scanner (USA, Philippines, Indonesia, India, England)
-    const topCountries = [187, 4, 6, 22, 12]
+    // ============================================================================
+    // MÉTHODE OPTIMISÉE: Utiliser getPrices sans paramètre country
+    // Retourne TOUS les pays avec leurs quantités en une seule requête
+    // Format: {"Country":{"Service":{"cost":"X","count":"Y"}}}
+    // ============================================================================
     
-    // Scanner tous les pays en parallèle
-    const results = await Promise.all(
-      topCountries.map(async (countryId: number) => {
-        try {
-          const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getNumbersStatus&country=${countryId}`
-          const response = await fetch(url)
-          const data = await response.json()
-          
-          console.log(`✅ [SYNC-COUNTS] Country ${countryId}: ${Object.keys(data).length} services`)
-          
-          return { countryId, data }
-        } catch (error) {
-          console.error(`❌ [SYNC-COUNTS] Error country ${countryId}:`, error)
-          return { countryId, data: {} }
-        }
-      })
-    )
+    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices`
+    console.log('📡 [SYNC-COUNTS] Fetching ALL countries prices...')
     
-    // Agréger les compteurs par service
+    const response = await fetch(url)
+    const allPricesData = await response.json()
+    
+    if (!allPricesData || typeof allPricesData !== 'object') {
+      throw new Error('Invalid response from getPrices API')
+    }
+    
+    // Compter le nombre de pays retournés
+    const countryIds = Object.keys(allPricesData)
+    console.log(`✅ [SYNC-COUNTS] Received data for ${countryIds.length} countries`)
+    
+    // ============================================================================
+    // Agréger les compteurs par service (SOMME de tous les pays)
+    // ============================================================================
     const totalCounts: Record<string, number> = {}
+    let totalCountries = 0
     
-    for (const { data } of results) {
-      for (const [key, value] of Object.entries(data)) {
-        // key format: "wa_0", "tg_0", "wa", etc.
-        const serviceCode = key.includes('_') ? key.split('_')[0] : key
-        
-        // La valeur peut être un string (nombre direct) ou un objet
+    for (const [countryId, countryServices] of Object.entries(allPricesData)) {
+      if (!countryServices || typeof countryServices !== 'object') continue
+      totalCountries++
+      
+      for (const [serviceCode, serviceData] of Object.entries(countryServices as Record<string, any>)) {
+        // serviceData format: { cost: "0.50", count: 100, physicalCount: 50 }
         let count = 0
-        if (typeof value === 'string') {
-          count = parseInt(value) || 0
-        } else if (typeof value === 'object' && value !== null) {
-          count = parseInt((value as any).count || 0)
+        
+        if (typeof serviceData === 'object' && serviceData !== null) {
+          // Utiliser 'count' qui représente le nombre de numéros disponibles
+          count = parseInt(serviceData.count) || 0
+        } else if (typeof serviceData === 'number') {
+          count = serviceData
         }
         
         if (count > 0) {
@@ -80,48 +84,56 @@ serve(async (req) => {
       }
     }
     
-    console.log(`📊 [SYNC-COUNTS] Total counts:`, Object.keys(totalCounts).length, 'services')
+    console.log(`📊 [SYNC-COUNTS] Aggregated counts for ${Object.keys(totalCounts).length} services from ${totalCountries} countries`)
     
-    // Update services.total_available en BATCH
+    // Afficher quelques exemples
+    const topServices = Object.entries(totalCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+    console.log('📊 [SYNC-COUNTS] Top 10 services by count:', topServices)
+    
+    // ============================================================================
+    // Update services.total_available - UPDATE INDIVIDUEL pour chaque service
+    // ============================================================================
     let updatedCount = 0
-    const updates = []
+    let errorCount = 0
     
-    for (const [serviceCode, count] of Object.entries(totalCounts)) {
-      updates.push({
-        code: serviceCode,
-        total_available: count,
-        updated_at: new Date().toISOString()
-      })
-    }
+    // Update par batch de 50 pour éviter les timeouts
+    const serviceCodes = Object.keys(totalCounts)
+    console.log(`📊 [SYNC-COUNTS] Updating ${serviceCodes.length} services with real totals`)
     
-    // BATCH UPDATE - Tous les services
-    if (updates.length > 0) {
-      console.log(`📊 [SYNC-COUNTS] Updating ${updates.length} services`)
+    for (const serviceCode of serviceCodes) {
+      const count = totalCounts[serviceCode]
       
-      // Update avec upsert - ignorer ceux qui n'existent pas
-      const { data: updateData, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('services')
-        .upsert(updates, { 
-          onConflict: 'code',
-          ignoreDuplicates: false 
+        .update({ 
+          total_available: count,
+          updated_at: new Date().toISOString()
         })
+        .eq('code', serviceCode)
       
       if (updateError) {
-        console.error('❌ [SYNC-COUNTS] Update error:', updateError)
-        // Continue même en cas d'erreur
-        updatedCount = 0
+        errorCount++
+        // Log only first few errors
+        if (errorCount <= 5) {
+          console.error(`❌ [SYNC-COUNTS] Update error for ${serviceCode}:`, updateError.message)
+        }
       } else {
-        updatedCount = updates.length
-        console.log(`✅ [SYNC-COUNTS] Updated ${updatedCount} services`)
+        updatedCount++
       }
-    }    // Log dans sync_logs
+    }
+    
+    console.log(`✅ [SYNC-COUNTS] Updated ${updatedCount} services, ${errorCount} errors`)
+    
+    // Log dans sync_logs
     const { error: logError } = await supabase
       .from('sync_logs')
       .insert({
         sync_type: 'services',
         status: 'success',
         services_synced: updatedCount,
-        countries_synced: topCountries.length,
+        countries_synced: totalCountries,
         prices_synced: 0,
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
@@ -132,15 +144,19 @@ serve(async (req) => {
       console.warn('⚠️ [SYNC-COUNTS] Log error:', logError)
     }
     
+    // Calculer le total global
+    const grandTotal = Object.values(totalCounts).reduce((sum, n) => sum + n, 0)
+    
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Service counts updated successfully',
+        message: 'Service counts updated successfully (ALL countries aggregated)',
         stats: {
           services: updatedCount,
-          countries: topCountries.length,
-          totalNumbers: Object.values(totalCounts).reduce((sum, n) => sum + n, 0)
+          countries: totalCountries,
+          totalNumbers: grandTotal
         },
+        topServices: topServices,
         counts: totalCounts
       }),
       { 

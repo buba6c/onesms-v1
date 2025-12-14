@@ -106,6 +106,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Profile loaded successfully
       }
       set({ user: profile, loading: false })
+
+      // Tentative de lier un code de parrainage stocké côté client
+      try {
+        const pendingCode = typeof window !== 'undefined'
+          ? localStorage.getItem('pending_referral_code')
+          : null
+
+        if (pendingCode) {
+          const { data, error } = await supabase.functions.invoke('link-referral', {
+            body: { referral_code: pendingCode },
+          })
+
+          if (!error) {
+            localStorage.removeItem('pending_referral_code')
+            console.log('[REFERRAL] linked', data)
+          } else {
+            console.warn('[REFERRAL] link error', error)
+          }
+        }
+      } catch (err) {
+        console.warn('[REFERRAL] link attempt failed', err)
+      }
       
     } catch (error) {
       console.error('❌ [AUTH] checkAuth exception:', error)

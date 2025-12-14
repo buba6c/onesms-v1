@@ -1,8 +1,9 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -150,52 +151,42 @@ serve(async (req) => {
           updateData.sms_code = 'NO_CODE'
         }
 
-        await supabaseClient
+        // 🛡️ PROTECTION: Mise à jour atomique avec vérification que status n'est pas déjà 'received'
+        const { data: updatedActivation } = await supabaseClient
           .from('activations')
           .update(updateData)
           .eq('id', activation.id)
+          .neq('status', 'received')
+          .select()
+          .single()
 
-        // Complete transaction if status was successful (status 4 = completed with SMS)
+        // Si aucune ligne mise à jour, l'activation était déjà traitée
+        if (!updatedActivation) {
+          console.log('⚠️ [RECOVER-SMS] Activation already processed by another process')
+          continue
+        }
+
+        // Complete transaction atomically (status 4 = completed with SMS)
         if (status === '4' || smsCode) {
           const { data: transaction } = await supabaseClient
             .from('transactions')
-            .select('*')
+            .select('id, status')
             .eq('related_activation_id', activation.id)
             .eq('status', 'pending')
             .single()
 
-          if (transaction) {
-            // Mark transaction as completed
-            await supabaseClient
-              .from('transactions')
-              .update({ status: 'completed' })
-              .eq('id', transaction.id)
+          const { data: commitResult, error: commitErr } = await supabaseClient.rpc('atomic_commit', {
+            p_user_id: activation.user_id,
+            p_activation_id: activation.id,
+            p_rental_id: null,
+            p_transaction_id: transaction?.id ?? null,
+            p_reason: 'SMS received (recovery)'
+          })
 
-            // Update user balance (deduct from balance, reduce frozen)
-            const { data: user } = await supabaseClient
-              .from('users')
-              .select('balance, frozen_balance')
-              .eq('id', activation.user_id)
-              .single()
-
-            if (user) {
-              const newBalance = user.balance - activation.price
-              const newFrozenBalance = Math.max(0, user.frozen_balance - activation.price)
-
-              await supabaseClient
-                .from('users')
-                .update({
-                  balance: newBalance,
-                  frozen_balance: newFrozenBalance
-                })
-                .eq('id', activation.user_id)
-
-              console.log('💰 [RECOVER-SMS] User charged:', {
-                price: activation.price,
-                newBalance,
-                newFrozenBalance
-              })
-            }
+          if (commitErr || !commitResult?.success) {
+            console.error('❌ [RECOVER-SMS] atomic_commit failed:', commitErr || commitResult)
+          } else {
+            console.log('💰 [RECOVER-SMS] atomic_commit success:', commitResult)
           }
         }
 

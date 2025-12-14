@@ -9,6 +9,7 @@
 ## 🔍 Diagnostic Réalisé
 
 ### 1. Test API Logo.dev ✅ FONCTIONNE
+
 ```bash
 curl -I "https://img.logo.dev/whatsapp.com?token=pk_acOeajbNRKGsSDnJvJrcfw&size=200"
 # → HTTP 200 OK
@@ -19,6 +20,7 @@ curl -I "https://img.logo.dev/whatsapp.com?token=pk_acOeajbNRKGsSDnJvJrcfw&size=
 ### 2. Analyse Base de Données
 
 **TOP 20 Services du Dashboard:**
+
 ```
  1. WhatsApp (wa)      → icon_url: ❌ NON → Utilise Logo.dev
  2. Telegram (tg)      → icon_url: ❌ NON → Utilise Logo.dev
@@ -33,26 +35,29 @@ curl -I "https://img.logo.dev/whatsapp.com?token=pk_acOeajbNRKGsSDnJvJrcfw&size=
 ```
 
 **Statistiques:**
+
 - **14/20** services TOP utilisent **Logo.dev API** (pas d'icon_url en DB)
 - **6/20** services ont icon_url (stockés sur S3)
 
 ### 3. Problème Identifié: Mappings Manquants ❌
 
 **Avant Correction:**
+
 ```typescript
 SERVICE_DOMAINS = {
   'whatsapp': 'whatsapp.com',  // ✅ OK
   'wa': // ❌ MANQUANT! → générait https://img.logo.dev/wa.com (404)
-  
+
   'telegram': 'telegram.org',  // ✅ OK
   'tg': // ❌ MANQUANT! → générait https://img.logo.dev/tg.com (404)
-  
+
   'viber': 'viber.com',        // ✅ OK
   'vi': // ❌ MANQUANT! → générait https://img.logo.dev/vi.com (404)
 }
 ```
 
 **Résultat:**
+
 - Code `wa` → URL `https://img.logo.dev/wa.com?token=...` → **HTTP 404**
 - Code `tg` → URL `https://img.logo.dev/tg.com?token=...` → **HTTP 404**
 - Code `vi` → URL `https://img.logo.dev/vi.com?token=...` → **HTTP 404**
@@ -68,53 +73,54 @@ SERVICE_DOMAINS = {
 ```typescript
 const SERVICE_DOMAINS: Record<string, string> = {
   // ✅ NOUVEAUX MAPPINGS - Codes SMS-Activate TOP services
-  'wa': 'whatsapp.com',      // WhatsApp
-  'tg': 'telegram.org',      // Telegram
-  'vi': 'viber.com',         // Viber
-  'ig': 'instagram.com',     // Instagram
-  'fb': 'facebook.com',      // Facebook
-  'tw': 'x.com',             // Twitter/X
-  'ds': 'discord.com',       // Discord
-  'vk': 'vk.com',            // VKontakte
-  'am': 'amazon.com',        // Amazon
-  'nf': 'netflix.com',       // Netflix
-  'ub': 'uber.com',          // Uber
-  'ts': 'paypal.com',        // PayPal
-  'mb': 'microsoft.com',     // Microsoft
-  'mm': 'mamba.ru',          // Mamba (dating)
-  'go': 'google.com',        // Google
-  'ym': 'yandex.com',        // Yandex
-  'ok': 'ok.ru',             // Odnoklassniki
-  'ma': 'mail.ru',           // Mail.ru
-  'av': 'avito.ru',          // Avito
-  'yz': 'youla.ru',          // Youla
-  'wb': 'wildberries.ru',    // Wildberries
-  'me': 'line.me',           // Line
-  'we': 'wechat.com',        // WeChat
-  'sn': 'snapchat.com',      // Snapchat
-  'tt': 'tiktok.com',        // TikTok
-  'lf': 'aliexpress.com',    // AliExpress
-  'gm': 'gmail.com',         // Gmail
-  'uk': 'ukr.net',           // UKR.net
-  'kp': 'kp.ru',             // KP.ru
-  'mr': 'mail.ru',           // Mail.ru (alt)
-  'oi': 'tinder.com',        // Tinder
-  'qv': 'badoo.com',         // Badoo
-  'bd': 'baddoo.com',        // Badoo (alt)
-  'zn': 'dzen.ru',           // Dzen
-  
+  wa: "whatsapp.com", // WhatsApp
+  tg: "telegram.org", // Telegram
+  vi: "viber.com", // Viber
+  ig: "instagram.com", // Instagram
+  fb: "facebook.com", // Facebook
+  tw: "x.com", // Twitter/X
+  ds: "discord.com", // Discord
+  vk: "vk.com", // VKontakte
+  am: "amazon.com", // Amazon
+  nf: "netflix.com", // Netflix
+  ub: "uber.com", // Uber
+  ts: "paypal.com", // PayPal
+  mb: "microsoft.com", // Microsoft
+  mm: "mamba.ru", // Mamba (dating)
+  go: "google.com", // Google
+  ym: "yandex.com", // Yandex
+  ok: "ok.ru", // Odnoklassniki
+  ma: "mail.ru", // Mail.ru
+  av: "avito.ru", // Avito
+  yz: "youla.ru", // Youla
+  wb: "wildberries.ru", // Wildberries
+  me: "line.me", // Line
+  we: "wechat.com", // WeChat
+  sn: "snapchat.com", // Snapchat
+  tt: "tiktok.com", // TikTok
+  lf: "aliexpress.com", // AliExpress
+  gm: "gmail.com", // Gmail
+  uk: "ukr.net", // UKR.net
+  kp: "kp.ru", // KP.ru
+  mr: "mail.ru", // Mail.ru (alt)
+  oi: "tinder.com", // Tinder
+  qv: "badoo.com", // Badoo
+  bd: "baddoo.com", // Badoo (alt)
+  zn: "dzen.ru", // Dzen
+
   // Noms complets (déjà existants)
-  'whatsapp': 'whatsapp.com',
-  'telegram': 'telegram.org',
-  'viber': 'viber.com',
-  'instagram': 'instagram.com',
+  whatsapp: "whatsapp.com",
+  telegram: "telegram.org",
+  viber: "viber.com",
+  instagram: "instagram.com",
   // ... 50+ autres mappings
-}
+};
 ```
 
 ### Résultat Après Correction
 
 **URLs générées maintenant:**
+
 ```
 wa → https://img.logo.dev/whatsapp.com?token=... → ✅ HTTP 200
 tg → https://img.logo.dev/telegram.org?token=... → ✅ HTTP 200
@@ -128,6 +134,7 @@ fb → https://img.logo.dev/facebook.com?token=...  → ✅ HTTP 200
 ## 🧪 Vérification
 
 ### Test Automatique (Node.js)
+
 ```javascript
 const testServices = ['wa', 'tg', 'vi', 'ig', 'fb', 'tw', 'ds', 'vk', 'mm', 'am'];
 
@@ -149,6 +156,7 @@ const testServices = ['wa', 'tg', 'vi', 'ig', 'fb', 'tw', 'ds', 'vk', 'mm', 'am'
 1. **Ouvrir le Dashboard** → http://localhost:5173
 2. **Observer la liste des services**
 3. **Vérifier TOP 10:**
+
    - WhatsApp affiche logo vert ✅
    - Telegram affiche logo bleu avec avion ✅
    - Viber affiche logo violet ✅
@@ -165,6 +173,7 @@ const testServices = ['wa', 'tg', 'vi', 'ig', 'fb', 'tw', 'ds', 'vk', 'mm', 'am'
 ## 📊 Impact de la Correction
 
 ### Avant
+
 ```
 TOP 20 Services:
    ✅ Avec logos visibles: 6/20 (30%)
@@ -172,6 +181,7 @@ TOP 20 Services:
 ```
 
 ### Après
+
 ```
 TOP 20 Services:
    ✅ Avec logos visibles: 20/20 (100%) 🎉
@@ -179,6 +189,7 @@ TOP 20 Services:
 ```
 
 **Services bénéficiant de la correction:**
+
 - WhatsApp (wa) - #1 popularité ⭐
 - Telegram (tg) - #2 popularité ⭐
 - Viber (vi) - #3 popularité ⭐
@@ -203,6 +214,7 @@ TOP 20 Services:
 ### Priorité HAUTE
 
 1. **Tester en Production** ✅
+
    ```bash
    npm run dev
    # Ouvrir http://localhost:5173
@@ -210,6 +222,7 @@ TOP 20 Services:
    ```
 
 2. **Vérifier Console Navigateur**
+
    - Ouvrir DevTools (F12)
    - Onglet Network → Filter: logo.dev
    - Vérifier: HTTP 200 pour tous les logos
@@ -222,11 +235,13 @@ TOP 20 Services:
 ### Priorité MOYENNE
 
 4. **Compléter SERVICE_DOMAINS**
+
    - Ajouter plus de codes SMS-Activate
    - Source: `src/lib/sms-activate-mapping.ts` (60+ services mappés)
    - Copier mappings code → domain depuis ce fichier
 
 5. **Optimiser Chargement**
+
    - Précharger logos TOP 10: `<link rel="preload" as="image" href="..." />`
    - Service Worker pour cache 30 jours
    - Réduction requêtes Logo.dev
@@ -293,34 +308,37 @@ onError={(e) => {
 ## 🛠️ Commandes Debug
 
 ### Tester un logo spécifique
+
 ```bash
 curl -I "https://img.logo.dev/whatsapp.com?token=pk_acOeajbNRKGsSDnJvJrcfw&size=200"
 # Attendu: HTTP/2 200
 ```
 
 ### Voir mappings en DB
+
 ```javascript
-const { createClient } = require('@supabase/supabase-js');
+const { createClient } = require("@supabase/supabase-js");
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const { data } = await supabase
-  .from('services')
-  .select('code, name, icon_url')
-  .eq('active', true)
-  .order('popularity_score', { ascending: false })
+  .from("services")
+  .select("code, name, icon_url")
+  .eq("active", true)
+  .order("popularity_score", { ascending: false })
   .limit(20);
 
 console.table(data);
 ```
 
 ### Vérifier mapping dans code
-```javascript
-import { getServiceLogo } from '@/lib/logo-service';
 
-console.log(getServiceLogo('wa'));  // whatsapp.com ✅
-console.log(getServiceLogo('tg'));  // telegram.org ✅
-console.log(getServiceLogo('vi'));  // viber.com ✅
-console.log(getServiceLogo('zz'));  // zz.com (fallback)
+```javascript
+import { getServiceLogo } from "@/lib/logo-service";
+
+console.log(getServiceLogo("wa")); // whatsapp.com ✅
+console.log(getServiceLogo("tg")); // telegram.org ✅
+console.log(getServiceLogo("vi")); // viber.com ✅
+console.log(getServiceLogo("zz")); // zz.com (fallback)
 ```
 
 ---
@@ -330,6 +348,7 @@ console.log(getServiceLogo('zz'));  // zz.com (fallback)
 ### Q: Pourquoi certains services ont icon_url et d'autres non?
 
 **R:** Historique de la plateforme:
+
 - **2024 Q2:** Logos uploadés manuellement sur S3 (995 services)
 - **2024 Q4:** Migration vers Logo.dev API (automatique)
 - **Aujourd'hui:** Hybride (icon_url prioritaire, sinon Logo.dev)
@@ -337,6 +356,7 @@ console.log(getServiceLogo('zz'));  // zz.com (fallback)
 ### Q: Que se passe-t-il si Logo.dev est down?
 
 **R:** Cascade de fallback automatique:
+
 1. Logo.dev timeout (5 sec)
 2. onError handler s'active
 3. SVG avec emoji généré (instantané)
@@ -345,6 +365,7 @@ console.log(getServiceLogo('zz'));  // zz.com (fallback)
 ### Q: Faut-il supprimer les icon_url en DB?
 
 **R:** Non recommandé:
+
 - **Garder icon_url** = logos personnalisés/branding
 - **Logo.dev** = mise à jour auto des logos officiels
 - **Meilleur des 2 mondes** = Hybride actuel
@@ -352,12 +373,13 @@ console.log(getServiceLogo('zz'));  // zz.com (fallback)
 ### Q: Comment ajouter un nouveau service?
 
 **R:** 2 options:
+
 ```typescript
 // Option 1: Ajouter mapping dans logo-service.ts
 SERVICE_DOMAINS['nouveaucode'] = 'nouveaudomaine.com'
 
 // Option 2: Upload image dans DB
-UPDATE services 
+UPDATE services
 SET icon_url = 'https://onesms.s3.amazonaws.com/icons/nouveau.png'
 WHERE code = 'nouveaucode'
 ```

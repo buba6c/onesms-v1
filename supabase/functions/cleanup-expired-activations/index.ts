@@ -44,7 +44,7 @@ serve(async (req) => {
       
       try {
         // Cancel on SMS-Activate
-        const cancelUrl = `https://api.sms-activate.io/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`
+        const cancelUrl = `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`
         
         console.log(`📞 [CLEANUP-EXPIRED] Cancelling on SMS-Activate: ${activation.order_id}`)
         const cancelResponse = await fetch(cancelUrl)
@@ -64,19 +64,42 @@ serve(async (req) => {
           throw new Error(`Failed to update activation ${activation.id}: ${updateError.message}`)
         }
 
-        // Update related transaction
-        await supabaseClient
+        // Update related transaction to refunded
+        const { data: transaction } = await supabaseClient
           .from('transactions')
-          .update({ status: 'cancelled' })
+          .select('*')
           .eq('related_activation_id', activation.id)
           .eq('status', 'pending')
+          .single()
+
+        if (transaction) {
+          await supabaseClient
+            .from('transactions')
+            .update({ status: 'refunded' })
+            .eq('id', transaction.id)
+        }
+
+        // Call atomic_refund to properly handle frozen funds
+        const { data: refundResult, error: refundError } = await supabaseClient
+          .rpc('atomic_refund', {
+            p_user_id: activation.user_id,
+            p_activation_id: activation.id,
+            p_reason: 'Cleanup expired activation'
+          })
+
+        if (refundError) {
+          console.error(`❌ [CLEANUP-EXPIRED] Refund error for ${activation.id}:`, refundError)
+        } else {
+          console.log(`✅ [CLEANUP-EXPIRED] Refunded ${refundResult?.refunded || activation.price}Ⓐ for user ${activation.user_id}`)
+        }
 
         cleanupResults.push({
           id: activation.id,
           phone: activation.phone,
           order_id: activation.order_id,
           status: 'cleaned',
-          sms_activate_response: cancelResult
+          sms_activate_response: cancelResult,
+          credits_unfrozen: activation.price
         })
 
         console.log(`✅ [CLEANUP-EXPIRED] Successfully cleaned ${activation.phone}`)

@@ -10,15 +10,17 @@
 ### Fichier: `src/pages/DashboardPage.tsx`
 
 **Ligne 130:**
+
 ```typescript
 // AVANT (affichait seulement 14 services populaires):
-const [selectedCategory, setSelectedCategory] = useState<string>('popular');
+const [selectedCategory, setSelectedCategory] = useState<string>("popular");
 
 // APRÈS (affiche TOUS les services):
-const [selectedCategory, setSelectedCategory] = useState<string>('all');
+const [selectedCategory, setSelectedCategory] = useState<string>("all");
 ```
 
 **Ligne 142-148:**
+
 ```typescript
 // AVANT:
 .limit(10000);
@@ -32,16 +34,19 @@ const [selectedCategory, setSelectedCategory] = useState<string>('all');
 ## 📊 RÉSULTAT
 
 ### Affichage Dashboard
+
 - **Avant:** "POPULAR (14 services)" (seulement les populaires)
 - **Après:** "POPULAR (1290 services)" (tous les services)
 
 ### Ordre des Services
 
 **Tri appliqué:**
+
 1. `popularity_score DESC` - Services populaires en premier (score 980-0)
 2. `total_available DESC` - Plus de stock = priorité
 
 **Top 20 services affichés:**
+
 ```
  1. Instagram        ⭐ Popular    (980) - 773,461 numéros
  2. Facebook         ⭐ Popular    (970) - 437,201 numéros
@@ -88,6 +93,7 @@ TOTAL:       1,290 services (tous affichés)
 ### Comment l'ordre est maintenu
 
 1. **Edge Function `sync-sms-activate`** (déployée):
+
    - Appelle `getServicesList` de SMS-Activate API
    - Construit un `masterServiceOrder` Map
    - Assigne `popularity_score` basé sur l'ordre API:
@@ -97,6 +103,7 @@ TOTAL:       1,290 services (tous affichés)
      - etc.
 
 2. **Query Dashboard**:
+
    ```sql
    SELECT * FROM services
    WHERE active = true AND total_available > 0
@@ -110,16 +117,19 @@ TOTAL:       1,290 services (tous affichés)
 ## 🔧 MAINTENANCE
 
 ### Mise à jour automatique
+
 - **Cron Job**: Toutes les 30 minutes
 - **Workflow**: `.github/workflows/sync-sms-activate.yml`
 - **Action**: Resynchronise les services, maintient l'ordre
 
 ### Ajout manuel d'un service
+
 Si besoin d'ajouter un service manuellement:
+
 ```sql
 INSERT INTO services (
-  code, 
-  name, 
+  code,
+  name,
   popularity_score,  -- Important! Détermine l'ordre
   total_available,
   category,
@@ -143,19 +153,21 @@ INSERT INTO services (
 ✅ **Ordre identique à SMS-Activate**  
 ✅ **Services populaires en tête**  
 ✅ **Tri par popularity_score puis total_available**  
-✅ **Affichage dynamique: "POPULAR (1290 services)"**  
+✅ **Affichage dynamique: "POPULAR (1290 services)"**
 
 ---
 
 ## 📝 NOTES TECHNIQUES
 
 ### Pourquoi "POPULAR" pour tous les services?
+
 - Le texte "POPULAR" est historique (UI design)
 - Il ne filtre pas, c'est juste le titre de la section
 - Tous les services sont affichés, triés par popularité
 - Les 14 premiers ont `category='popular'` (⭐) pour distinction visuelle
 
 ### Limite PostgREST
+
 - Par défaut: 1000 lignes max
 - Utilisation de `.range(0, 9999)` contourne la limite
 - Actuellement: 1290 services retournés ✅

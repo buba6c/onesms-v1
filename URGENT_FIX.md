@@ -3,18 +3,23 @@
 ## Problèmes identifiés
 
 ### 1. ❌ CORS Error sur sync_logs
+
 ```
 Fetch API cannot load .../sync_logs due to access control checks
 ```
+
 **Cause**: Policy RLS bloque l'accès public
 
 ### 2. ❌ Sync error: TypeError: Load failed
+
 **Cause**: Edge Function pas déployée ou API key manquante
 
 ### 3. ❌ 404/500 sur logos Clearbit
+
 **Cause**: Trop de services obscurs essaient de charger des logos
 
 ### 4. ❌ Affiche "10 services, 3 numéros, 0 numbers"
+
 **Cause**: Données de test, pas de vraie sync avec 5sim
 
 ---
@@ -30,6 +35,7 @@ Fetch API cannot load .../sync_logs due to access control checks
 ```
 
 Ce script va :
+
 - ✅ Corriger les policies RLS sur sync_logs
 - ✅ Permettre l'accès public en lecture
 - ✅ Créer la table sync_logs si manquante
@@ -79,6 +85,7 @@ pm2 restart all
 ### Dans la console du navigateur:
 
 **AVANT le fix**:
+
 ```
 ❌ CORS error sur sync_logs
 ❌ Load failed
@@ -86,6 +93,7 @@ pm2 restart all
 ```
 
 **APRÈS le fix**:
+
 ```
 ✅ 📊 [DASHBOARD] Services récupérés: 1000+
 ✅ ✅ [DASHBOARD] Services mappés: 1000+
@@ -110,35 +118,41 @@ SELECT * FROM sync_logs ORDER BY started_at DESC LIMIT 5;
 ### Si encore CORS error
 
 **Vérifier les policies**:
+
 ```sql
-SELECT tablename, policyname, cmd 
-FROM pg_policies 
+SELECT tablename, policyname, cmd
+FROM pg_policies
 WHERE tablename = 'sync_logs';
 ```
 
 Devrait montrer:
+
 - `Anyone can read sync logs` (SELECT)
 - `Service role can create sync logs` (INSERT)
 
 ### Si "Load failed" persiste
 
 **Vérifier Edge Function**:
+
 ```bash
 # Logs de la fonction
 supabase functions logs sync-5sim
 ```
 
 **Vérifier les secrets**:
+
 ```bash
 supabase secrets list
 ```
 
 Devrait montrer:
+
 - `FIVE_SIM_API_KEY`
 
 ### Si sync réussit mais 0 services
 
 **Vérifier l'API 5sim**:
+
 ```bash
 # Test manuel
 curl "https://5sim.net/v1/guest/prices" -H "Accept: application/json"
@@ -164,6 +178,7 @@ Devrait retourner un gros JSON avec tous les services/pays/prix.
 ## 🎯 Résultat attendu
 
 ### Avant:
+
 ```
 Services: 10 (données de test)
 Numéros: 3 par service
@@ -172,6 +187,7 @@ CORS errors partout
 ```
 
 ### Après:
+
 ```
 Services: 1000+ (vrais services 5sim)
 Numéros: Vrais nombres (ex: Instagram 150,000+)

@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -176,10 +176,10 @@ serve(async (req) => {
       price = 0.5
     }
 
-    // 3. Check user balance
+    // 3. Check user balance AND frozen_balance atomically
     const { data: userProfile, error: profileError } = await supabaseClient
       .from('users')
-      .select('balance')
+      .select('balance, frozen_balance')
       .eq('id', userId)
       .single()
 
@@ -187,11 +187,65 @@ serve(async (req) => {
       throw new Error('User profile not found')
     }
 
-    if (userProfile.balance < price) {
-      throw new Error(`Insufficient balance. Required: $${price}, Available: $${userProfile.balance}`)
+    // Calculate available balance (balance - frozen)
+    const frozenBalance = userProfile.frozen_balance || 0
+    const availableBalance = userProfile.balance - frozenBalance
+
+    console.log('💰 [BUY-SMS-ACTIVATE] Balance check:', {
+      total: userProfile.balance,
+      frozen: frozenBalance,
+      available: availableBalance,
+      required: price
+    })
+
+    if (availableBalance < price) {
+      throw new Error(`Insufficient balance. Required: $${price}, Available: $${availableBalance} (${frozenBalance} frozen)`)
     }
 
+    // 3.1. Create pending transaction BEFORE API call
+    const currentBalance = userProfile.balance
+    
+    const { data: pendingTransaction, error: txnError } = await supabaseClient
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        type: 'purchase',
+        amount: -price, // Négatif pour débit
+        balance_before: currentBalance,
+        balance_after: currentBalance, // Balance ne change pas encore (crédits gelés)
+        status: 'pending',
+        description: `Purchase SMS activation for ${product} (${country})`
+      })
+      .select()
+      .single()
+
+    if (txnError) {
+      console.error('❌ [BUY-SMS-ACTIVATE] Failed to create transaction:', txnError)
+      throw new Error(`Failed to create transaction: ${txnError.message}`)
+    }
+
+    const transactionId = pendingTransaction.id
+    console.log('📝 [BUY-SMS-ACTIVATE] Transaction created:', transactionId)
+
+    // 3.2. FREEZE credits BEFORE API call (prevents double-purchase)
+    const { error: freezeError } = await supabaseClient
+      .from('users')
+      .update({
+        frozen_balance: frozenBalance + price
+      })
+      .eq('id', userId)
+
+    if (freezeError) {
+      console.error('❌ [BUY-SMS-ACTIVATE] Failed to freeze balance:', freezeError)
+      // Rollback transaction
+      await supabaseClient.from('transactions').update({ status: 'failed' }).eq('id', transactionId)
+      throw new Error('Failed to freeze balance')
+    }
+
+    console.log('🔒 [BUY-SMS-ACTIVATE] Credits frozen:', price, 'New frozen:', frozenBalance + price)
+
     // 4. Buy number from SMS-Activate using getNumberV2 (JSON response)
+    // NOTE: Credits are now FROZEN - safe to make API call
     const orderId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const params = new URLSearchParams({
@@ -224,8 +278,33 @@ serve(async (req) => {
         const [, activationId, phone] = responseText.split(':')
         data = { activationId, phoneNumber: phone }
       } else {
+        // ❌ API ERROR - ROLLBACK frozen credits
+        console.error('❌ [BUY-SMS-ACTIVATE] API Error, rolling back frozen credits...')
+        await supabaseClient
+          .from('users')
+          .update({ frozen_balance: Math.max(0, frozenBalance) })
+          .eq('id', userId)
+        await supabaseClient
+          .from('transactions')
+          .update({ status: 'failed', description: `SMS-Activate error: ${responseText}` })
+          .eq('id', transactionId)
         throw new Error(`SMS-Activate error: ${responseText}`)
       }
+    }
+
+    // Check for error in JSON response
+    if (data.status === 'error' || data.error) {
+      // ❌ API ERROR - ROLLBACK frozen credits
+      console.error('❌ [BUY-SMS-ACTIVATE] API Error response, rolling back frozen credits...')
+      await supabaseClient
+        .from('users')
+        .update({ frozen_balance: Math.max(0, frozenBalance) })
+        .eq('id', userId)
+      await supabaseClient
+        .from('transactions')
+        .update({ status: 'failed', description: `SMS-Activate error: ${data.message || data.error}` })
+        .eq('id', transactionId)
+      throw new Error(`SMS-Activate error: ${data.message || data.error || JSON.stringify(data)}`)
     }
 
     const {
@@ -271,18 +350,17 @@ serve(async (req) => {
     if (activationError) {
       console.error('❌ [BUY-SMS-ACTIVATE] Failed to create activation:', activationError)
       console.error('❌ [BUY-SMS-ACTIVATE] Activation error details:', JSON.stringify(activationError, null, 2))
-      console.error('❌ [BUY-SMS-ACTIVATE] Attempted insert:', {
-        user_id: userId,
-        order_id: activationId,
-        phone: phone,
-        service_code: product,
-        country_code: country,
-        operator: operator || 'any',
-        price: price,
-        status: 'pending',
-        expires_at: expiresAt.toISOString(),
-        provider: 'sms-activate'
-      })
+      
+      // ROLLBACK: Unfreeze credits and cancel transaction
+      await supabaseClient
+        .from('users')
+        .update({ frozen_balance: Math.max(0, frozenBalance) })
+        .eq('id', userId)
+      
+      await supabaseClient
+        .from('transactions')
+        .update({ status: 'failed', description: `Failed to create activation: ${activationError.message}` })
+        .eq('id', transactionId)
       
       // Try to cancel on SMS-Activate
       try {
@@ -294,40 +372,24 @@ serve(async (req) => {
       throw new Error(`Failed to create activation record: ${activationError.message || JSON.stringify(activationError)}`)
     }
 
-    // 6. DEDUCT user balance immediately
-    const { error: balanceError } = await supabaseClient
-      .from('users')
-      .update({ balance: userProfile.balance - price })
-      .eq('id', userId)
+    console.log('✅ [BUY-SMS-ACTIVATE] Activation created:', activation.id)
 
-    if (balanceError) {
-      console.error('❌ [BUY-SMS-ACTIVATE] Failed to deduct balance:', balanceError)
-      // Try to cancel on SMS-Activate since we couldn't charge
-      try {
-        await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activationId}&status=8`)
-      } catch (e) {
-        console.error('Failed to cancel on SMS-Activate:', e)
-      }
-      throw new Error('Failed to deduct balance')
-    }
-
-    console.log(`💰 [BUY-SMS-ACTIVATE] Balance deducted: ${price} from ${userProfile.balance} = ${userProfile.balance - price}`)
-
-    // 7. Create transaction record (completed)
-    const { error: transactionError } = await supabaseClient
+    // 5.1. Link transaction to activation (CRITICAL for later status updates)
+    const { error: linkError } = await supabaseClient
       .from('transactions')
-      .insert({
-        user_id: userId,
-        type: 'usage',
-        amount: -price,
-        description: `SMS activation for ${service.name} in ${country}`,
-        status: 'completed',
-        related_activation_id: activation.id
-      })
+      .update({ related_activation_id: activation.id })
+      .eq('id', transactionId)
 
-    if (transactionError) {
-      console.error('❌ [BUY-SMS-ACTIVATE] Failed to create transaction:', transactionError)
+    if (linkError) {
+      console.error('⚠️ [BUY-SMS-ACTIVATE] Failed to link transaction to activation:', linkError)
+      // Non-critical error, continue
+    } else {
+      console.log('🔗 [BUY-SMS-ACTIVATE] Transaction linked to activation:', activation.id)
     }
+
+    // 6. SUCCESS - Credits stay frozen until SMS received (handled by check-status)
+    // Note: Balance will be debited when SMS is received in check-sms-activate-status
+    console.log('✅ [BUY-SMS-ACTIVATE] Purchase complete - credits frozen until SMS received')
 
     console.log('✅ [BUY-SMS-ACTIVATE] Success:', {
       id: activation.id,

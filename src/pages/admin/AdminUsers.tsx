@@ -40,6 +40,8 @@ export default function AdminUsers() {
   const [creditAmount, setCreditAmount] = useState('')
   const [creditNote, setCreditNote] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -93,40 +95,75 @@ export default function AdminUsers() {
     }
 
     setFilteredUsers(filtered)
+    // reset selection when filtering to avoid inconsistent view
+    setSelectedIds([])
+  }
+
+  const toggleSelect = (userId: string) => {
+    setSelectedIds((prev) => prev.includes(userId)
+      ? prev.filter(id => id !== userId)
+      : [...prev, userId])
+  }
+
+  const toggleSelectAll = () => {
+    if (filteredUsers.length === 0) return
+    const allIds = filteredUsers.map((u: any) => u.id)
+    const allSelected = allIds.every(id => selectedIds.includes(id))
+    setSelectedIds(allSelected ? [] : allIds)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    setActionLoading(true)
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .in('id', selectedIds)
+
+      if (error) throw error
+
+      toast({
+        title: 'Succès',
+        description: `${selectedIds.length} utilisateur(s) supprimé(s)`
+      })
+
+      setBulkDeleteOpen(false)
+      setSelectedIds([])
+      fetchUsers()
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const handleAddCredit = async () => {
     if (!selectedUser || !creditAmount) return
+
+    const amount = parseFloat(creditAmount)
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: 'Erreur',
+        description: 'Montant invalide',
+        variant: 'destructive'
+      })
+      return
+    }
     
     setActionLoading(true)
     try {
-      const amount = parseFloat(creditAmount)
-      if (isNaN(amount) || amount <= 0) {
-        toast({
-          title: 'Erreur',
-          description: 'Montant invalide',
-          variant: 'destructive'
-        })
-        return
-      }
-
-      const newBalance = (selectedUser.balance || 0) + amount
-
-      const { error } = await (supabase
-        .from('users') as any)
-        .update({ balance: newBalance })
-        .eq('id', selectedUser.id)
+      const { data, error } = await supabase.rpc('admin_add_credit', {
+        p_user_id: selectedUser.id,
+        p_amount: amount,
+        p_admin_note: creditNote || null
+      }) as any
 
       if (error) throw error
-
-      // Create transaction log
-      await (supabase.from('transactions') as any).insert({
-        user_id: selectedUser.id,
-        type: 'credit',
-        amount: amount,
-        description: creditNote || `Crédit ajouté par admin`,
-        status: 'completed'
-      })
 
       toast({
         title: 'Succès',
@@ -137,10 +174,10 @@ export default function AdminUsers() {
       setCreditAmount('')
       setCreditNote('')
       fetchUsers()
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Erreur',
-        description: error.message,
+        description: error.message || 'Impossible d\'ajouter du crédit',
         variant: 'destructive'
       })
     } finally {
@@ -250,6 +287,14 @@ export default function AdminUsers() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Rafraîchir
           </Button>
+          <Button
+            variant="destructive"
+            disabled={selectedIds.length === 0}
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer sélection ({selectedIds.length})
+          </Button>
           <Button>
             <UserPlus className="w-4 h-4 mr-2" />
             Add User
@@ -307,6 +352,14 @@ export default function AdminUsers() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <input
+                    type="checkbox"
+                    aria-label="Sélectionner tout"
+                    checked={filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedIds.includes(u.id))}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -328,6 +381,14 @@ export default function AdminUsers() {
               ) : (
                 filteredUsers.map(user => (
                   <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        aria-label={`Sélectionner ${user.email}`}
+                        checked={selectedIds.includes(user.id)}
+                        onChange={() => toggleSelect(user.id)}
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div>
                         <div className="font-medium">{user.email}</div>
@@ -387,6 +448,26 @@ export default function AdminUsers() {
           </table>
         </div>
       </Card>
+
+      {/* Dialog Suppression multiple */}
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer {selectedIds.length} utilisateur(s)</DialogTitle>
+            <DialogDescription>
+              Cette action est irréversible. Les comptes sélectionnés seront définitivement supprimés.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)} disabled={actionLoading}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={actionLoading || selectedIds.length === 0}>
+              {actionLoading ? 'Suppression...' : 'Supprimer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog Ajouter Crédit */}
       <Dialog open={creditDialogOpen} onOpenChange={setCreditDialogOpen}>

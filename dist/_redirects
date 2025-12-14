@@ -1,0 +1,5 @@
+# Proxy Supabase Auth pour masquer le domaine
+/auth/*  https://htfqmamvmhdoixqcbbbw.supabase.co/auth/:splat  200
+
+# SPA fallback - doit être en dernier
+/*    /index.html   200

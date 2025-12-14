@@ -1,8 +1,10 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Version: 2024-12-01-fixed
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,148 +12,150 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Use SERVICE_ROLE_KEY to bypass RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Support both orderId and activationId for compatibility
     const body = await req.json()
-    const orderId = body.orderId // ID SMS-Activate (numérique)
-    const activationId = body.activationId // UUID Supabase
-    const userId = body.userId
+    const { orderId, activationId, userId } = body
 
-    console.log('❌ [CANCEL-SMS-ACTIVATE] Cancelling:', { orderId, activationId, userId })
+    console.log('❌ [CANCEL] Starting cancellation:', { orderId, activationId, userId })
 
-    // 1. Get activation from database - try multiple strategies
+    // 1. Find activation
     let activation = null
     
-    // Strategy 1: Try by order_id (SMS-Activate ID)
     if (orderId) {
-      const { data, error } = await supabaseClient
+      const { data } = await supabaseClient
         .from('activations')
         .select('*')
         .eq('order_id', orderId.toString())
         .single()
-      
-      if (!error && data) {
-        activation = data
-        console.log('✅ [CANCEL-SMS-ACTIVATE] Found by order_id:', orderId)
-      }
+      if (data) activation = data
     }
     
-    // Strategy 2: Try by UUID (activationId)
     if (!activation && activationId) {
-      const { data, error } = await supabaseClient
+      const { data } = await supabaseClient
         .from('activations')
         .select('*')
         .eq('id', activationId)
         .single()
-      
-      if (!error && data) {
-        activation = data
-        console.log('✅ [CANCEL-SMS-ACTIVATE] Found by id:', activationId)
-      }
+      if (data) activation = data
     }
     
     if (!activation) {
-      throw new Error(`Activation not found. orderId=${orderId}, activationId=${activationId}`)
+      throw new Error(`Activation not found: orderId=${orderId}, activationId=${activationId}`)
     }
 
-    // 2. Check if cancellable (only pending/waiting status)
-    if (!['pending', 'waiting'].includes(activation.status)) {
-      throw new Error(`Cannot cancel activation with status: ${activation.status}`)
+    console.log('📋 [CANCEL] Activation found:', {
+      id: activation.id,
+      status: activation.status,
+      price: activation.price,
+      frozen_amount: activation.frozen_amount
+    })
+
+    // 2. Check if cancellable
+    if (!['pending', 'waiting', 'active'].includes(activation.status)) {
+      // Already cancelled or completed
+      return new Response(
+        JSON.stringify({ success: true, message: 'Already processed', alreadyProcessed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // 3. Cancel on SMS-Activate (status 8 = cancel)
+    // 3. Atomic lock - mark as cancelled immediately to prevent race condition
+    const { data: lockedActivation, error: lockError } = await supabaseClient
+      .from('activations')
+      .update({ 
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString()
+      })
+      .eq('id', activation.id)
+      .in('status', ['pending', 'waiting', 'active'])
+      .select()
+      .single()
+
+    if (lockError || !lockedActivation) {
+      console.log('⚠️ [CANCEL] Could not lock - already processed')
+      return new Response(
+        JSON.stringify({ success: true, message: 'Already processed', alreadyProcessed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('🔒 [CANCEL] Activation locked')
+
+    // 4. Cancel on SMS-Activate
     const apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`
-    console.log('🌐 [CANCEL-SMS-ACTIVATE] API Call:', apiUrl.replace(SMS_ACTIVATE_API_KEY!, 'KEY_HIDDEN'))
+    console.log('🌐 [CANCEL] Calling SMS-Activate API...')
 
     const response = await fetch(apiUrl)
     const responseText = await response.text()
+    console.log('📥 [CANCEL] API Response:', responseText)
 
-    console.log('📥 [CANCEL-SMS-ACTIVATE] API Response:', responseText)
-
-    // ACCESS_CANCEL means success, also accept ACCESS_READY
-    if (!responseText.includes('ACCESS_CANCEL') && !responseText.includes('ACCESS_READY') && responseText.startsWith('BAD_')) {
-      throw new Error(`SMS-Activate error: ${responseText}`)
-    }
-
-    // 4. Update activation status
-    await supabaseClient
-      .from('activations')
-      .update({ status: 'cancelled' })
-      .eq('id', activation.id)
-
-    // 5. Refund user - ADD BACK to balance
-    const { data: user, error: userError } = await supabaseClient
-      .from('users')
-      .select('balance')
-      .eq('id', activation.user_id)
+    // 5. Find related transaction
+    const { data: txn } = await supabaseClient
+      .from('transactions')
+      .select('id, status')
+      .eq('related_activation_id', activation.id)
       .single()
 
-    if (user && !userError) {
-      const newBalance = user.balance + activation.price
-      
-      await supabaseClient
-        .from('users')
-        .update({ balance: newBalance })
-        .eq('id', activation.user_id)
+    // 6. ATOMIC REFUND via RPC
+    const { data: refundResult, error: refundError } = await supabaseClient.rpc('atomic_refund', {
+      p_user_id: activation.user_id,
+      p_activation_id: activation.id,
+      p_transaction_id: txn?.id || null,
+      p_reason: 'Cancelled by user'
+    })
 
-      // Create refund transaction
-      await supabaseClient
-        .from('transactions')
-        .insert({
-          user_id: activation.user_id,
-          type: 'refund',
-          amount: activation.price,
-          description: `Refund for cancelled activation ${activation.service_code}`,
-          status: 'completed',
-          related_activation_id: activation.id
-        })
+    let finalBalance = 0
+    let finalFrozen = 0
+    // ✅ SÉCURITÉ: Utiliser UNIQUEMENT frozen_amount, PAS price
+    let refundedAmount = activation.frozen_amount || 0
 
-      console.log('💰 [CANCEL-SMS-ACTIVATE] Refunded:', {
-        price: activation.price,
-        oldBalance: user.balance,
-        newBalance
-      })
+    if (refundError) {
+      console.error('⚠️ [CANCEL] atomic_refund failed:', refundError)
+      // Ne pas tenter d'update direct users (bloqué par users_balance_guard).
+      // On s'arrête ici pour éviter des crédits fantômes.
+      return new Response(
+        JSON.stringify({ success: false, error: 'Refund failed', detail: refundError.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    } else {
+      console.log('💰 [CANCEL] atomic_refund SUCCESS:', refundResult)
+      finalBalance = refundResult?.balance_after || 0
+      finalFrozen = refundResult?.frozen_after || 0
+      refundedAmount = refundResult?.refunded || refundedAmount
     }
 
-    console.log('✅ [CANCEL-SMS-ACTIVATE] Successfully cancelled and refunded')
+    console.log('✅ [CANCEL] Completed:', {
+      activation_id: activation.id,
+      refunded: refundedAmount,
+      newBalance: finalBalance,
+      newFrozen: finalFrozen
+    })
 
     return new Response(
       JSON.stringify({
         success: true,
         message: 'Activation cancelled and refunded',
-        refunded: activation.price
+        refunded: refundedAmount,
+        newBalance: finalBalance,
+        newFrozenBalance: finalFrozen
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {
-    console.error('❌ [CANCEL-SMS-ACTIVATE] Error:', error)
+    console.error('❌ [CANCEL] Error:', error)
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

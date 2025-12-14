@@ -3,7 +3,22 @@
  * Simple, rapide, toujours à jour
  */
 
+import * as ServicesComplete from './sms-activate-services-complete'
+
 const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
+
+// Collect all service codes from the comprehensive catalogue to auto-fill fallbacks
+const ALL_SERVICE_CODES: Set<string> = (() => {
+  const codes = new Set<string>()
+  Object.values(ServicesComplete).forEach(value => {
+    if (Array.isArray(value)) {
+      value.forEach((s: any) => {
+        if (s && typeof s.code === 'string') codes.add(s.code)
+      })
+    }
+  })
+  return codes
+})()
 
 // ============================================================================
 // Mapping services SMS-Activate vers domaines
@@ -21,7 +36,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'tg': 'telegram.org',           // Telegram
   'hw': 'alibaba.com',            // Alipay/Alibaba/1688
   'lf': 'tiktok.com',             // TikTok/Douyin
-  'yw': 'grindr.com',             // Grindr (code yw, pas gr!)
+  'yw': 'youwin.com',              // Youwin (code yw)
   'ot': 'sms-activate.io',        // Any other
   'tw': 'x.com',                  // Twitter
   'mm': 'microsoft.com',          // Microsoft (PAS Mamba!)
@@ -257,7 +272,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'cyberghost': 'cyberghostvpn.com', // CyberGhost
   
   // Services additionnels
-  'gr': 'astropay.com',           // AstroPay (code SMS-Activate: gr)
+  'gr': 'grindr.com',             // Grindr (code SMS-Activate: gr)
   'afk': 'astropay.com',          // AstroPay (autre code possible)
   'astropay': 'astropay.com',     // AstroPay (nom complet)
   'et': 'clubhouse.com',          // Clubhouse (code SMS-Activate: et)
@@ -412,6 +427,13 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'badoo': 'badoo.com',
 }
 
+// Auto-fill missing service codes with a generic fallback domain to remove gaps
+ALL_SERVICE_CODES.forEach(code => {
+  if (!SERVICE_DOMAINS[code]) {
+    SERVICE_DOMAINS[code] = 'sms-activate.io'
+  }
+})
+
 /**
  * Générer un logo SVG de fallback pour un service
  */
@@ -463,6 +485,11 @@ export const getServiceLogo = (serviceCode: string): string => {
   if (!isValidCode) {
     return generateFallbackLogo(code)
   }
+
+  // Overrides pour services dont le logo.dev est trompeur
+  if (code === 'afk' || code === 'astropay') {
+    return '/logos/astropay.svg'
+  }
   
   // PRIORITÉ 1: Si le code est dans SERVICE_DOMAINS, utiliser le domaine mappé
   // Ceci résout le conflit tg=Telegram vs tg=Togo, am=Amazon vs am=Armenia, etc.
@@ -505,7 +532,8 @@ export const getServiceIcon = (serviceCode: string): string => {
     'tg': '✈️',       // Telegram
     'hw': '🛍️',       // Alipay/Alibaba/1688
     'lf': '🎵',       // TikTok/Douyin
-    'yw': '🌈',       // Grindr (code yw!)
+    'yw': '🎰',       // Youwin
+    'gr': '🌈',       // Grindr
     'ot': '📱',       // Any other
     'tw': '🐦',       // Twitter
     'mm': '🪟',       // Microsoft (PAS Mamba!)
@@ -566,6 +594,8 @@ export const getServiceIcon = (serviceCode: string): string => {
     'acz': '🤖',      // Claude
     'df': '❤️',       // Happn
     'vz': '💖',       // Hinge
+    'afk': '💳',      // AstroPay
+    'astropay': '💳', // AstroPay (nom complet)
     
     // Noms complets (fallback)
     'whatsapp': '💬',
@@ -602,6 +632,13 @@ export const getServiceIcon = (serviceCode: string): string => {
     'badoo': '💙',
     'bumble': '💛',
   }
+
+  // Auto-fill missing codes with a neutral icon to avoid inconsistent UI for long-tail services
+  ALL_SERVICE_CODES.forEach(code => {
+    if (!iconMap[code]) {
+      iconMap[code] = '📱'
+    }
+  })
   return iconMap[serviceCode.toLowerCase()] || '📱'
 }
 

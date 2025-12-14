@@ -1,6 +1,7 @@
 # 🚨 FIX URGENT - Erreur 500 sur /users
 
 ## ❌ Problème
+
 ```
 GET https://htfqmamvmhdoixqcbbbw.supabase.co/rest/v1/users?select=*&id=eq.xxx 500 (Internal Server Error)
 ```
@@ -37,6 +38,7 @@ Ouvrir le fichier **`RUN_THIS_SQL.sql`** et copier TOUT le contenu.
 ## 🔧 Ce que fait le script
 
 ### 1. Fixe les politiques RLS (Résout l'erreur 500)
+
 ```sql
 -- Supprime les anciennes politiques problématiques
 DROP POLICY IF EXISTS "Users can view own profile" ON users;
@@ -45,11 +47,13 @@ CREATE POLICY "Users can view own data" ON users FOR SELECT USING (auth.uid() = 
 ```
 
 ### 2. Ajoute success_rate aux pays
+
 ```sql
 ALTER TABLE countries ADD COLUMN success_rate DECIMAL(5, 2) DEFAULT 99.00;
 ```
 
 ### 3. Crée la table service_icons
+
 ```sql
 CREATE TABLE service_icons (
   service_code TEXT UNIQUE,
@@ -76,7 +80,7 @@ Une fois le SQL exécuté avec succès :
 1. **Tester l'app** : Connexion + Navigation
 2. **Cliquer sur "Sync avec 5sim"** dans Admin → Services
 3. **Attendre** : ~30-60 secondes pour ~1000 services
-4. **Vérifier** : 
+4. **Vérifier** :
    - Services avec vraies disponibilités ✅
    - Pays avec success_rate calculé ✅
    - Prix réels affichés dans le dashboard ✅
@@ -86,11 +90,13 @@ Une fois le SQL exécuté avec succès :
 ## ⚠️ Si Erreur Persiste
 
 Vérifie les logs Supabase :
+
 1. Dashboard → Logs
-2. Chercher "users" 
+2. Chercher "users"
 3. Regarder l'erreur exacte
 
 Ou désactive temporairement RLS :
+
 ```sql
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ```

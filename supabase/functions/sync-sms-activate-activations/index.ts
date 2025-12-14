@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.io/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,63 +78,35 @@ serve(async (req) => {
         continue
       }
 
+      // 🛡️ Skip if already received
+      if (activation.status === 'received' || activation.status === 'completed') {
+        console.log(`⚠️ [SYNC-ACTIVATIONS] Order ${orderId} already processed, skipping`)
+        continue
+      }
+
       syncedCount++
 
       // 4. If SMS code exists and not yet in our DB, update it
       if (smsCode && !activation.sms_code) {
         console.log(`✅ [SYNC-ACTIVATIONS] Found SMS for ${phoneNumber}:`, smsCode)
 
-        // Update activation with SMS
-        await supabaseClient
-          .from('activations')
-          .update({
-            status: 'received',
-            sms_code: smsCode,
-            sms_text: smsText || `Your verification code is: ${smsCode}`,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', activation.id)
+        // Traitement unique et atomique : process_sms_received (update + commit + tx)
+        const { data: processResult, error: processError } = await supabaseClient.rpc('process_sms_received', {
+          p_order_id: activation.order_id,
+          p_code: smsCode,
+          p_text: smsText || `Your verification code is: ${smsCode}`,
+          p_source: 'sync'
+        })
 
-        // Complete transaction (charge user)
-        const { data: transaction } = await supabaseClient
-          .from('transactions')
-          .select('*')
-          .eq('related_activation_id', activation.id)
-          .eq('status', 'pending')
-          .single()
+        if (processError) {
+          console.error('❌ [SYNC-ACTIVATIONS] process_sms_received error:', processError)
+          continue
+        }
 
-        if (transaction) {
-          // Mark transaction as completed
-          await supabaseClient
-            .from('transactions')
-            .update({ status: 'completed' })
-            .eq('id', transaction.id)
-
-          // Update user balance (deduct from balance, reduce frozen)
-          const { data: user } = await supabaseClient
-            .from('users')
-            .select('balance, frozen_balance')
-            .eq('id', activation.user_id)
-            .single()
-
-          if (user) {
-            const newBalance = user.balance - activation.price
-            const newFrozenBalance = Math.max(0, user.frozen_balance - activation.price)
-
-            await supabaseClient
-              .from('users')
-              .update({
-                balance: newBalance,
-                frozen_balance: newFrozenBalance
-              })
-              .eq('id', activation.user_id)
-
-            console.log('💰 [SYNC-ACTIVATIONS] User charged:', {
-              price: activation.price,
-              newBalance,
-              newFrozenBalance
-            })
-          }
+        if (processResult?.success) {
+          console.log('✅ [SYNC-ACTIVATIONS] process_sms_received SUCCESS:', processResult)
+        } else {
+          console.error('❌ [SYNC-ACTIVATIONS] process_sms_received returned error payload:', processResult)
         }
 
         // Mark as complete on SMS-Activate

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -6,12 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.org/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  // ❌ Deprecated: use continue-sms-activate-rent (atomic freeze/commit)
+  return new Response(
+    JSON.stringify({
+      error: 'Deprecated endpoint. Please use continue-sms-activate-rent.',
+      hint: 'This function is disabled to prevent unsafe balance handling.'
+    }),
+    {
+      status: 410,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  )
 
   try {
     const { rentId, hours } = await req.json()
@@ -154,10 +167,24 @@ serve(async (req) => {
     if (continueData.status === 'success' && continueData.phone) {
       const { endDate } = continueData.phone
 
-      // Déduire le solde
+      // Déduire le solde avec log
+      const newBalance = profile.balance - price
+
+      await supabase.from('balance_operations').insert({
+        user_id: user.id,
+        rental_id: rental.id,
+        operation_type: 'debit',
+        amount: price,
+        balance_before: profile.balance,
+        balance_after: newBalance,
+        frozen_before: profile.frozen_balance ?? 0,
+        frozen_after: profile.frozen_balance ?? 0,
+        reason: `Extend rent ${rentId} (+${hours}h)`
+      })
+
       await supabase
         .from('users')
-        .update({ balance: profile.balance - price })
+        .update({ balance: newBalance })
         .eq('id', user.id)
 
       // Mettre à jour le rental

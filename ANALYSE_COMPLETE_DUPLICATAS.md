@@ -3,6 +3,7 @@
 ## 📊 PROBLÈME IDENTIFIÉ
 
 ### Situation actuelle:
+
 - **Admin affiche**: 2425 services
 - **Dashboard affiche**: 1290 services (avec stock > 0)
 - **API SMS-Activate**: 2035 services officiels
@@ -11,17 +12,20 @@
 ### Causes des duplicatas:
 
 1. **Codes longs vs codes courts**:
+
    - ❌ Base de données contient: `whatsapp`, `telegram`, `instagram`, `facebook`, `google`, `discord`, `amazon`
    - ✅ API SMS-Activate utilise: `wa`, `tg`, `ig`, `fb`, `go`, `ds`, `am`
 
 2. **Mapping incomplet** dans `/supabase/functions/sync-sms-activate/index.ts`:
+
    ```typescript
    const NORMALIZE_SERVICE_CODE: Record<string, string> = {
-     'whatsapp': 'wa',
-     'telegram': 'tg',
+     whatsapp: "wa",
+     telegram: "tg",
      // ... seulement 23 mappings
-   }
+   };
    ```
+
    ⚠️ Ce mapping est utilisé pour normaliser les codes, **MAIS** l'API `getPrices` retourne déjà des codes COURTS, donc ce mapping crée des doublons au lieu de les résoudre.
 
 3. **Source des codes invalides**:
@@ -32,6 +36,7 @@
 ## 📋 RÉSULTATS DE L'ANALYSE API
 
 ### Services valides (exemples):
+
 ```
 ✅ wa  (WhatsApp)     - 348 numéros disponibles
 ✅ tg  (Telegram)     - 29,547 numéros
@@ -45,17 +50,18 @@
 
 ### Services populaires avec duplicatas:
 
-| Service   | Code VALIDE ✅ | Stock | Code INVALIDE ❌ | Stock |
-|-----------|----------------|-------|------------------|-------|
-| Google    | `go`           | 275,776 | `google`       | 0     |
-| Discord   | `ds`           | 890,316 | `discord`      | 0     |
-| Amazon    | `am`           | 876,382 | `amazon`       | 0     |
-| Instagram | `ig`           | 773,461 | -              | -     |
-| Facebook  | `fb`           | 437,201 | -              | -     |
-| WhatsApp  | `wa`           | 348     | -              | -     |
-| Telegram  | `tg`           | 29,547  | -              | -     |
+| Service   | Code VALIDE ✅ | Stock   | Code INVALIDE ❌ | Stock |
+| --------- | -------------- | ------- | ---------------- | ----- |
+| Google    | `go`           | 275,776 | `google`         | 0     |
+| Discord   | `ds`           | 890,316 | `discord`        | 0     |
+| Amazon    | `am`           | 876,382 | `amazon`         | 0     |
+| Instagram | `ig`           | 773,461 | -                | -     |
+| Facebook  | `fb`           | 437,201 | -                | -     |
+| WhatsApp  | `wa`           | 348     | -                | -     |
+| Telegram  | `tg`           | 29,547  | -                | -     |
 
 ### Duplicatas identifiés (10 services):
+
 1. **Google**: `google` (invalide, stock=0) + `go` (valide, stock=275,776)
 2. **Discord**: `discord` (invalide, stock=0) + `ds` (valide, stock=890,316)
 3. **Amazon**: `amazon` (invalide, stock=0) + `am` (valide, stock=876,382)
@@ -74,11 +80,13 @@
 **Fichier**: `/scripts/clean-duplicates.sql`
 
 **Avantages**:
+
 - Rapide et direct
 - Supprime uniquement les codes invalides
 - Préserve les données valides
 
 **Commandes**:
+
 1. Ouvrir Supabase Dashboard → SQL Editor
 2. Copier le contenu de `clean-duplicates.sql`
 3. Exécuter le script
@@ -88,6 +96,7 @@
 ### Option 2: Resynchronisation complète
 
 **Commandes**:
+
 ```bash
 # 1. Supprimer tous les services
 DELETE FROM services WHERE active = true;
@@ -99,6 +108,7 @@ DELETE FROM services WHERE active = true;
 ### Option 3: Script automatisé (À CORRIGER)
 
 Le script `/scripts/clean-duplicate-services.ts` nécessite:
+
 - Correction de l'authentification Supabase
 - Utilisation de la clé `service_role` pour les opérations DELETE
 
@@ -109,6 +119,7 @@ Le script `/scripts/clean-duplicate-services.ts` nécessite:
 **Fichier**: `/supabase/functions/sync-sms-activate/index.ts`
 
 **Ligne 127-151**: Ce mapping n'est plus nécessaire car:
+
 - L'API `getServicesList` retourne déjà les codes COURTS
 - L'API `getPrices` utilise les mêmes codes COURTS
 - Le mapping crée de la confusion
@@ -118,10 +129,11 @@ Le script `/scripts/clean-duplicate-services.ts` nécessite:
 ### 2. Utiliser uniquement `getServicesList` comme source de vérité
 
 **Ligne 228-245**: ✅ Déjà implémenté correctement
+
 ```typescript
-const servicesListUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getServicesList`
-const servicesListResponse = await fetch(servicesListUrl)
-const servicesListData = await servicesListResponse.json()
+const servicesListUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getServicesList`;
+const servicesListResponse = await fetch(servicesListUrl);
+const servicesListData = await servicesListResponse.json();
 ```
 
 Cette API retourne la liste officielle de 2035 services avec leurs codes courts.
@@ -129,10 +141,11 @@ Cette API retourne la liste officielle de 2035 services avec leurs codes courts.
 ### 3. Filtrer les services lors de la sync
 
 **Ligne 375-408**: Ajouter une validation:
+
 ```typescript
 // Avant d'ajouter un service:
 if (!apiCodes.has(serviceCode)) {
-  console.warn(`⚠️ Skipping invalid service code: ${serviceCode}`)
+  console.warn(`⚠️ Skipping invalid service code: ${serviceCode}`);
   continue;
 }
 ```
@@ -140,6 +153,7 @@ if (!apiCodes.has(serviceCode)) {
 ## 📈 RÉSULTAT ATTENDU
 
 Après nettoyage:
+
 - **Total services**: 2035 (= API SMS-Activate)
 - **Services avec stock**: ~1290 (selon disponibilité)
 - **Services sans stock**: ~745
@@ -162,12 +176,14 @@ Après nettoyage:
 C'est **INTENTIONNEL** et **CORRECT**:
 
 **Admin** (2425 services):
+
 - Affiche TOUS les services (`active=true`)
 - Inclut les services sans stock
 - Pour monitoring et statistiques
 - Requête: `SELECT * FROM services WHERE active = true`
 
 **Dashboard** (1290 services):
+
 - Affiche seulement les services DISPONIBLES (`total_available > 0`)
 - Exclut 1135 services sans stock
 - Interface client (seulement services achetables)
@@ -178,6 +194,7 @@ C'est **INTENTIONNEL** et **CORRECT**:
 ### Services populaires affectés
 
 Les 14 services populaires (score > 800) sont **tous valides** avec des codes courts:
+
 1. `fb` - Facebook (✅ valide)
 2. `ds` - Discord (✅ valide)
 3. `am` - Amazon (✅ valide)
@@ -190,6 +207,7 @@ Les 14 services populaires (score > 800) sont **tous valides** avec des codes co
 10. `tg` - Telegram (✅ valide si score > 800)
 
 ❌ Services invalides à supprimer:
+
 - `googlevoice` (pas dans l'API)
 - `spotify` (pas dans l'API)
 - `coinswitchkuber` (pas dans l'API)
@@ -202,17 +220,20 @@ Les 14 services populaires (score > 800) sont **tous valides** avec des codes co
 **Base URL**: `https://api.sms-activate.ae/stubs/handler_api.php`
 
 **Endpoints utilisés**:
+
 1. `action=getServicesList` - Liste officielle des 2035 services
 2. `action=getPrices&country=X` - Prix et stock par pays
 3. `action=getNumbersStatus&country=X` - Stock disponible uniquement
 
 **Format des codes**: Tous les codes sont COURTS (2-3 caractères)
+
 - ✅ `wa`, `tg`, `ig`, `fb`, `go`, `ds`, `am`, `nf`
 - ❌ `whatsapp`, `telegram`, `instagram`, `facebook`, `google`
 
 ## ⚠️ AVERTISSEMENT
 
 Avant de supprimer les 1388 services invalides:
+
 1. **Backup**: Exporter la table `services` (Supabase → Table Editor → Export)
 2. **Vérification**: S'assurer que les codes à supprimer sont bien invalides
 3. **Test**: Exécuter d'abord sur une copie de la base si possible

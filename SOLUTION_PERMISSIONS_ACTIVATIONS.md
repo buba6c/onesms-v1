@@ -5,12 +5,13 @@
 La table `activations` a **RLS activé** mais **AUCUNE POLICY pour INSERT** qui fonctionne !
 
 ### Policies actuelles :
+
 ```sql
 -- ✅ Lecture OK
 CREATE POLICY "Users can read own activations" ON activations FOR SELECT
   USING (auth.uid() = user_id);
 
--- ❌ NE FONCTIONNE PAS pour INSERT depuis Edge Functions  
+-- ❌ NE FONCTIONNE PAS pour INSERT depuis Edge Functions
 CREATE POLICY "Service role can manage activations" ON activations FOR ALL
   USING (auth.jwt()->>'role' = 'service_role');
 ```
@@ -39,6 +40,7 @@ Donc quand `buy-5sim-number` essaie de faire un INSERT, la policy bloque la requ
 ## Solution
 
 ### Option 1 : Policy TO service_role (RECOMMANDÉE)
+
 ```sql
 DROP POLICY IF EXISTS "Service role can manage activations" ON activations;
 
@@ -50,6 +52,7 @@ CREATE POLICY "Service role can manage activations"
 ```
 
 ### Option 2 : Policy pour authenticated users
+
 ```sql
 CREATE POLICY "Authenticated users can insert activations"
   ON activations FOR INSERT
@@ -84,8 +87,8 @@ CREATE POLICY "Authenticated users can insert activations"
   WITH CHECK (auth.uid() = user_id);
 
 -- Vérifier les policies
-SELECT schemaname, tablename, policyname, roles, cmd 
-FROM pg_policies 
+SELECT schemaname, tablename, policyname, roles, cmd
+FROM pg_policies
 WHERE tablename = 'activations';
 ```
 
@@ -126,6 +129,7 @@ INSERT INTO activations (
 ## Résultat attendu
 
 Après application de la migration :
+
 - ✅ Les nouveaux achats seront enregistrés en DB
 - ✅ Les numéros seront visibles même après refresh
 - ✅ Le polling SMS fonctionnera correctement
@@ -134,6 +138,7 @@ Après application de la migration :
 ## Logs à vérifier
 
 Console navigateur devrait montrer :
+
 ```
 🚀 [ACTIVATE] Début achat: { ... }
 ✅ [ACTIVATE] Numéro acheté: { id: ..., phone: '+44...' }
@@ -142,6 +147,7 @@ Console navigateur devrait montrer :
 ```
 
 Supabase Edge Function logs :
+
 ```
 🛒 [BUY] Achat numéro: { country, product, userId }
 📞 [BUY] Appel API 5sim...

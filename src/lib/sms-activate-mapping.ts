@@ -50,7 +50,7 @@ export const SMS_ACTIVATE_SERVICES: ServiceMapping[] = [
   { code: 'am', name: 'Amazon', displayName: 'Amazon', icon: '📦', category: 'shopping', aliases: ['amazon'], popularityRank: 11 },
   { code: 'nf', name: 'Netflix', displayName: 'Netflix', icon: '🎬', category: 'entertainment', aliases: ['netflix'], popularityRank: 12 },
   { code: 'ts', name: 'PayPal', displayName: 'PayPal', icon: '💳', category: 'financial', aliases: ['paypal'], popularityRank: 13 },
-  { code: 'yw', name: 'Grindr', displayName: 'Grindr', icon: '🌈', category: 'dating', aliases: ['grindr'], popularityRank: 14 },
+  { code: 'gr', name: 'Grindr', displayName: 'Grindr', icon: '🌈', category: 'dating', aliases: ['grindr'], popularityRank: 14 },
   { code: 'tg', name: 'Telegram', displayName: 'Telegram', icon: '✈️', category: 'messaging', aliases: ['telegram'], popularityRank: 15 },
   { code: 'ds', name: 'Discord', displayName: 'Discord', icon: '🎮', category: 'social', aliases: ['discord'], popularityRank: 16 },
   { code: 'tw', name: 'Twitter', displayName: 'Twitter (X)', icon: '🐦', category: 'social', aliases: ['twitter', 'x'], popularityRank: 17 },

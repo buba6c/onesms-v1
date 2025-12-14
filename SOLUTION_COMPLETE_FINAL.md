@@ -3,6 +3,7 @@
 ## 🎯 Problèmes Résolus
 
 ### 1️⃣ **Erreur SQL - Conflit de clé unique**
+
 ```
 ERROR: 23505: duplicate key value violates unique constraint "services_code_key"
 DETAIL: Key (code)=(oi) already exists.
@@ -15,11 +16,13 @@ DETAIL: Key (code)=(oi) already exists.
 ---
 
 ### 2️⃣ **Format Téléphone Dashboard/History**
+
 **Demandé** : `+62 (895) 234 369 70`
 
 **Status** : ✅ **Déjà fonctionnel** - La fonction `formatPhoneNumber` produit exactement ce format.
 
 **Corrections appliquées** :
+
 - ✅ **DashboardPage.tsx** : Utilise déjà `formatPhoneNumber(num.phone)` (ligne 991)
 - ✅ **HistoryPage.tsx** : Utilise déjà `formatPhoneNumber(order.phone)` (ligne 352)
 - ✅ **MyNumbersPage.tsx** : **CORRIGÉ** - Ajout de `formatPhoneNumber(number.phone_number)` (ligne 212)
@@ -29,6 +32,7 @@ DETAIL: Key (code)=(oi) already exists.
 ## 📋 Actions à Effectuer
 
 ### ✅ ÉTAPE 1 : Code Frontend (FAIT)
+
 - [x] DashboardPage.tsx : Suppression mapping incomplet
 - [x] MyNumbersPage.tsx : Ajout formatPhoneNumber
 
@@ -41,28 +45,28 @@ DETAIL: Key (code)=(oi) already exists.
 ```sql
 -- 1️⃣ Supprimer le service "OI" qui bloque
 DELETE FROM services
-WHERE name = 'OI' 
-  AND code = 'oi' 
+WHERE name = 'OI'
+  AND code = 'oi'
   AND active = false;
 
 -- 2️⃣ Corriger Tinder: "tinder" → "oi"
 UPDATE services
 SET code = 'oi'
-WHERE name = 'Tinder' 
+WHERE name = 'Tinder'
   AND code = 'tinder'
   AND active = true;
 
 -- 3️⃣ Désactiver le mauvais Badoo (code: "badoo")
 UPDATE services
 SET active = false
-WHERE name = 'Badoo' 
+WHERE name = 'Badoo'
   AND code = 'badoo';
 
 -- 4️⃣ Activer le bon Badoo (code: "qv")
 UPDATE services
 SET active = true,
     popularity_score = 850
-WHERE name = 'Badoo' 
+WHERE name = 'Badoo'
   AND code = 'qv';
 
 -- 5️⃣ Vérifier
@@ -77,11 +81,13 @@ ORDER BY name, active DESC;
 ## 🧪 Tests de Vérification
 
 ### Test 1 : Format Téléphone
+
 ```bash
 node test_phone_format.mjs
 ```
 
 **Résultats** : ✅ Tous les tests passent
+
 ```
 +62 (895) 182 496 36  ✅
 +62 (831) 879 924 99  ✅
@@ -90,17 +96,20 @@ node test_phone_format.mjs
 ```
 
 ### Test 2 : Services Tinder/Badoo
+
 ```bash
 node verify_tinder_badoo_fix.mjs
 ```
 
 **Résultat APRÈS correction DB** :
+
 ```
 ✅ Tinder (code: oi) → 52+ pays disponibles
 ✅ Badoo (code: qv) → 43 pays disponibles
 ```
 
 ### Test 3 : Interface Utilisateur
+
 1. Ouvrir http://localhost:3002
 2. **Dashboard** : Activer un numéro → Vérifier format `+62 (895) XXX XXX XX`
 3. **History** : Vérifier les numéros s'affichent au bon format
@@ -112,19 +121,21 @@ node verify_tinder_badoo_fix.mjs
 ## 📊 Résumé des Changements
 
 ### Code Frontend
-| Fichier | Ligne | Changement |
-|---------|-------|------------|
+
+| Fichier           | Ligne   | Changement                       |
+| ----------------- | ------- | -------------------------------- |
 | DashboardPage.tsx | 263-266 | ✅ Suppression mapping incomplet |
-| MyNumbersPage.tsx | 21 | ✅ Import formatPhoneNumber |
-| MyNumbersPage.tsx | 212 | ✅ Formatage du numéro affiché |
+| MyNumbersPage.tsx | 21      | ✅ Import formatPhoneNumber      |
+| MyNumbersPage.tsx | 212     | ✅ Formatage du numéro affiché   |
 
 ### Database
-| Table | Action | Détails |
-|-------|--------|---------|
-| services | DELETE | Service "OI" (id: 555e7956...) |
+
+| Table    | Action | Détails                          |
+| -------- | ------ | -------------------------------- |
+| services | DELETE | Service "OI" (id: 555e7956...)   |
 | services | UPDATE | Tinder: code `"tinder"` → `"oi"` |
 | services | UPDATE | Badoo: désactiver code `"badoo"` |
-| services | UPDATE | Badoo: activer code `"qv"` |
+| services | UPDATE | Badoo: activer code `"qv"`       |
 
 ---
 
@@ -133,6 +144,7 @@ node verify_tinder_badoo_fix.mjs
 ### Pourquoi le conflit SQL ?
 
 **Timeline** :
+
 1. Anciennement, un service "OI" (opérateur télécom) existait avec le code `"oi"`
 2. Service "OI" désactivé (active: false) mais pas supprimé
 3. Tentative de changer Tinder vers `"oi"` → **Conflit** car `services.code` a une contrainte `UNIQUE`
@@ -145,6 +157,7 @@ node verify_tinder_badoo_fix.mjs
 **Fonction** : `src/utils/phoneFormatter.ts::formatPhoneNumber()`
 
 **Algorithme** :
+
 1. Nettoyer le numéro (garder chiffres uniquement)
 2. Détecter l'indicatif pays (1-3 chiffres)
 3. Grouper le reste : `(XXX) XXX XXX XX`
@@ -153,6 +166,7 @@ node verify_tinder_badoo_fix.mjs
 **Pays supportés** : 15+ (USA, Indonésie, France, UK, Chine, Inde, Russie, Brésil, etc.)
 
 **Exemples** :
+
 - `6289518249636` → `+62 (895) 182 496 36`
 - `14155552671` → `+1 (415) 555 267 1`
 - `33612345678` → `+33 (612) 345 678`
@@ -172,11 +186,11 @@ node verify_tinder_badoo_fix.mjs
 
 ## 📁 Fichiers Créés
 
-| Fichier | Description |
-|---------|-------------|
+| Fichier                      | Description                      |
+| ---------------------------- | -------------------------------- |
 | `FIX_TINDER_BADOO_FINAL.sql` | SQL corrigé avec gestion conflit |
-| `find_oi_conflict.mjs` | Diagnostic du conflit |
-| `SOLUTION_COMPLETE_FINAL.md` | Ce document |
+| `find_oi_conflict.mjs`       | Diagnostic du conflit            |
+| `SOLUTION_COMPLETE_FINAL.md` | Ce document                      |
 
 ---
 

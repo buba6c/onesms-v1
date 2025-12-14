@@ -44,7 +44,7 @@ SHOW_ORIGINAL_COST=true
 ### Étape 3: Configurer l'Auto-Update (Cron)
 
 1. Aller sur **Supabase Dashboard**
-2. Ouvrir **Database** → **Cron Jobs**  
+2. Ouvrir **Database** → **Cron Jobs**
 3. Créer un nouveau job:
 
 #### Job 1: Update Popularity Scores (chaque heure)
@@ -87,13 +87,14 @@ curl -X POST \
   'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/update-popularity-scores' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0NjA0NjYsImV4cCI6MjA1ODAzNjQ2Nn0.FDlsHHGR7YVLlCQMoiIKS6w2Rp5RkFvbI_8sAZP6JfA'
 
-# Test 2: Update Success Rates  
+# Test 2: Update Success Rates
 curl -X POST \
   'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/update-success-rates' \
   -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI0NjA0NjYsImV4cCI6MjA1ODAzNjQ2Nn0.FDlsHHGR7YVLlCQMoiIKS6w2Rp5RkFvbI_8sAZP6JfA'
 ```
 
 **Attendu:**
+
 ```json
 {
   "success": true,
@@ -112,6 +113,7 @@ node analyze-problems.js
 ```
 
 **Avant:**
+
 ```
 1. whatsapp (Pop: 100) - 1.2M nums
 2. google (Pop: 90) - 2.2M nums
@@ -119,6 +121,7 @@ node analyze-problems.js
 ```
 
 **Après:**
+
 ```
 1. apple (Pop: 95) - 2.7M nums ✅
 2. microsoft (Pop: 92) - 2.8M nums ✅
@@ -132,6 +135,7 @@ node analyze-problems.js
 ### Bouton Admin (Déjà Ajouté)
 
 Dans **Admin Services**, nouveau bouton **"Update Scores"** :
+
 - Clique → Recalcule instantanément les popularity_scores
 - Refresh automatique de la liste
 - Toast de confirmation
@@ -147,14 +151,17 @@ Dans **Admin Services**, nouveau bouton **"Update Scores"** :
 ## 📊 Impact Attendu
 
 ### Tri des Services
+
 **Avant:** Ordre manuel, obsolète  
 **Après:** Tri intelligent basé sur performances réelles
 
 ### Tri des Pays
+
 **Avant:** Tous à 99%, inutile  
 **Après:** Taux réels 70%-99%, différenciation claire
 
 ### Transparence Prix
+
 **Avant:** "Pourquoi 18Ⓐ?"  
 **Après:** "18Ⓐ (15₽ + 20% marge)" → Clair
 
@@ -163,15 +170,18 @@ Dans **Admin Services**, nouveau bouton **"Update Scores"** :
 ## 🔧 Dépannage
 
 ### Erreur: "Function not found"
+
 ```bash
 # Redéployer
 npx supabase functions deploy update-popularity-scores
 ```
 
 ### Erreur: "Unauthorized"
+
 Vérifier que le token Supabase est correct dans le cron job
 
 ### Pas de changement visible
+
 ```bash
 # Vider le cache
 Cmd + Shift + R (macOS)
@@ -206,11 +216,13 @@ Ctrl + Shift + R (Windows)
 ### Amélioration Possible
 
 1. **Dashboard Analytics**
+
    - Graphique évolution popularity_scores
    - Tendances success_rates par pays
    - Top/Bottom performers
 
 2. **Notifications Admin**
+
    - Alert si service perd > 10 points
    - Alert si pays descend < 80%
 

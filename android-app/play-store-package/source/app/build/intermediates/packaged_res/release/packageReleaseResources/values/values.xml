@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="enableNotification">true</bool>
+    <bool name="enableSiteSettingsShortcut">true</bool>
+    <color name="backgroundColor">#0F172A</color>
+    <color name="colorPrimary">#3B82F6</color>
+    <color name="colorPrimaryDark">#3B82F6</color>
+    <color name="navigationColor">#3B82F6</color>
+    <color name="navigationColorDark">#3B82F6</color>
+    <color name="navigationDividerColor">#3B82F6</color>
+    <color name="navigationDividerColorDark">#3B82F6</color>
+    <color name="shortcut_background">#F5F5F5</color>
+    <integer name="splashScreenFadeOutDuration">300</integer>
+    <string name="appName" translatable="false">ONE SMS</string>
+    <string name="assetStatements">
+    [{
+        \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+        \"target\": {
+            \"namespace\": \"web\",
+            \"site\": \"https://onesms-sn.com\"
+        }
+    }]
+    
+  </string>
+    <string name="fallbackType" translatable="false">customtabs</string>
+    <string name="fullScopeUrl" translatable="false">https://onesms-sn.com/</string>
+    <string name="generatorApp" translatable="false">PWABuilder</string>
+    <string name="hostName" translatable="false">onesms-sn.com</string>
+    <string name="launchUrl" translatable="false">https://onesms-sn.com/</string>
+    <string name="launcherName" translatable="false">ONE SMS</string>
+    <string name="orientation" translatable="false">portrait-primary</string>
+    <string name="providerAuthority" translatable="false">com.onesms_sn.twa.fileprovider</string>
+    <string name="shortcut_name_0" translatable="false">Acheter un numéro</string>
+    <string name="shortcut_name_1" translatable="false">Mes activations</string>
+    <string name="shortcut_short_name_0" translatable="false">Acheter</string>
+    <string name="shortcut_short_name_1" translatable="false">Activations</string>
+    <string name="webManifestUrl" translatable="false">https://onesms-sn.com/manifest.json</string>
+</resources>

@@ -11,6 +11,7 @@
 ### 1. Suppression des Clés Dupliquées dans le Mapping
 
 **Avant** :
+
 ```typescript
 '15': 'poland',  // Dupliqué
 '22': 'india',   // Dupliqué
@@ -22,6 +23,7 @@
 ```
 
 **Après** :
+
 ```typescript
 '15': 'poland',    // Une seule fois
 '22': 'india',     // Une seule fois
@@ -35,27 +37,32 @@
 ### 2. Correction du Fallback avec Vraies Données
 
 **Avant** :
+
 ```typescript
-return topCountries.map(country => ({
+return topCountries.map((country) => ({
   count: 999, // ❌ Valeur fixe
-  price: priceMap.get(country.code.toLowerCase()) || 1.0
+  price: priceMap.get(country.code.toLowerCase()) || 1.0,
 }));
 ```
 
 **Après** :
+
 ```typescript
 // Récupérer depuis pricing_rules
 const { data: pricingRules } = await supabase
-  .from('pricing_rules')
-  .select('country_code, available_count, activation_price')
-  .eq('service_code', selectedService.code)
-  .eq('active', true)
-  .gt('available_count', 0);
+  .from("pricing_rules")
+  .select("country_code, available_count, activation_price")
+  .eq("service_code", selectedService.code)
+  .eq("active", true)
+  .gt("available_count", 0);
 
 // Grouper par pays et additionner
 const countryMap = new Map();
-pricingRules.forEach(rule => {
-  const existing = countryMap.get(rule.country_code) || { count: 0, price: rule.activation_price };
+pricingRules.forEach((rule) => {
+  const existing = countryMap.get(rule.country_code) || {
+    count: 0,
+    price: rule.activation_price,
+  };
   existing.count += rule.available_count; // ✅ Vraies quantités
   countryMap.set(rule.country_code, existing);
 });
@@ -81,6 +88,7 @@ Pour que les vrais numéros s'affichent, il faut synchroniser avec SMS-Activate 
 ### Vérification
 
 Après synchronisation, tu devrais voir :
+
 - ✅ Nombres réels (ex: 1500, 2300, 850 au lieu de 999)
 - ✅ Prix corrects par pays
 - ✅ Success rate réels
@@ -100,6 +108,7 @@ Si les problèmes persistent :
 ## 🎯 Résultat Attendu
 
 **Avant** :
+
 ```
 Philippines: 999 numbers - 1.0 Ⓐ
 Indonesia: 999 numbers - 1.0 Ⓐ
@@ -107,6 +116,7 @@ India: 999 numbers - 1.0 Ⓐ
 ```
 
 **Après** :
+
 ```
 Philippines: 2,450 numbers - 0.85 Ⓐ
 Indonesia: 1,832 numbers - 0.75 Ⓐ

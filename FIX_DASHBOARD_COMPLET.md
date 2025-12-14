@@ -8,6 +8,7 @@
 ## 📊 ANALYSE COMPLÈTE
 
 ### État Actuel de la Base
+
 - ✅ **Total services actifs:** 2,432
 - ✅ **Services avec stock:** 1,290
 - ❌ **Catégorie POPULAR:** 0 services (devrait être ~30)
@@ -15,6 +16,7 @@
 - ❌ **Duplicatas:** 2 services (Facebook, Twitter)
 
 ### Distribution par Catégorie (AVANT FIX)
+
 ```
 social          :   10 total |    4 disponibles (40%)
 messaging       :    4 total |    4 disponibles (100%)
@@ -48,10 +50,10 @@ WHERE active = true
   AND total_available > 0;
 
 -- Vérifier le résultat
-SELECT 
+SELECT
   COUNT(*) as services_populaires
 FROM services
-WHERE active = true 
+WHERE active = true
   AND category = 'popular'
   AND total_available > 0;
 
@@ -66,19 +68,19 @@ WHERE active = true
 -- ============================================
 
 -- Facebook duplicata (garder celui avec stock)
-DELETE FROM services 
-WHERE code = 'facebook' 
-  AND name = 'Facebook' 
+DELETE FROM services
+WHERE code = 'facebook'
+  AND name = 'Facebook'
   AND total_available = 0;
 
 -- Twitter duplicata
-DELETE FROM services 
-WHERE code = 'twitter' 
-  AND name = 'Twitter' 
+DELETE FROM services
+WHERE code = 'twitter'
+  AND name = 'Twitter'
   AND total_available = 0;
 
 -- WhatsApp/Telegram/Instagram sans stock
-DELETE FROM services 
+DELETE FROM services
 WHERE (name ILIKE 'whatsapp' OR name ILIKE 'telegram' OR name ILIKE 'instagram')
   AND total_available = 0;
 ```
@@ -101,12 +103,14 @@ Modifier `src/pages/DashboardPage.tsx`:
 ```typescript
 // Remplacer la requête actuelle par:
 const { data: dbServices, error } = await supabase
-  .from('services')
-  .select('code, name, display_name, icon, total_available, category, popularity_score')
-  .eq('active', true)
-  .gt('total_available', 0)
-  .order('popularity_score', { ascending: false })
-  .order('total_available', { ascending: false })
+  .from("services")
+  .select(
+    "code, name, display_name, icon, total_available, category, popularity_score"
+  )
+  .eq("active", true)
+  .gt("total_available", 0)
+  .order("popularity_score", { ascending: false })
+  .order("total_available", { ascending: false })
   .range(0, 9999); // ← Utiliser .range() au lieu de .limit()
 ```
 
@@ -115,6 +119,7 @@ const { data: dbServices, error } = await supabase
 ## 📈 RÉSULTAT ATTENDU (APRÈS FIX)
 
 ### Distribution par Catégorie (APRÈS)
+
 ```
 popular         :   ~30 total |   ~30 disponibles (100%)
 social          :    ~8 total |    ~4 disponibles (50%)
@@ -129,10 +134,12 @@ other           : ~2373 total | ~1239 disponibles (52%)
 ```
 
 ### Dashboard Affichage
+
 **AVANT:** `POPULAR (1290 services)` ❌  
 **APRÈS:** `POPULAR (30 services)` ✅
 
 ### Top 10 Services Populaires
+
 ```
  1. Instagram            | popular  | Score:  980 | Stock: 773,461
  2. Facebook             | popular  | Score:  970 | Stock: 437,201
@@ -178,7 +185,7 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SU
     .eq('active', true)
     .eq('category', 'popular')
     .gt('total_available', 0);
-  
+
   console.log('Services POPULAR avec stock:', count);
   console.log(count > 20 ? '✅ FIX RÉUSSI!' : '❌ Exécuter le SQL');
 })();
@@ -190,6 +197,7 @@ const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SU
 ## 🚀 EDGE FUNCTION (DÉJÀ DÉPLOYÉE)
 
 La Edge Function `sync-sms-activate` (VERSION 15) est déjà configurée pour:
+
 - ✅ Détecter automatiquement category='popular' si `popularity_score > 800`
 - ✅ Catégoriser correctement (messaging, entertainment, delivery, etc.)
 - ✅ Éviter les duplicatas lors des prochaines syncs
@@ -201,10 +209,13 @@ La Edge Function `sync-sms-activate` (VERSION 15) est déjà configurée pour:
 ## 📝 NOTES TECHNIQUES
 
 ### Pourquoi .limit(10000) ne fonctionne pas?
+
 PostgREST a une configuration serveur `max-rows` qui limite à 1000 par défaut, indépendamment du `.limit()` client.
 
 ### Pourquoi la catégorie 'popular' n'est pas appliquée?
+
 L'Edge Function utilise `upsert()` qui ne met pas à jour les services existants. Les services créés avant le déploiement gardent leur ancienne catégorie.
 
 ### Solution permanente
+
 Après le fix SQL, toutes les futures synchronisations appliqueront automatiquement la bonne catégorie grâce à la nouvelle Edge Function.

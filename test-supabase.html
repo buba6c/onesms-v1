@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Supabase Connection</title>
+  <style>
+    body { font-family: monospace; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .log { margin: 5px 0; padding: 5px; border-left: 3px solid #ccc; }
+    .success { border-color: #4CAF50; background: #e8f5e9; }
+    .error { border-color: #f44336; background: #ffebee; }
+    .warning { border-color: #ff9800; background: #fff3e0; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Test de connexion Supabase</h1>
+  <div id="logs"></div>
+  
+  <script type="module">
+    const log = (msg, type = 'log') => {
+      const div = document.createElement('div');
+      div.className = `log ${type}`;
+      div.textContent = `${new Date().toLocaleTimeString()} - ${msg}`;
+      document.getElementById('logs').appendChild(div);
+      console.log(msg);
+    };
+
+    const SUPABASE_URL = 'https://htfqmamvmhdoixqcbbbw.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MjQ4MjgsImV4cCI6MjA3OTIwMDgyOH0.HQ5KsI86nrDidy4XLh1OnOSpM8c1ZnY3fYo-UF5Jtyg';
+
+    log('Chargement du client Supabase...', 'log');
+    
+    import('https://esm.sh/@supabase/supabase-js@2').then(({ createClient }) => {
+      log('✅ Module Supabase chargé', 'success');
+      
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      log('✅ Client Supabase créé', 'success');
+      
+      // Test 1: getSession (local, rapide)
+      log('Test 1: getSession()...', 'log');
+      supabase.auth.getSession()
+        .then(({ data, error }) => {
+          if (error) {
+            log(`❌ getSession error: ${error.message}`, 'error');
+          } else {
+            log(`✅ getSession OK (session: ${data.session ? 'présente' : 'absente'})`, 'success');
+          }
+          
+          // Test 2: getUser (réseau)
+          log('Test 2: getUser()...', 'log');
+          const start = Date.now();
+          
+          const timeout = setTimeout(() => {
+            log('⚠️ getUser timeout après 5s', 'warning');
+          }, 5000);
+          
+          return supabase.auth.getUser()
+            .then(({ data, error }) => {
+              clearTimeout(timeout);
+              const duration = Date.now() - start;
+              
+              if (error) {
+                log(`❌ getUser error après ${duration}ms: ${error.message}`, 'error');
+              } else {
+                log(`✅ getUser OK après ${duration}ms (user: ${data.user ? data.user.email : 'aucun'})`, 'success');
+              }
+              
+              // Test 3: Query simple
+              log('Test 3: Query table users...', 'log');
+              return supabase.from('users').select('id').limit(1);
+            });
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            log(`❌ Query error: ${error.message}`, 'error');
+          } else {
+            log(`✅ Query OK (${data?.length || 0} résultats)`, 'success');
+          }
+          
+          log('🎉 Tests terminés!', 'success');
+        })
+        .catch(err => {
+          log(`❌ Erreur globale: ${err.message}`, 'error');
+        });
+    }).catch(err => {
+      log(`❌ Erreur chargement module: ${err.message}`, 'error');
+    });
+  </script>
+</body>
+</html>

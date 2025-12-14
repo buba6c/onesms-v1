@@ -113,7 +113,7 @@ SELECT COUNT(*) FROM services WHERE icon_url IS NOT NULL;
 SELECT code, name FROM services WHERE icon_url IS NULL ORDER BY popularity_score DESC;
 
 # Mettre à jour une icône manuellement
-UPDATE services 
+UPDATE services
 SET icon_url = 'https://onesms-icons.s3.amazonaws.com/icons/custom/icon.svg'
 WHERE code = 'mon-service';
 ```

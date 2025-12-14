@@ -28,7 +28,7 @@ DECLARE
   response TEXT;
 BEGIN
   -- Appeler l'Edge Function via pg_net
-  SELECT 
+  SELECT
     net.http_post(
       url := 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-service-counts',
       headers := jsonb_build_object(
@@ -37,7 +37,7 @@ BEGIN
       ),
       body := '{}'::jsonb
     ) INTO response;
-  
+
   RAISE NOTICE 'Sync service counts triggered: %', response;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -57,8 +57,8 @@ SELECT cron.schedule(
 SELECT * FROM cron.job;
 
 -- Voir l'historique d'exécution
-SELECT * FROM cron.job_run_details 
-ORDER BY start_time DESC 
+SELECT * FROM cron.job_run_details
+ORDER BY start_time DESC
 LIMIT 10;
 ```
 
@@ -73,7 +73,7 @@ Si pg_cron ne fonctionne pas, utiliser **Database Webhooks**:
    - **HTTP Request**:
      - URL: `https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-service-counts`
      - Method: POST
-     - Headers: 
+     - Headers:
        ```json
        {
          "Authorization": "Bearer YOUR_SERVICE_ROLE_KEY",
@@ -108,7 +108,7 @@ name: Sync Service Counts
 on:
   schedule:
     # Toutes les 5 minutes
-    - cron: '*/5 * * * *'
+    - cron: "*/5 * * * *"
   workflow_dispatch: # Permet déclenchement manuel
 
 jobs:
@@ -122,12 +122,13 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{}'
-      
+
       - name: Check response
         run: echo "Sync triggered successfully"
 ```
 
 **Configurer le secret:**
+
 1. Aller dans Settings → Secrets → Actions
 2. Créer `SUPABASE_SERVICE_ROLE_KEY`
 3. Valeur: Votre service role key Supabase
@@ -147,8 +148,8 @@ curl -X POST \
 **Test 2: Via Supabase Client**
 
 ```typescript
-const { data, error } = await supabase.functions.invoke('sync-service-counts');
-console.log('Sync result:', data);
+const { data, error } = await supabase.functions.invoke("sync-service-counts");
+console.log("Sync result:", data);
 ```
 
 **Test 3: Via SQL**
@@ -164,13 +165,13 @@ INSERT INTO sync_trigger (triggered_at) VALUES (NOW());
 
 ```sql
 -- Voir les dernières syncs
-SELECT * FROM sync_logs 
+SELECT * FROM sync_logs
 WHERE sync_type = 'services'
-ORDER BY started_at DESC 
+ORDER BY started_at DESC
 LIMIT 10;
 
 -- Statistiques
-SELECT 
+SELECT
   status,
   COUNT(*) as count,
   AVG(services_synced) as avg_services,
@@ -191,6 +192,7 @@ npx supabase functions logs sync-service-counts --tail
 **Option la plus simple et fiable: GitHub Actions**
 
 ✅ **Avantages:**
+
 - Gratuit (2000 minutes/mois)
 - Logs détaillés
 - Retry automatique
@@ -198,6 +200,7 @@ npx supabase functions logs sync-service-counts --tail
 - Pas de config Supabase complexe
 
 ❌ **Alternatives pg_cron:**
+
 - Nécessite configuration PostgreSQL
 - Peut être désactivé selon plan Supabase
 - Logs moins accessibles
@@ -207,14 +210,17 @@ npx supabase functions logs sync-service-counts --tail
 ## Résumé Configuration
 
 1. ✅ Edge Functions créées et déployées
+
    - `sync-service-counts` (66.44kB)
    - `get-country-availability` (22.02kB)
 
 2. ✅ Frontend optimisé
+
    - Services: Lecture DB directe
    - Pays: Vraies quantités via Edge Function
 
 3. ⏳ À faire: Configurer Cron Job
+
    - **Recommandé**: GitHub Actions (voir ci-dessus)
    - **Alternative**: Cron-job.org
    - **Avancé**: pg_cron PostgreSQL
@@ -229,6 +235,7 @@ npx supabase functions logs sync-service-counts --tail
 ## Contact Support
 
 Si problème avec pg_cron:
+
 - Vérifier plan Supabase (Pro+ recommandé)
 - Contacter support Supabase
 - Utiliser GitHub Actions en attendant

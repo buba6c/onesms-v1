@@ -1,0 +1,235 @@
+-- ============================================================================
+-- Migration: Suppression du système de synchronisation des prix
+-- Date: 29 novembre 2025
+-- ============================================================================
+-- 
+-- OBJECTIF: Passer d'un système de cache prix (pricing_rules) à des prix
+--           dynamiques en temps réel via l'API SMS-Activate
+--
+-- CHANGEMENTS:
+-- 1. Supprime la table pricing_rules (cache de synchronisation)
+-- 2. Supprime la colonne price des activations (prix figé)
+-- 3. Supprime les colonnes hourly_rate/total_cost des rentals (prix figé)
+-- 4. Supprime la table sync_logs (logs de synchronisation)
+-- 5. Les prix seront maintenant calculés dynamiquement via getPrices API
+-- ============================================================================
+
+-- ============================================================================
+-- PARTIE 1: Sauvegarder les données critiques (au cas où)
+-- ============================================================================
+
+-- Créer une table d'archive pour les anciennes règles de prix
+CREATE TABLE IF NOT EXISTS pricing_rules_archive (
+  id UUID,
+  service_code TEXT,
+  country_code TEXT,
+  activation_cost DECIMAL(10, 2),
+  activation_price DECIMAL(10, 2),
+  rent_cost DECIMAL(10, 2),
+  rent_price DECIMAL(10, 2),
+  active BOOLEAN,
+  archived_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Archiver les pricing_rules existantes
+INSERT INTO pricing_rules_archive (
+  id, service_code, country_code, 
+  activation_cost, activation_price, 
+  rent_cost, rent_price, active
+)
+SELECT 
+  id, service_code, country_code,
+  activation_cost, activation_price,
+  rent_cost, rent_price, active
+FROM pricing_rules
+WHERE EXISTS (SELECT 1 FROM pricing_rules LIMIT 1);
+
+-- ============================================================================
+-- PARTIE 2: Supprimer les contraintes et index liés
+-- ============================================================================
+
+-- Drop triggers
+DROP TRIGGER IF EXISTS update_pricing_rules_updated_at ON pricing_rules;
+
+-- Drop policies RLS
+DROP POLICY IF EXISTS "Anyone can view pricing" ON pricing_rules;
+DROP POLICY IF EXISTS "Public can view active pricing" ON pricing_rules;
+DROP POLICY IF EXISTS "Authenticated users can view pricing" ON pricing_rules;
+DROP POLICY IF EXISTS "Admins can manage pricing" ON pricing_rules;
+
+-- Drop indexes
+DROP INDEX IF EXISTS idx_pricing_service_country;
+DROP INDEX IF EXISTS idx_pricing_active;
+DROP INDEX IF EXISTS idx_pricing_rules_provider;
+
+-- Drop foreign keys dans sync_logs si elles existent
+ALTER TABLE sync_logs DROP CONSTRAINT IF EXISTS sync_logs_pricing_rules_fk;
+
+-- ============================================================================
+-- PARTIE 3: Supprimer les tables de synchronisation
+-- ============================================================================
+
+-- Supprimer la table pricing_rules (cache de prix synchronisés)
+DROP TABLE IF EXISTS pricing_rules CASCADE;
+
+-- Supprimer la table sync_logs (logs de synchronisation)
+DROP TABLE IF EXISTS sync_logs CASCADE;
+
+-- Supprimer la table country_service_stats (stats de synchronisation)
+DROP TABLE IF EXISTS country_service_stats CASCADE;
+
+-- ============================================================================
+-- PARTIE 4: Modifier la table activations (supprimer prix figé)
+-- ============================================================================
+
+-- La colonne price n'est plus nécessaire car on calcule en temps réel
+-- MAIS on la garde temporairement pour historique, juste on la rend nullable
+ALTER TABLE activations ALTER COLUMN price DROP NOT NULL;
+
+-- Ajouter une colonne pour stocker le prix au moment de l'achat (historique)
+COMMENT ON COLUMN activations.price IS 'Prix historique au moment de l''achat (USD). Calculé dynamiquement via getPrices API lors de l''achat.';
+
+-- ============================================================================
+-- PARTIE 5: Modifier la table rentals (supprimer prix figés)
+-- ============================================================================
+
+-- Rendre les colonnes de prix nullable (garde historique mais pas obligatoire)
+ALTER TABLE rentals ALTER COLUMN hourly_rate DROP NOT NULL;
+ALTER TABLE rentals ALTER COLUMN total_cost DROP NOT NULL;
+
+-- Ajouter commentaires
+COMMENT ON COLUMN rentals.hourly_rate IS 'Tarif horaire historique (USD) au moment de la location. Calculé via getRentServicesAndCountries API.';
+COMMENT ON COLUMN rentals.total_cost IS 'Coût total historique de la location. Calculé: hourly_rate * rent_hours.';
+
+-- ============================================================================
+-- PARTIE 6: Créer une vue pour les services disponibles (remplace pricing_rules)
+-- ============================================================================
+
+-- Vue pour lister tous les services connus (depuis activations + rentals)
+CREATE OR REPLACE VIEW available_services AS
+SELECT DISTINCT 
+  service_code,
+  country_code,
+  'activation' as type,
+  COUNT(*) as usage_count,
+  MAX(created_at) as last_used
+FROM activations
+WHERE service_code IS NOT NULL AND country_code IS NOT NULL
+GROUP BY service_code, country_code
+
+UNION ALL
+
+SELECT DISTINCT
+  service_code,
+  country_code,
+  'rental' as type,
+  COUNT(*) as usage_count,
+  MAX(created_at) as last_used
+FROM rentals
+WHERE service_code IS NOT NULL AND country_code IS NOT NULL
+GROUP BY service_code, country_code
+
+ORDER BY last_used DESC;
+
+-- Rendre la vue accessible en lecture publique
+GRANT SELECT ON available_services TO anon, authenticated;
+
+-- ============================================================================
+-- PARTIE 7: Créer une table pour les services populaires (cache léger)
+-- ============================================================================
+
+-- Table pour stocker uniquement les services populaires (pas les prix!)
+CREATE TABLE IF NOT EXISTS popular_services (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  service_code TEXT NOT NULL,
+  country_code TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('activation', 'rental')),
+  display_order INTEGER DEFAULT 0,
+  is_featured BOOLEAN DEFAULT FALSE,
+  icon_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(service_code, country_code, type)
+);
+
+-- Indexes
+CREATE INDEX idx_popular_services_featured ON popular_services(is_featured, display_order);
+CREATE INDEX idx_popular_services_type ON popular_services(type);
+
+-- RLS
+ALTER TABLE popular_services ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can view popular services"
+  ON popular_services FOR SELECT
+  USING (true);
+
+CREATE POLICY "Admins can manage popular services"
+  ON popular_services FOR ALL
+  USING (
+    auth.jwt() ->> 'role' = 'admin' OR
+    auth.jwt() ->> 'user_role' = 'admin'
+  );
+
+-- Trigger updated_at
+CREATE TRIGGER update_popular_services_updated_at
+  BEFORE UPDATE ON popular_services
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- PARTIE 8: Insérer les services populaires par défaut (sans prix!)
+-- ============================================================================
+
+INSERT INTO popular_services (service_code, country_code, type, display_order, is_featured) VALUES
+-- WhatsApp (le plus populaire)
+('wa', '6', 'activation', 1, true),   -- Indonesia
+('wa', '12', 'activation', 2, true),  -- Philippines
+('wa', '0', 'activation', 3, true),   -- Russia
+
+-- Telegram
+('tg', '0', 'activation', 4, true),   -- Russia
+('tg', '6', 'activation', 5, false),  -- Indonesia
+
+-- Facebook
+('fb', '6', 'activation', 6, false),  -- Indonesia
+('fb', '10', 'activation', 7, false), -- UK
+
+-- Google
+('go', '6', 'activation', 8, false),  -- Indonesia
+
+-- Location (rentals)
+('full', '2', 'rental', 10, true),    -- Kazakhstan - service complet
+('wa', '2', 'rental', 11, false)      -- Kazakhstan - WhatsApp only
+
+ON CONFLICT (service_code, country_code, type) DO NOTHING;
+
+-- ============================================================================
+-- PARTIE 9: Nettoyer les références obsolètes dans system_settings
+-- ============================================================================
+
+-- Supprimer les settings liés à la synchronisation
+DELETE FROM system_settings 
+WHERE key IN (
+  'sync_enabled',
+  'sync_interval_minutes',
+  'last_sync_at',
+  'pricing_cache_ttl'
+);
+
+-- ============================================================================
+-- PARTIE 10: Messages de confirmation
+-- ============================================================================
+
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Migration terminée: Système de synchronisation des prix supprimé';
+  RAISE NOTICE '📊 Tables supprimées: pricing_rules, sync_logs, country_service_stats';
+  RAISE NOTICE '💰 Prix: Maintenant calculés dynamiquement via API SMS-Activate';
+  RAISE NOTICE '🎯 Services populaires: Stockés dans popular_services (sans prix)';
+  RAISE NOTICE '📦 Archive: pricing_rules_archive contient les anciennes données';
+  RAISE NOTICE '';
+  RAISE NOTICE '⚠️  IMPORTANT: Redéployer les Edge Functions modifiées:';
+  RAISE NOTICE '   - buy-sms-activate-number (calcul prix dynamique)';
+  RAISE NOTICE '   - rent-sms-activate-number (calcul prix dynamique)';
+  RAISE NOTICE '   - get-services (utilise API au lieu de pricing_rules)';
+END $$;

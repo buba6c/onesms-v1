@@ -21,9 +21,10 @@
 5. **Vérifie les badges** → Les pays avec bon taux auront des badges **verts** 🟢
 
 ### Résultat attendu
+
 ```
 ✅ 150+ services synchronisés
-✅ 180+ pays synchronisés  
+✅ 180+ pays synchronisés
 ✅ 50,000+ règles de prix avec delivery_rate
 ✅ Badges de couleur selon vrais taux de 5sim
 ```
@@ -33,6 +34,7 @@
 ## 📲 Étape 3 : Configurer le Webhook SMS (OPTIONNEL mais recommandé)
 
 ### Pourquoi ?
+
 - **Sans webhook** : Le système fonctionne avec polling (vérification toutes les 5s) ✅
 - **Avec webhook** : Notifications **instantanées** + moins de charge serveur 🚀
 
@@ -66,28 +68,28 @@ Received webhook: { id: 12345, phone: "+123...", sms: [...] }
 
 ### Codes couleur
 
-| Couleur | Taux | Signification | Exemple |
-|---------|------|---------------|---------|
-| 🟢 **Vert** | ≥ 95% | Excellent - Très fiable | USA, UK, France |
-| 🟡 **Jaune** | 85-94% | Bon - Fiable | Espagne, Italie |
-| 🟠 **Orange** | 70-84% | Moyen - Acceptable | Certains pays émergents |
-| 🔴 **Rouge** | < 70% | Faible - Risqué | Pays avec peu d'opérateurs |
+| Couleur       | Taux   | Signification           | Exemple                    |
+| ------------- | ------ | ----------------------- | -------------------------- |
+| 🟢 **Vert**   | ≥ 95%  | Excellent - Très fiable | USA, UK, France            |
+| 🟡 **Jaune**  | 85-94% | Bon - Fiable            | Espagne, Italie            |
+| 🟠 **Orange** | 70-84% | Moyen - Acceptable      | Certains pays émergents    |
+| 🔴 **Rouge**  | < 70%  | Faible - Risqué         | Pays avec peu d'opérateurs |
 
 ### Données utilisées
 
 1. **Avec `delivery_rate` en DB** (après sync) :
    - Utilise le taux **réel** de l'API 5sim
    - Moyenne des taux par opérateur pour chaque pays+service
-   
 2. **Sans `delivery_rate`** (fallback) :
    - Estimation basée sur :
      - Stock disponible (plus de stock = meilleur taux estimé)
      - Prix (prix bas = généralement meilleur taux)
 
 ### Formule d'estimation (fallback)
+
 ```typescript
 const stockScore = Math.min(100, (totalStock / 1000) * 10);
-const priceScore = Math.max(70, 100 - (avgPrice * 5));
+const priceScore = Math.max(70, 100 - avgPrice * 5);
 const estimatedRate = (stockScore + priceScore) / 2;
 ```
 
@@ -96,11 +98,13 @@ const estimatedRate = (stockScore + priceScore) / 2;
 ## 🔍 Structure de l'API 5sim
 
 ### Endpoint Prices
+
 ```
 GET https://5sim.net/v1/guest/prices
 ```
 
 ### Réponse (exemple)
+
 ```json
 {
   "england": {
@@ -121,6 +125,7 @@ GET https://5sim.net/v1/guest/prices
 ```
 
 ### Champs importants
+
 - **`cost`** : Prix d'achat (en roubles)
 - **`count`** : Nombre de numéros disponibles
 - **`rate`** : Taux de réussite (%) - **omis si < 20% ou trop peu de commandes**
@@ -134,6 +139,7 @@ GET https://5sim.net/v1/guest/prices
 **Fichier** : `src/hooks/useSmsPolling.ts`
 
 **Fonctionnement** :
+
 ```
 1. Achat d'un numéro → Status: "waiting"
 2. Polling démarre automatiquement (toutes les 5s)
@@ -145,11 +151,13 @@ GET https://5sim.net/v1/guest/prices
 ```
 
 **Avantages** :
+
 - ✅ Fonctionne sans configuration
 - ✅ Pas de dépendance externe
 - ✅ Détection fiable
 
 **Inconvénients** :
+
 - ⚠️ Délai de 5 secondes max
 - ⚠️ Charge serveur (requêtes régulières)
 
@@ -158,6 +166,7 @@ GET https://5sim.net/v1/guest/prices
 **Fichier** : `supabase/functions/sms-webhook/index.ts`
 
 **Fonctionnement** :
+
 ```
 1. 5sim reçoit un SMS
 2. 5sim envoie notification webhook à notre serveur
@@ -167,16 +176,20 @@ GET https://5sim.net/v1/guest/prices
 ```
 
 **Avantages** :
+
 - ✅ Instantané (0 délai)
 - ✅ Moins de charge serveur
 - ✅ Plus efficace
 
 **Configuration requise** :
+
 - ⚠️ Doit être configuré sur 5sim.net
 - ⚠️ Nécessite URL publique
 
 ### Recommandation
+
 **Utiliser les DEUX** :
+
 - Webhook pour notifications instantanées
 - Polling comme backup/fallback
 
@@ -185,6 +198,7 @@ GET https://5sim.net/v1/guest/prices
 ## 🧪 Tests de validation
 
 ### Test 1 : Badges de couleur
+
 ```
 1. Va sur le dashboard
 2. Sélectionne un service (ex: WhatsApp)
@@ -193,6 +207,7 @@ GET https://5sim.net/v1/guest/prices
 ```
 
 ### Test 2 : Synchronisation
+
 ```
 1. Va dans Admin → Services
 2. Clique "Sync from 5sim"
@@ -204,6 +219,7 @@ GET https://5sim.net/v1/guest/prices
 ```
 
 ### Test 3 : Réception SMS
+
 ```
 1. Achète un numéro test (pays avec bon taux)
 2. Envoie un SMS au numéro via le service
@@ -213,6 +229,7 @@ GET https://5sim.net/v1/guest/prices
 ```
 
 ### Test 4 : Webhook (si configuré)
+
 ```
 1. Achète un numéro
 2. Vérifie les logs Supabase Functions → sms-webhook
@@ -225,9 +242,10 @@ GET https://5sim.net/v1/guest/prices
 ## 📊 Requêtes SQL utiles
 
 ### Vérifier les delivery_rate
+
 ```sql
 -- Top 10 pays par taux de réussite (service Facebook)
-SELECT 
+SELECT
   c.name,
   AVG(pr.delivery_rate) as avg_rate,
   COUNT(pr.id) as operators_count,
@@ -243,9 +261,10 @@ LIMIT 10;
 ```
 
 ### Vérifier les activations récentes
+
 ```sql
 -- Dernières 10 activations avec leur status
-SELECT 
+SELECT
   id,
   phone,
   service_code,
@@ -262,9 +281,10 @@ LIMIT 10;
 ```
 
 ### Statistiques SMS
+
 ```sql
 -- Taux de réussite global
-SELECT 
+SELECT
   status,
   COUNT(*) as count,
   ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) as percentage
@@ -280,9 +300,10 @@ GROUP BY status;
 ### Problème : Tous les badges sont orange/rouge
 
 **Solution** :
+
 1. Vérifie que la migration SQL a été appliquée :
    ```sql
-   SELECT column_name FROM information_schema.columns 
+   SELECT column_name FROM information_schema.columns
    WHERE table_name = 'pricing_rules' AND column_name = 'delivery_rate';
    ```
 2. Lance la synchronisation depuis l'admin
@@ -294,6 +315,7 @@ GROUP BY status;
 ### Problème : SMS pas reçu
 
 **Solution** :
+
 1. Vérifie les logs du polling : Console DevTools → Voir `[POLLING]` et `[CHECK]`
 2. Vérifie que l'Edge Function `check-5sim-sms` fonctionne
 3. Teste manuellement sur 5sim.net le numéro
@@ -302,6 +324,7 @@ GROUP BY status;
 ### Problème : Webhook ne fonctionne pas
 
 **Solution** :
+
 1. Vérifie que l'URL webhook est correcte dans 5sim
 2. Vérifie les logs Supabase Functions
 3. Teste le webhook avec curl :
@@ -329,6 +352,7 @@ GROUP BY status;
 ## 📞 Support
 
 Si tu as des problèmes :
+
 1. Vérifie les logs Supabase Functions
 2. Vérifie la console DevTools pour les erreurs frontend
 3. Vérifie les logs PM2 : `pm2 logs onesms-frontend`

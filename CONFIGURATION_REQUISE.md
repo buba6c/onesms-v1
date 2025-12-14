@@ -15,12 +15,14 @@ Clique sur **"Edge Functions"** → **"Add new secret"**
 Ajoute ces 2 secrets:
 
 #### Secret 1:
+
 ```
 Name: SMS_ACTIVATE_API_KEY
 Value: d29edd5e1d04c3127d5253d5eAe70de8
 ```
 
 #### Secret 2:
+
 ```
 Name: SERVICE_ROLE_KEY
 Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzYyNDgyOCwiZXhwIjoyMDc5MjAwODI4fQ.i31PDBp-K02RqZs35gfqEUQp9OHtxEQ6FqwfBV33wac
@@ -35,6 +37,7 @@ Va sur: https://github.com/buba6c/onesms-v1/settings/secrets/actions
 Clique sur **"New repository secret"**
 
 #### Secret GitHub:
+
 ```
 Name: SUPABASE_SERVICE_ROLE_KEY
 Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzYyNDgyOCwiZXhwIjoyMDc5MjAwODI4fQ.i31PDBp-K02RqZs35gfqEUQp9OHtxEQ6FqwfBV33wac
@@ -65,20 +68,24 @@ Le cron automatique s'exécutera ensuite **toutes les 5 minutes** automatiquemen
 ### Après configuration, vérifie:
 
 1. **Edge Function fonctionne:**
+
    ```bash
    ./test-github-workflow.sh
    ```
+
    Devrait retourner HTTP 200 avec stats
 
 2. **Logs de sync:**
+
    ```sql
-   SELECT * FROM sync_logs 
+   SELECT * FROM sync_logs
    WHERE sync_type = 'services'
-   ORDER BY started_at DESC 
+   ORDER BY started_at DESC
    LIMIT 5;
    ```
 
 3. **Services mis à jour:**
+
    ```sql
    SELECT code, name, total_available, updated_at
    FROM services
@@ -96,6 +103,7 @@ Le cron automatique s'exécutera ensuite **toutes les 5 minutes** automatiquemen
 ## 🎯 RÉSULTAT FINAL
 
 Une fois configuré:
+
 - ✅ Sync automatique toutes les 5 minutes
 - ✅ Counts toujours à jour (max 5 min de retard)
 - ✅ Frontend charge les services en <500ms

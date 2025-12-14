@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Favicon Generator</title>
+</head>
+<body>
+    <h1>🚀 Génération Favicon OneSMS</h1>
+    
+    <h2>📝 Instructions pour créer le favicon.ico</h2>
+    <ol>
+        <li><strong>Prendre le logo OneSMS</strong> (PNG haute résolution)</li>
+        <li><strong>Aller sur:</strong> <a href="https://favicon.io/favicon-converter/" target="_blank">https://favicon.io/favicon-converter/</a></li>
+        <li><strong>Upload le logo OneSMS</strong></li>
+        <li><strong>Télécharger le pack</strong> généré</li>
+        <li><strong>Copier favicon.ico</strong> dans le dossier <code>/public/</code></li>
+    </ol>
+
+    <h2>✅ Alternative rapide</h2>
+    <p>Si tu as déjà le logo OneSMS en PNG:</p>
+    <pre><code>
+# Utiliser ImageMagick (si installé)
+convert logo-onesms.png -resize 32x32 favicon.ico
+
+# Ou utiliser un service en ligne:
+# - https://realfavicongenerator.net/
+# - https://www.favicon-generator.org/
+</code></pre>
+
+    <h2>🎯 Fichiers nécessaires pour Google</h2>
+    <ul>
+        <li><strong>favicon.ico</strong> (32x32px) → Racine du site</li>
+        <li><strong>icon-512x512.png</strong> → Déjà présent</li>
+        <li><strong>Schema.org logo</strong> → Mis à jour avec dimensions</li>
+    </ul>
+
+    <h2>🔍 Test après déploiement</h2>
+    <p>Pour vérifier que Google affiche bien le logo:</p>
+    <ol>
+        <li>Déployer les modifications</li>
+        <li>Aller sur: <a href="https://search.google.com/test/rich-results" target="_blank">Rich Results Test</a></li>
+        <li>Tester l'URL: <code>https://onesms-sn.com</code></li>
+        <li>Vérifier que le logo apparaît dans Organization</li>
+    </ol>
+</body>
+</html>

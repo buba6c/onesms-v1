@@ -4,36 +4,36 @@
 
 ### 📚 Documentation (4 fichiers - 21 KB)
 
-| Fichier | Taille | Description |
-|---------|--------|-------------|
-| **ICONS-README.md** | 1.5 KB | Point d'entrée principal |
-| **QUICKSTART-ICONS.md** | 2.8 KB | Guide rapide (2 pages) |
-| **README-ICONS.md** | 8.4 KB | Documentation complète (12 pages) |
-| **FILES-CREATED.md** | 8.3 KB | Détails de tous les fichiers |
+| Fichier                 | Taille | Description                       |
+| ----------------------- | ------ | --------------------------------- |
+| **ICONS-README.md**     | 1.5 KB | Point d'entrée principal          |
+| **QUICKSTART-ICONS.md** | 2.8 KB | Guide rapide (2 pages)            |
+| **README-ICONS.md**     | 8.4 KB | Documentation complète (12 pages) |
+| **FILES-CREATED.md**    | 8.3 KB | Détails de tous les fichiers      |
 
 ### 🔧 Scripts exécutables (4 fichiers - 34 KB)
 
-| Fichier | Taille | Fonction |
-|---------|--------|----------|
-| **setup-icons.sh** | 5.2 KB | Configuration interactive |
-| **start-icons.sh** | 8.1 KB | Guide interactif |
-| **test-icons.js** | 5.0 KB | Test sur 5 services |
-| **import-icons.js** | 16 KB | Script principal (650 lignes) |
+| Fichier             | Taille | Fonction                      |
+| ------------------- | ------ | ----------------------------- |
+| **setup-icons.sh**  | 5.2 KB | Configuration interactive     |
+| **start-icons.sh**  | 8.1 KB | Guide interactif              |
+| **test-icons.js**   | 5.0 KB | Test sur 5 services           |
+| **import-icons.js** | 16 KB  | Script principal (650 lignes) |
 
 ### ⚙️ Configuration (4 fichiers - 15 KB)
 
-| Fichier | Taille | But |
-|---------|--------|-----|
-| **.env.icons** | 1.1 KB | Template de configuration |
-| **package-icons.json** | 634 B | Dépendances Node.js |
-| **s3-bucket.tf** | 5.4 KB | Infrastructure S3 (Terraform) |
-| **cloudfront-cdn.tf** | 7.4 KB | CDN CloudFront (Terraform) |
+| Fichier                | Taille | But                           |
+| ---------------------- | ------ | ----------------------------- |
+| **.env.icons**         | 1.1 KB | Template de configuration     |
+| **package-icons.json** | 634 B  | Dépendances Node.js           |
+| **s3-bucket.tf**       | 5.4 KB | Infrastructure S3 (Terraform) |
+| **cloudfront-cdn.tf**  | 7.4 KB | CDN CloudFront (Terraform)    |
 
 ### 🗄️ Base de données (1 fichier - 602 B)
 
-| Fichier | Taille | Description |
-|---------|--------|-------------|
-| **029_add_icon_url_to_services.sql** | 602 B | Migration Supabase |
+| Fichier                              | Taille | Description        |
+| ------------------------------------ | ------ | ------------------ |
+| **029_add_icon_url_to_services.sql** | 602 B  | Migration Supabase |
 
 ---
 
@@ -56,14 +56,14 @@
 
 ### Formats générés
 
-| Format | Tailles | Usage |
-|--------|---------|-------|
-| **SVG** | Vectoriel | Toutes résolutions |
-| **PNG** | 32×32 | Favicon, liste mobile |
-| **PNG** | 64×64 | Liste desktop |
-| **PNG** | 128×128 | Aperçu moyen |
-| **PNG** | 256×256 | Grande prévisualisation |
-| **PNG** | 512×512 | Haute résolution |
+| Format  | Tailles   | Usage                   |
+| ------- | --------- | ----------------------- |
+| **SVG** | Vectoriel | Toutes résolutions      |
+| **PNG** | 32×32     | Favicon, liste mobile   |
+| **PNG** | 64×64     | Liste desktop           |
+| **PNG** | 128×128   | Aperçu moyen            |
+| **PNG** | 256×256   | Grande prévisualisation |
+| **PNG** | 512×512   | Haute résolution        |
 
 ### Intégrations
 
@@ -82,6 +82,7 @@
 ```
 
 Demande interactivement :
+
 - AWS Access Key ID
 - AWS Secret Access Key
 - S3 Bucket Name
@@ -168,32 +169,32 @@ out-icons/                     # Copie locale de tous les fichiers
 
 ### AWS S3
 
-| Item | Calcul | Coût |
-|------|--------|------|
-| Stockage (150 MB) | 0.15 GB × $0.023/GB/mois | **$0.003/mois** |
-| PUT Requests (7800) | 7.8 × $0.005/1000 | **$0.039** |
-| GET Requests (1M/mois) | 1000 × $0.0004/1000 | **$0.40/mois** |
-| Transfert sortant (10 GB/mois) | 10 × $0.09/GB | **$0.90/mois** |
-| **Total S3** | | **$1.34/mois** |
+| Item                           | Calcul                   | Coût            |
+| ------------------------------ | ------------------------ | --------------- |
+| Stockage (150 MB)              | 0.15 GB × $0.023/GB/mois | **$0.003/mois** |
+| PUT Requests (7800)            | 7.8 × $0.005/1000        | **$0.039**      |
+| GET Requests (1M/mois)         | 1000 × $0.0004/1000      | **$0.40/mois**  |
+| Transfert sortant (10 GB/mois) | 10 × $0.09/GB            | **$0.90/mois**  |
+| **Total S3**                   |                          | **$1.34/mois**  |
 
 ### CloudFront CDN (optionnel)
 
-| Item | Calcul | Coût |
-|------|--------|------|
-| Stockage S3 | (inchangé) | $0.003/mois |
-| Transfert CF (10 GB) | 10 × $0.085/GB | **$0.85/mois** |
-| Requêtes CF (1M) | 1M × $0.0075/10000 | **$0.75/mois** |
-| **Total CloudFront** | | **$1.63/mois** |
+| Item                 | Calcul             | Coût           |
+| -------------------- | ------------------ | -------------- |
+| Stockage S3          | (inchangé)         | $0.003/mois    |
+| Transfert CF (10 GB) | 10 × $0.085/GB     | **$0.85/mois** |
+| Requêtes CF (1M)     | 1M × $0.0075/10000 | **$0.75/mois** |
+| **Total CloudFront** |                    | **$1.63/mois** |
 
 **Différence** : +$0.29/mois pour des performances 10× meilleures
 
 ### Brandfetch API (optionnel)
 
-| Plan | Requêtes/mois | Coût |
-|------|---------------|------|
-| Free | 100 | **$0** |
-| Starter | 500 | $9/mois |
-| Pro | Illimité | **$29/mois** |
+| Plan    | Requêtes/mois | Coût         |
+| ------- | ------------- | ------------ |
+| Free    | 100           | **$0**       |
+| Starter | 500           | $9/mois      |
+| Pro     | Illimité      | **$29/mois** |
 
 Pour 1300 services : **Plan Pro recommandé** ($29/mois)
 
@@ -213,14 +214,14 @@ Avec Brandfetch + CDN:         $31.63/mois
 
 ```javascript
 // import-icons.js, ligne 26
-const CONCURRENCY_LIMIT = 20  // Au lieu de 10 (plus rapide)
+const CONCURRENCY_LIMIT = 20; // Au lieu de 10 (plus rapide)
 ```
 
 ### Tailles PNG personnalisées
 
 ```javascript
 // import-icons.js, ligne 25
-const PNG_SIZES = [64, 128, 256]  // Au lieu de [32, 64, 128, 256, 512]
+const PNG_SIZES = [64, 128, 256]; // Au lieu de [32, 64, 128, 256, 512]
 ```
 
 ### Tester sur un sous-ensemble
@@ -234,7 +235,7 @@ const PNG_SIZES = [64, 128, 256]  // Au lieu de [32, 64, 128, 256, 512]
 
 ```javascript
 // import-icons.js, ligne ~435
-let iconData = 
+let iconData =
   await tryBrandfetch(displayName, code) ||    // Brandfetch en premier
   await trySimpleIcons(displayName, code) ||   // Simple-icons en second
   // ...
@@ -260,6 +261,7 @@ terraform apply
 ```
 
 Crée automatiquement :
+
 - ✅ Bucket S3 avec permissions publiques
 - ✅ Politique CORS
 - ✅ Lifecycle rules
@@ -274,6 +276,7 @@ terraform apply
 ```
 
 Crée :
+
 - ✅ Distribution CloudFront
 - ✅ Cache optimisé (1 an)
 - ✅ Compression automatique (gzip/brotli)
@@ -287,6 +290,7 @@ Crée :
 
 **Cause** : Variables AWS non définies  
 **Solution** :
+
 ```bash
 cat .env.icons  # Vérifier que AWS_ACCESS_KEY_ID, etc. sont remplis
 ```
@@ -295,14 +299,17 @@ cat .env.icons  # Vérifier que AWS_ACCESS_KEY_ID, etc. sont remplis
 
 **Cause** : Permissions IAM insuffisantes  
 **Solution** : Ajouter la politique IAM :
+
 ```json
 {
   "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": ["s3:PutObject", "s3:PutObjectAcl"],
-    "Resource": "arn:aws:s3:::onesms-icons/*"
-  }]
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:PutObjectAcl"],
+      "Resource": "arn:aws:s3:::onesms-icons/*"
+    }
+  ]
 }
 ```
 
@@ -310,6 +317,7 @@ cat .env.icons  # Vérifier que AWS_ACCESS_KEY_ID, etc. sont remplis
 
 **Cause** : Utilisation de la clé anon au lieu de service_role  
 **Solution** :
+
 ```bash
 # Vérifier que c'est bien la SERVICE ROLE KEY
 cat .env.icons | grep SUPABASE_SERVICE_ROLE_KEY
@@ -330,18 +338,21 @@ cat .env.icons | grep SUPABASE_SERVICE_ROLE_KEY
 ## 📈 Améliorations futures possibles
 
 ### Court terme
+
 - [ ] Support de services personnalisés (JSON externe)
 - [ ] Option de re-génération pour services échoués uniquement
 - [ ] Support de WebP pour réduire la taille
 - [ ] Invalidation automatique CloudFront
 
 ### Moyen terme
+
 - [ ] Interface web de gestion des icônes
 - [ ] API pour uploader des icônes personnalisées
 - [ ] A/B testing de plusieurs variantes d'icônes
 - [ ] Génération automatique de favicons multi-résolutions
 
 ### Long terme
+
 - [ ] IA pour générer des icônes custom
 - [ ] Optimisation automatique basée sur l'usage
 - [ ] Support de formats animés (SVG animations, GIF)
@@ -380,30 +391,30 @@ Après l'exécution :
 
 ```javascript
 const { data, error } = await supabase
-  .from('services')
-  .select('code, name, display_name, icon_url')
-  .not('icon_url', 'is', null)
-  .order('popularity_score', { ascending: false })
+  .from("services")
+  .select("code, name, display_name, icon_url")
+  .not("icon_url", "is", null)
+  .order("popularity_score", { ascending: false });
 ```
 
 ### Services sans icônes (échecs)
 
 ```javascript
 const { data, error } = await supabase
-  .from('services')
-  .select('code, name')
-  .is('icon_url', null)
+  .from("services")
+  .select("code, name")
+  .is("icon_url", null);
 ```
 
 ### Mettre à jour une icône manuellement
 
 ```javascript
 const { error } = await supabase
-  .from('services')
-  .update({ 
-    icon_url: 'https://onesms-icons.s3.amazonaws.com/icons/custom/icon.svg' 
+  .from("services")
+  .update({
+    icon_url: "https://onesms-icons.s3.amazonaws.com/icons/custom/icon.svg",
   })
-  .eq('code', 'mon-service')
+  .eq("code", "mon-service");
 ```
 
 ---
@@ -434,34 +445,37 @@ const { error } = await supabase
 ## 📝 Notes finales
 
 ### Points forts
+
 ✅ **Complet** : 13 fichiers créés, tout est prêt à l'emploi  
 ✅ **Documenté** : 21 KB de documentation détaillée  
 ✅ **Robuste** : 5 sources de fallback, gestion d'erreurs complète  
 ✅ **Performant** : Batch processing, concurrence, optimisations  
-✅ **Flexible** : Configuration Terraform, CDN optionnel, personnalisable  
+✅ **Flexible** : Configuration Terraform, CDN optionnel, personnalisable
 
 ### Limitations connues
+
 ⚠️ Brandfetch API limitée à 100 requêtes/mois (plan gratuit)  
 ⚠️ Potrace peut échouer sur certaines images complexes  
 ⚠️ Simple-icons ne couvre pas tous les services (60% de couverture)  
-⚠️ Fallback SVG basique (initiales + couleur uniquement)  
+⚠️ Fallback SVG basique (initiales + couleur uniquement)
 
 ### Recommandations
+
 💡 Utiliser Brandfetch Pro pour meilleure qualité ($29/mois)  
 💡 Activer CloudFront CDN pour meilleures performances (+$0.30/mois)  
 💡 Tester sur 10 services avant l'import complet  
 💡 Exécuter pendant les heures creuses (AWS moins cher)  
-💡 Conserver une sauvegarde de `import-results.json`  
+💡 Conserver une sauvegarde de `import-results.json`
 
 ---
 
 **Créé le** : 22 novembre 2025  
 **Pour** : ONE SMS V1  
 **Version** : 1.0.0  
-**Auteur** : GitHub Copilot  
+**Auteur** : GitHub Copilot
 
 **Temps total de développement** : ~2 heures  
 **Lignes de code générées** : ~1500  
-**Documentation générée** : ~500 lignes  
+**Documentation générée** : ~500 lignes
 
 ✨ **Prêt à l'emploi !**

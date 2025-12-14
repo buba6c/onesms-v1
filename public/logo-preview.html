@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONE SMS - Prévisualisation des Logos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        
+        .original {
+            text-align: center;
+            margin-bottom: 50px;
+            padding: 30px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+        }
+        
+        .original h2 {
+            color: #fbbf24;
+            margin-bottom: 20px;
+        }
+        
+        .original-note {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 15px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .logo-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .logo-card:hover {
+            transform: translateY(-5px);
+            border-color: #3b82f6;
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.2);
+        }
+        
+        .logo-card img {
+            width: 200px;
+            height: 200px;
+            object-fit: contain;
+            margin-bottom: 20px;
+            border-radius: 16px;
+        }
+        
+        .logo-card h3 {
+            color: white;
+            margin-bottom: 8px;
+            font-size: 1.2rem;
+        }
+        
+        .logo-card p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .version-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .sizes {
+            margin-top: 50px;
+            text-align: center;
+        }
+        
+        .sizes h2 {
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .size-preview {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .size-item {
+            text-align: center;
+        }
+        
+        .size-item img {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .size-item span {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+        
+        .recommendation {
+            margin-top: 50px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.2));
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .recommendation h2 {
+            color: #3b82f6;
+            margin-bottom: 15px;
+        }
+        
+        .recommendation p {
+            color: #e2e8f0;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 ONE SMS - Logos</h1>
+    <p class="subtitle">Basés sur le design carte SIM original</p>
+    
+    <div class="original">
+        <h2>📱 Logo Original de Référence</h2>
+        <p class="original-note">Tous les logos ci-dessous sont inspirés du style carte SIM avec notification</p>
+    </div>
+    
+    <div class="grid">
+        <div class="logo-card">
+            <span class="version-badge">V1</span>
+            <img src="logos/onesms-sim-v1.svg" alt="Logo V1">
+            <h3>Fidèle à l'Original</h3>
+            <p>Carte SIM blanche avec puce cyan/bleue et badge notification rouge "1"</p>
+        </div>
+        
+        <div class="logo-card">
+            <span class="version-badge">V2</span>
+            <img src="logos/onesms-sim-v2.svg" alt="Logo V2">
+            <h3>Avec Texte ONE</h3>
+            <p>Intègre le texte "ONE" dans la puce + waves signal sur le côté</p>
+        </div>
+        
+        <div class="logo-card">
+            <span class="version-badge">V3</span>
+            <img src="logos/onesms-sim-v3.svg" alt="Logo V3">
+            <h3>Minimaliste Élégant</h3>
+            <p>Design épuré avec pattern dots, "1" au centre et texte "ONE SMS"</p>
+        </div>
+        
+        <div class="logo-card">
+            <span class="version-badge">V4</span>
+            <img src="logos/onesms-sim-v4.svg" alt="Logo V4">
+            <h3>Effet 3D Premium</h3>
+            <p>Carte en 3D avec puce dorée réaliste - style premium</p>
+        </div>
+        
+        <div class="logo-card">
+            <span class="version-badge">V5</span>
+            <img src="logos/onesms-sim-v5.svg" alt="Logo V5">
+            <h3>Style Apple/iOS</h3>
+            <p>Flat design très propre, coins arrondis - style applications iOS</p>
+        </div>
+        
+        <div class="logo-card">
+            <span class="version-badge">V6</span>
+            <img src="logos/onesms-sim-v6.svg" alt="Logo V6">
+            <h3>Premium Dégradé</h3>
+            <p>Puce colorée gradient, cercles décoratifs - très raffiné</p>
+        </div>
+    </div>
+    
+    <div class="sizes">
+        <h2>📐 Prévisualisation Multi-tailles (V5 exemple)</h2>
+        <div class="size-preview">
+            <div class="size-item">
+                <img src="logos/onesms-sim-v5.svg" width="128" height="128" alt="128px">
+                <span>128×128</span>
+            </div>
+            <div class="size-item">
+                <img src="logos/onesms-sim-v5.svg" width="64" height="64" alt="64px">
+                <span>64×64</span>
+            </div>
+            <div class="size-item">
+                <img src="logos/onesms-sim-v5.svg" width="48" height="48" alt="48px">
+                <span>48×48</span>
+            </div>
+            <div class="size-item">
+                <img src="logos/onesms-sim-v5.svg" width="32" height="32" alt="32px">
+                <span>32×32</span>
+            </div>
+            <div class="size-item">
+                <img src="logos/onesms-sim-v5.svg" width="16" height="16" alt="16px">
+                <span>16×16</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="recommendation">
+        <h2>💡 Recommandation</h2>
+        <p>
+            <strong>V5 (Style Apple)</strong> est le plus proche de ton original et le plus lisible à toutes tailles.<br><br>
+            <strong>V6 (Premium)</strong> offre un look plus sophistiqué si tu veux te démarquer.<br><br>
+            Dis-moi lequel tu préfères et je l'appliquerai à ta plateforme !
+        </p>
+    </div>
+</body>
+</html>

@@ -5,6 +5,7 @@
 **Row Level Security (RLS)** bloque les insertions dans la table `activations`.
 
 ### Preuve
+
 ```
 Code: 42501
 Message: new row violates row-level security policy for table "activations"
@@ -62,6 +63,7 @@ node test_manual_activation_sync.mjs
 ```
 
 Vous devriez voir:
+
 ```
 ✅ Activation créée
 ✅ SMS ajouté
@@ -91,21 +93,21 @@ Vous devriez voir:
 2. buy-sms-activate-number crée activation (status: pending)
    ↓
 3. Trois systèmes parallèles vérifient le SMS:
-   
+
    A. Frontend Polling (10s)
       - useQuery refetchInterval: 10000
       - Recharge activations régulièrement
-   
+
    B. Cron Job (30s-1min)
       - cron-check-pending-sms
       - Appelle check-sms-activate-status
       - Met à jour la DB avec sms_code
-   
+
    C. WebSocket Realtime (0s)
       - useRealtimeSms hook
       - Écoute UPDATE sur activations
       - Notifie instantanément quand SMS arrive
-   
+
 4. SMS détecté → DB mise à jour (status: received, sms_code: XXX)
    ↓
 5. WebSocket trigger → Frontend notifié
@@ -116,16 +118,19 @@ Vous devriez voir:
 ## 🐛 POURQUOI ÇA NE MARCHAIT PAS
 
 ### Problème 1: RLS bloque insertions
+
 - `buy-sms-activate-number` ne peut pas créer d'activations
 - Table `activations` reste vide
 - Aucun SMS à synchroniser
 
 ### Problème 2: Policies incorrectes
+
 - Policies trop restrictives
 - Service role bloqué
 - Anonymous users bloqués
 
 ### Problème 3: Realtime pas activé
+
 - WebSocket ne fonctionnait pas
 - Pas de notifications instantanées
 
@@ -166,6 +171,7 @@ CREATE POLICY "anon_read_activations" ON activations
 ## 📝 LOGS À SURVEILLER
 
 ### Frontend (Console navigateur)
+
 ```
 🔌 [REALTIME] WebSocket connecté avec succès
 ✅ [LOAD] Activations chargées: 3
@@ -173,6 +179,7 @@ CREATE POLICY "anon_read_activations" ON activations
 ```
 
 ### Backend (Supabase Logs)
+
 ```
 🚀 [BUY-SMS-ACTIVATE] Number purchased
 ✅ [CHECK-SMS-ACTIVATE] SMS received
@@ -180,6 +187,7 @@ CREATE POLICY "anon_read_activations" ON activations
 ```
 
 ### Cron Job
+
 ```
 {
   "checked": 12,

@@ -1,9 +1,11 @@
 # One SMS - Plateforme de Numéros Virtuels
 
 ## Description
+
 Plateforme web et mobile pour attribution et réception de numéros virtuels temporaires destinés à la réception de SMS de vérification.
 
 ## Technologies
+
 - **Frontend**: React 18 + TypeScript + Vite
 - **UI**: Tailwind CSS + shadcn/ui
 - **Backend**: Supabase (PostgreSQL, Auth, Edge Functions)
@@ -11,6 +13,7 @@ Plateforme web et mobile pour attribution et réception de numéros virtuels tem
 - **Notifications**: Firebase Cloud Messaging
 
 ## Fonctionnalités Principales
+
 - Authentification (Google, Apple, Email/Password)
 - Achat par Activation (usage unique)
 - Location (courte et longue durée)
@@ -23,6 +26,7 @@ Plateforme web et mobile pour attribution et réception de numéros virtuels tem
 ## Installation
 
 ### Prérequis
+
 - Node.js 18+
 - npm ou yarn
 - Compte Supabase
@@ -32,33 +36,39 @@ Plateforme web et mobile pour attribution et réception de numéros virtuels tem
 ### Configuration
 
 1. Cloner le projet
+
 ```bash
 git clone <repository-url>
 cd one-sms-v1
 ```
 
 2. Installer les dépendances
+
 ```bash
 npm install
 ```
 
 3. Configurer les variables d'environnement
+
 ```bash
 cp .env.example .env
 # Éditer .env avec vos clés API
 ```
 
 4. Lancer le serveur de développement
+
 ```bash
 npm run dev
 ```
 
 5. Build pour la production
+
 ```bash
 npm run build
 ```
 
 ## Structure du Projet
+
 ```
 src/
 ├── components/        # Composants React réutilisables
@@ -78,6 +88,7 @@ src/
 ```
 
 ## API 5sim.net
+
 - Documentation: https://5sim.net/docs
 - Base URL: https://5sim.net/v1
 - Endpoints principaux:
@@ -88,6 +99,7 @@ src/
   - POST /user/buy/hosting - Louer numéro
 
 ## API Paytech
+
 - Documentation: https://docs.intech.sn/doc_paytech.php
 - Base URL: https://paytech.sn/api
 - Endpoints principaux:
@@ -98,6 +110,7 @@ src/
 ## Base de Données Supabase
 
 ### Tables principales:
+
 - users - Utilisateurs
 - credits - Gestion crédits
 - virtual_numbers - Numéros virtuels
@@ -108,13 +121,16 @@ src/
 - pricing_rules - Règles de tarification
 
 ## Sécurité
+
 - JWT pour l'authentification
 - Row Level Security (RLS) sur Supabase
 - HTTPS obligatoire
 - Conformité RGPD
 
 ## Support
+
 Pour toute question: support@onesms.com
 
 ## Licence
+
 Propriétaire - Tous droits réservés

@@ -1,4 +1,5 @@
 # 🔍 ANALYSE COMPLÈTE - SYNCHRONISATION TEMPS RÉEL
+
 ## Services, Pays, Prix & Admin Dashboard
 
 **Date:** 24 Novembre 2024  
@@ -29,6 +30,7 @@
 **Localisation:** `/src/hooks/useSmsPolling.ts` ligne 184
 
 **Code problématique:**
+
 ```typescript
 // ❌ ANCIEN CODE (BUGUÉ)
 const scheduleNextCheck = () => {
@@ -49,6 +51,7 @@ intervalsRef.current[num.orderId] = interval; // 'interval' n'existe pas!
 ```
 
 **Impact:**
+
 - ❌ Polling SMS bloqué après premier check
 - ❌ Détection SMS impossible
 - ❌ Console flooded avec ReferenceError
@@ -77,11 +80,13 @@ scheduleNextCheck();
 ```
 
 **Changements supplémentaires:**
+
 - `clearInterval()` → `clearTimeout()` (cohérence avec setTimeout)
 - Cleanup automatique après 400 checks
 - Timeout sécurité passé de `clearInterval` à `clearTimeout`
 
 **Résultat:**
+
 - ✅ Polling fonctionne correctement
 - ✅ Détection SMS en 3-30s selon stratégie adaptive
 - ✅ Plus d'erreurs console
@@ -188,32 +193,40 @@ PRIX FLOW (User → Affichage):
 ```typescript
 // 📂 src/pages/DashboardPage.tsx ligne 129
 const { data: services = [] } = useQuery<Service[]>({
-  queryKey: ['services', selectedCategory],
+  queryKey: ["services", selectedCategory],
   queryFn: async () => {
-    console.log('⚡ [SERVICES] Chargement depuis données statiques + API temps réel...');
-    
+    console.log(
+      "⚡ [SERVICES] Chargement depuis données statiques + API temps réel..."
+    );
+
     // 1️⃣ Données STATIQUES (sms-activate-data.ts)
-    const staticServices = selectedCategory === 'all' 
-      ? getAllServices() 
-      : getServicesByCategory(selectedCategory);
-    
+    const staticServices =
+      selectedCategory === "all"
+        ? getAllServices()
+        : getServicesByCategory(selectedCategory);
+
     // 2️⃣ Quantités RÉELLES (Edge Function)
-    const { data, error } = await supabase.functions.invoke('get-services-counts', {
-      body: { countries: [187, 4, 6] } // USA, Philippines, Indonesia
-    });
-    
+    const { data, error } = await supabase.functions.invoke(
+      "get-services-counts",
+      {
+        body: { countries: [187, 4, 6] }, // USA, Philippines, Indonesia
+      }
+    );
+
     const totalCounts = data.counts || {}; // { wa: 245000, tg: 158000, ... }
-    
+
     // 3️⃣ MERGE: Static + Real counts
-    return staticServices.map(s => ({
-      id: s.code,
-      name: s.name,
-      code: s.code,
-      icon: s.code,
-      count: totalCounts[s.code] || 0 // ✅ Quantités réelles
-    })).filter(s => s.count > 0); // Only available services
+    return staticServices
+      .map((s) => ({
+        id: s.code,
+        name: s.name,
+        code: s.code,
+        icon: s.code,
+        count: totalCounts[s.code] || 0, // ✅ Quantités réelles
+      }))
+      .filter((s) => s.count > 0); // Only available services
   },
-  staleTime: 30000 // Cache 30s
+  staleTime: 30000, // Cache 30s
 });
 ```
 
@@ -222,6 +235,7 @@ const { data: services = [] } = useQuery<Service[]>({
 **Localisation:** `/supabase/functions/get-services-counts/index.ts`
 
 **Fonctionnement:**
+
 ```typescript
 // INPUT
 { countries: [187, 4, 6] } // USA, Philippines, Indonesia
@@ -231,9 +245,9 @@ for each country:
   GET https://api.sms-activate.ae/stubs/handler_api.php
       ?action=getNumbersStatus
       &country=187
-  
+
   Response: { "wa": 123456, "tg": 78900, "wa_0": 50000, ... }
-  
+
 // AGGREGATE
 totalCounts = {
   "wa": 245000,  // Sum across countries
@@ -251,6 +265,7 @@ totalCounts = {
 ```
 
 **Performance:**
+
 - ⏱️ **Temps:** 1-2s pour 3 pays
 - 📡 **Requêtes:** 3 API calls parallèles
 - 💾 **Cache:** 30s frontend
@@ -280,11 +295,13 @@ CREATE INDEX idx_services_popularity ON services(popularity_score DESC);
 ```
 
 **⚠️ Problème identifié:**
+
 - `total_available` n'est PAS synchronisé en temps réel
 - Valeur obsolète après sync 5sim
 - Frontend utilise `get-services-counts` pour contourner
 
 **✅ Solution actuelle:**
+
 - Frontend ignore `total_available` de la DB
 - Appelle `get-services-counts` pour vraies quantités
 - Cache 30s pour limiter API calls
@@ -294,32 +311,34 @@ CREATE INDEX idx_services_popularity ON services(popularity_score DESC);
 **Localisation:** `/src/pages/admin/AdminServices.tsx`
 
 **Fonctionnalités:**
+
 ```typescript
 // 🔄 SYNC avec 5sim
 const syncMutation = useMutation({
-  mutationFn: triggerSync,  // Edge Function: sync-5sim
+  mutationFn: triggerSync, // Edge Function: sync-5sim
   onSuccess: (result) => {
     // Synced 250 services, 150 countries, 15,000 prices
-    queryClient.invalidateQueries(['admin-services'])
-  }
-})
+    queryClient.invalidateQueries(["admin-services"]);
+  },
+});
 
 // ⭐ Update Popularity Scores
 // Calcule scores basés sur homepage 5sim.net
-await updatePopularityScores()
+await updatePopularityScores();
 
 // 🌍 Update Success Rates
 // Calcule taux de réussite moyens par pays
-await updateSuccessRates()
+await updateSuccessRates();
 
 // ✏️ Toggle Active/Popular
 updateMutation.mutate({
   id: service.id,
-  updates: { active: false } // Désactiver service
-})
+  updates: { active: false }, // Désactiver service
+});
 ```
 
 **Statistiques affichées:**
+
 - Total Services: 250
 - Active: 245
 - Popular (score ≥50): 45
@@ -336,55 +355,60 @@ updateMutation.mutate({
 ```typescript
 // 📂 src/pages/DashboardPage.tsx ligne 228
 const { data: countries = [] } = useQuery<Country[]>({
-  queryKey: ['countries-live', selectedService?.code],
+  queryKey: ["countries-live", selectedService?.code],
   queryFn: async () => {
-    console.log('🌐 [LIVE] Chargement pays depuis données statiques...');
-    
+    console.log("🌐 [LIVE] Chargement pays depuis données statiques...");
+
     // 1️⃣ Prix depuis pricing_rules
     const { data: pricingData } = await supabase
-      .from('pricing_rules')
-      .select('country_code, activation_price')
-      .eq('service_code', selectedService.code)
-      .eq('active', true);
-    
-    const priceMap = new Map(pricingData?.map(p => 
-      [p.country_code, p.activation_price]
-    ));
-    
+      .from("pricing_rules")
+      .select("country_code, activation_price")
+      .eq("service_code", selectedService.code)
+      .eq("active", true);
+
+    const priceMap = new Map(
+      pricingData?.map((p) => [p.country_code, p.activation_price])
+    );
+
     // 2️⃣ TOP pays STATIQUES (sms-activate-data.ts)
-    const topCountries = SMS_ACTIVATE_COUNTRIES
-      .filter(c => c.popular)
-      .sort((a, b) => b.priority - a.priority);
-    
+    const topCountries = SMS_ACTIVATE_COUNTRIES.filter((c) => c.popular).sort(
+      (a, b) => b.priority - a.priority
+    );
+
     // 3️⃣ MERGE: Countries + Prices
-    return topCountries.map(country => ({
+    return topCountries.map((country) => ({
       id: country.id.toString(),
       name: country.name,
       code: country.code,
       flag: getFlagEmoji(country.code),
       successRate: 95, // SMS-Activate a bon taux
-      count: 999,      // ⚠️ Approximatif, pas réel
-      price: priceMap.get(country.code) || 1.0
+      count: 999, // ⚠️ Approximatif, pas réel
+      price: priceMap.get(country.code) || 1.0,
     }));
   },
-  staleTime: 60000 // Cache 60s (données statiques)
+  staleTime: 60000, // Cache 60s (données statiques)
 });
 ```
 
 **⚠️ Problème identifié:**
+
 - Quantités (`count: 999`) sont approximatives
 - Pas de vérification temps réel de disponibilité
 - Utilise des données statiques hardcodées
 
 **💡 Solution possible:**
+
 ```typescript
 // Amélioration suggérée
-const { data, error } = await supabase.functions.invoke('get-country-availability', {
-  body: { 
-    service: selectedService.code,
-    countries: topCountries.map(c => c.id)
+const { data, error } = await supabase.functions.invoke(
+  "get-country-availability",
+  {
+    body: {
+      service: selectedService.code,
+      countries: topCountries.map((c) => c.id),
+    },
   }
-});
+);
 
 // Edge Function pourrait appeler:
 // SMS-Activate: getNumbersStatus pour chaque pays
@@ -416,13 +440,26 @@ CREATE INDEX idx_countries_success_rate ON countries(success_rate DESC);
 ```
 
 **Top pays populaires (hardcodés):**
+
 ```typescript
 const SMS_ACTIVATE_COUNTRIES = [
-  { code: 'usa', id: 187, name: 'United States', priority: 1000, popular: true },
-  { code: 'philippines', id: 4, name: 'Philippines', priority: 900, popular: true },
-  { code: 'indonesia', id: 6, name: 'Indonesia', priority: 800, popular: true },
-  { code: 'india', id: 22, name: 'India', priority: 700, popular: true },
-  { code: 'england', id: 12, name: 'England', priority: 600, popular: true },
+  {
+    code: "usa",
+    id: 187,
+    name: "United States",
+    priority: 1000,
+    popular: true,
+  },
+  {
+    code: "philippines",
+    id: 4,
+    name: "Philippines",
+    priority: 900,
+    popular: true,
+  },
+  { code: "indonesia", id: 6, name: "Indonesia", priority: 800, popular: true },
+  { code: "india", id: 22, name: "India", priority: 700, popular: true },
+  { code: "england", id: 12, name: "England", priority: 600, popular: true },
   // ... 25 pays populaires
 ];
 ```
@@ -432,6 +469,7 @@ const SMS_ACTIVATE_COUNTRIES = [
 **Localisation:** `/src/pages/admin/AdminCountries.tsx`
 
 **Fonctionnalités:**
+
 - Liste tous les pays
 - Éditer success_rate manuellement
 - Toggle active/inactive
@@ -453,25 +491,25 @@ CREATE TABLE pricing_rules (
   country_code TEXT NOT NULL,              -- "usa", "philippines"
   provider TEXT DEFAULT '5sim',            -- "5sim", "sms-activate"
   operator TEXT DEFAULT 'any',             -- "virtual21", "virtual4", "any"
-  
+
   -- COÛTS (ce qu'on paye au provider)
   activation_cost DECIMAL(10,2) DEFAULT 0,   -- Ex: 0.50Ⓐ
   rent_cost DECIMAL(10,2) DEFAULT 0,
-  
+
   -- PRIX DE VENTE (ce que le user paye)
   activation_price DECIMAL(10,2) DEFAULT 0,  -- Ex: 0.60Ⓐ (coût + 20%)
   rent_price DECIMAL(10,2) DEFAULT 0,
-  
+
   -- MÉTADONNÉES
   available_count INTEGER DEFAULT 0,         -- Nombres dispo
   margin_percentage DECIMAL(5,2) DEFAULT 20.0,  -- Marge: 20%
   delivery_rate DECIMAL(5,2) DEFAULT 99.0,   -- Taux livraison (5sim)
   active BOOLEAN DEFAULT true,
   last_synced_at TIMESTAMPTZ,
-  
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  
+
   UNIQUE(service_code, country_code, operator)
 );
 
@@ -485,26 +523,28 @@ CREATE INDEX idx_pricing_synced ON pricing_rules(last_synced_at DESC);
 ### 5.2 Calcul des Prix
 
 **Formule appliquée lors du sync:**
+
 ```typescript
 // Dans sync-5sim Edge Function
-const cost = priceInfo.cost || 0;  // Ex: 10.50 RUB
-const sellingPrice = cost > 0 ? (cost * 1.2) : 0;  // +20% marge
+const cost = priceInfo.cost || 0; // Ex: 10.50 RUB
+const sellingPrice = cost > 0 ? cost * 1.2 : 0; // +20% marge
 
-await supabase.from('pricing_rules').upsert({
-  service_code: 'wa',
-  country_code: 'usa',
-  operator: 'virtual21',
-  activation_cost: 10.50,       // Coût 5sim
-  activation_price: 12.60,      // Prix utilisateur (+20%)
+await supabase.from("pricing_rules").upsert({
+  service_code: "wa",
+  country_code: "usa",
+  operator: "virtual21",
+  activation_cost: 10.5, // Coût 5sim
+  activation_price: 12.6, // Prix utilisateur (+20%)
   margin_percentage: 20.0,
   available_count: 5432,
   delivery_rate: 98.5,
   active: true,
-  last_synced_at: NOW()
+  last_synced_at: NOW(),
 });
 ```
 
 **Exemple concret:**
+
 ```
 Service: WhatsApp (wa)
 Pays: USA (187)
@@ -524,52 +564,54 @@ Prix:  0.630 Ⓐ  ← Affiché au user
 **Localisation:** `/src/pages/admin/AdminPricing.tsx`
 
 **Statistiques affichées:**
+
 ```typescript
 // Total Prices: 15,247 règles
 const totalRules = filteredRules.length;
 
 // Avg Margin: 20.0%
-const avgMargin = filteredRules.reduce((sum, r) => 
-  sum + r.margin_percentage, 0
-) / totalRules;
+const avgMargin =
+  filteredRules.reduce((sum, r) => sum + r.margin_percentage, 0) / totalRules;
 
 // Avg Activation: 0.58 Ⓐ
-const avgActivationPrice = filteredRules.reduce((sum, r) => 
-  sum + r.activation_price, 0
-) / totalRules;
+const avgActivationPrice =
+  filteredRules.reduce((sum, r) => sum + r.activation_price, 0) / totalRules;
 
 // Total Available: 2,450,000
-const totalAvailable = filteredRules.reduce((sum, r) => 
-  sum + r.available_count, 0
+const totalAvailable = filteredRules.reduce(
+  (sum, r) => sum + r.available_count,
+  0
 );
 ```
 
 **Tableau des prix:**
 | Service | Pays | Opérateur | Coût | Prix | Marge | Dispo | Statut |
 |---------|------|-----------|------|------|-------|-------|--------|
-| wa      | usa  | virtual21 | 0.52Ⓐ | 0.63Ⓐ | 20.0% | 5432 | ✅ Actif |
-| tg      | philippines | any | 0.15Ⓐ | 0.18Ⓐ | 20.0% | 12450 | ✅ Actif |
-| fb      | indonesia | virtual4 | 0.30Ⓐ | 0.36Ⓐ | 20.0% | 8900 | ✅ Actif |
+| wa | usa | virtual21 | 0.52Ⓐ | 0.63Ⓐ | 20.0% | 5432 | ✅ Actif |
+| tg | philippines | any | 0.15Ⓐ | 0.18Ⓐ | 20.0% | 12450 | ✅ Actif |
+| fb | indonesia | virtual4 | 0.30Ⓐ | 0.36Ⓐ | 20.0% | 8900 | ✅ Actif |
 
 ### 5.4 Synchronisation des Prix
 
 **Déclenchement:**
+
 ```typescript
 // Admin clique "Sync avec 5sim"
 const syncMutation = useMutation({
-  mutationFn: triggerSync,  // Edge Function: sync-5sim
+  mutationFn: triggerSync, // Edge Function: sync-5sim
   onSuccess: (result) => {
     toast({
-      title: 'Sync completed!',
-      description: `Synced ${result.stats?.prices || 0} prices`
+      title: "Sync completed!",
+      description: `Synced ${result.stats?.prices || 0} prices`,
     });
-  }
+  },
 });
 ```
 
 **Edge Function: sync-5sim**
 
 **Processus:**
+
 ```typescript
 // 1️⃣ Fetch prices depuis 5sim
 const response = await fetch('https://5sim.net/v1/guest/prices');
@@ -623,6 +665,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ```
 
 **Performance:**
+
 - ⏱️ **Temps:** 30-45s pour sync complète
 - 📡 **Requêtes:** 1 API call 5sim
 - 💾 **Insertions:** 15,247 règles (BATCH 250)
@@ -649,6 +692,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ### 6.2 AdminServices.tsx
 
 **Fonctionnalités:**
+
 ```typescript
 // 🔄 Sync avec 5sim (services + countries + prices)
 <Button onClick={() => syncMutation.mutate()}>
@@ -683,6 +727,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ```
 
 **Statistiques affichées:**
+
 - Total Services: 250
 - Active: 245 (98%)
 - Popular (score ≥50): 45 (18%)
@@ -698,6 +743,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ### 6.3 AdminPricing.tsx
 
 **Fonctionnalités:**
+
 ```typescript
 // 🔄 Sync avec 5sim (met à jour tous les prix)
 <Button onClick={() => syncMutation.mutate()}>
@@ -717,6 +763,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ```
 
 **Statistiques affichées:**
+
 - Total Prices: 15,247 règles
 - Avg Margin: 20.0%
 - Avg Activation: 0.58 Ⓐ
@@ -731,6 +778,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ### 6.4 AdminCountries.tsx
 
 **Fonctionnalités:**
+
 - Liste tous les pays (150 pays 5sim)
 - Toggle active/inactive
 - Modifier success_rate (taux de réussite)
@@ -740,6 +788,7 @@ for (let i = 0; i < pricingRules.length; i += batchSize) {
 ### 6.5 Edge Functions pour Admin
 
 **1. sync-5sim**
+
 ```typescript
 // Sync complète: services + countries + prices
 POST /functions/v1/sync-5sim
@@ -748,6 +797,7 @@ POST /functions/v1/sync-5sim
 ```
 
 **2. update-popularity-scores**
+
 ```typescript
 // Calcule scores basés sur ordre homepage 5sim.net
 POST /functions/v1/update-popularity-scores
@@ -763,6 +813,7 @@ POST /functions/v1/update-popularity-scores
 ```
 
 **3. update-success-rates**
+
 ```typescript
 // Calcule taux de réussite moyens par pays
 POST /functions/v1/update-success-rates
@@ -770,7 +821,7 @@ POST /functions/v1/update-success-rates
 📊 Résultat: { updated: 150, avgRate: 95.5 }
 
 // Algorithme:
-SELECT 
+SELECT
   country_code,
   COUNT(*) FILTER (WHERE status = 'received') * 100.0 / COUNT(*) as success_rate
 FROM activations
@@ -787,36 +838,39 @@ GROUP BY country_code;
 ### 7.1 🚀 Optimisation Services
 
 **Problème actuel:**
+
 - `total_available` dans DB jamais mis à jour
 - Frontend contourne via `get-services-counts`
 - Quantités calculées à chaque requête
 
 **Solution 1: Update Background Job**
+
 ```typescript
 // Créer Edge Function: sync-service-counts
 // Cron: Toutes les 5 minutes
 export async function syncServiceCounts() {
   const topCountries = [187, 4, 6, 22, 12]; // USA, PH, ID, IN, UK
-  
-  const { data } = await supabase.functions.invoke('get-services-counts', {
-    body: { countries: topCountries }
+
+  const { data } = await supabase.functions.invoke("get-services-counts", {
+    body: { countries: topCountries },
   });
-  
+
   const counts = data.counts; // { wa: 245000, tg: 158000, ... }
-  
+
   // BATCH UPDATE services.total_available
   for (const [code, count] of Object.entries(counts)) {
     await supabase
-      .from('services')
+      .from("services")
       .update({ total_available: count })
-      .eq('code', code);
+      .eq("code", code);
   }
-  
+
   console.log(`✅ Updated ${Object.keys(counts).length} service counts`);
 }
 ```
 
 **Déploiement:**
+
 ```bash
 # Créer Edge Function
 supabase functions new sync-service-counts
@@ -829,23 +883,25 @@ supabase functions deploy sync-service-counts
 ```
 
 **Bénéfices:**
+
 - ✅ Counts toujours à jour (max 5min retard)
 - ✅ Frontend peut lire directement depuis DB
 - ✅ Moins d'appels API SMS-Activate
 - ✅ Cache React Query efficace
 
 **Solution 2: Cache Redis**
+
 ```typescript
 // Alternative: Utiliser Redis pour cache distribué
-import { Redis } from '@upstash/redis';
+import { Redis } from "@upstash/redis";
 
 const redis = new Redis({ url: REDIS_URL, token: REDIS_TOKEN });
 
 // Cache counts pendant 5 minutes
-await redis.setex('service:counts', 300, JSON.stringify(counts));
+await redis.setex("service:counts", 300, JSON.stringify(counts));
 
 // Lecture depuis cache
-const cached = await redis.get('service:counts');
+const cached = await redis.get("service:counts");
 if (cached) {
   return JSON.parse(cached);
 }
@@ -854,50 +910,59 @@ if (cached) {
 ### 7.2 🌍 Optimisation Pays
 
 **Problème actuel:**
+
 - Counts approximatifs (`count: 999`)
 - Pas de vérification disponibilité réelle
 
 **Solution: get-country-availability Edge Function**
+
 ```typescript
 // Nouvelle Edge Function
-export async function getCountryAvailability(service: string, countries: number[]) {
+export async function getCountryAvailability(
+  service: string,
+  countries: number[]
+) {
   const availability = {};
-  
+
   // Paralléliser les appels par pays
-  await Promise.all(countries.map(async (countryId) => {
-    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${API_KEY}&action=getNumbersStatus&country=${countryId}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    // Extraire count pour service spécifique
-    const count = data[service] || 0;
-    availability[countryId] = count;
-  }));
-  
+  await Promise.all(
+    countries.map(async (countryId) => {
+      const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${API_KEY}&action=getNumbersStatus&country=${countryId}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      // Extraire count pour service spécifique
+      const count = data[service] || 0;
+      availability[countryId] = count;
+    })
+  );
+
   return availability;
 }
 ```
 
 **Usage frontend:**
+
 ```typescript
-const { data } = await supabase.functions.invoke('get-country-availability', {
-  body: { 
-    service: 'wa',
-    countries: [187, 4, 6, 22, 12]
-  }
+const { data } = await supabase.functions.invoke("get-country-availability", {
+  body: {
+    service: "wa",
+    countries: [187, 4, 6, 22, 12],
+  },
 });
 
 // data = { 187: 125000, 4: 45000, 6: 32000, 22: 68000, 12: 15000 }
 
 // Mapper vers UI
-return topCountries.map(country => ({
+return topCountries.map((country) => ({
   ...country,
-  count: data[country.id] || 0,  // ✅ Vraies quantités
-  available: data[country.id] > 0
+  count: data[country.id] || 0, // ✅ Vraies quantités
+  available: data[country.id] > 0,
 }));
 ```
 
 **Bénéfices:**
+
 - ✅ Quantités précises par pays
 - ✅ Filtrer pays indisponibles
 - ✅ Tri par disponibilité réelle
@@ -905,28 +970,30 @@ return topCountries.map(country => ({
 ### 7.3 💰 Optimisation Prix
 
 **Problème actuel:**
+
 - Sync complète 30-45s (lourd)
 - Pas de sync partielle
 - Pas de détection changements
 
 **Solution 1: Sync Partielle**
+
 ```typescript
 // Sync uniquement services populaires (top 50)
 export async function syncPopularServicesOnly() {
   const popularServices = await supabase
-    .from('services')
-    .select('code')
-    .gte('popularity_score', 50)
-    .order('popularity_score', { ascending: false });
-  
-  const serviceCodes = popularServices.data.map(s => s.code);
-  
+    .from("services")
+    .select("code")
+    .gte("popularity_score", 50)
+    .order("popularity_score", { ascending: false });
+
+  const serviceCodes = popularServices.data.map((s) => s.code);
+
   // Fetch prices seulement pour ces services
   for (const code of serviceCodes) {
     const url = `https://5sim.net/v1/guest/prices?product=${code}`;
     const response = await fetch(url);
     const data = await response.json();
-    
+
     // Update pricing_rules pour ce service uniquement
     await updatePricingForService(code, data);
   }
@@ -934,33 +1001,35 @@ export async function syncPopularServicesOnly() {
 ```
 
 **Solution 2: Delta Sync**
+
 ```typescript
 // Détecter changements uniquement
 export async function syncPriceChanges() {
   const newPrices = await fetch5simPrices();
   const oldPrices = await loadCurrentPrices();
-  
+
   const changes = [];
   for (const [key, newPrice] of Object.entries(newPrices)) {
     const oldPrice = oldPrices[key];
-    
+
     // Changement détecté si > 5%
     if (!oldPrice || Math.abs(newPrice - oldPrice) / oldPrice > 0.05) {
       changes.push({ key, oldPrice, newPrice });
     }
   }
-  
+
   // Update seulement les prix modifiés
   if (changes.length > 0) {
     await batchUpdatePrices(changes);
     console.log(`✅ Updated ${changes.length} price changes`);
   } else {
-    console.log('✅ No price changes detected');
+    console.log("✅ No price changes detected");
   }
 }
 ```
 
 **Solution 3: Cron Sync Auto**
+
 ```typescript
 // Sync auto toutes les heures
 // Supabase Cron Job
@@ -970,7 +1039,7 @@ export async function syncPriceChanges() {
 export async function autoSyncPrices() {
   const now = new Date();
   const hour = now.getHours();
-  
+
   // Peak hours: sync complète
   if (hour >= 8 && hour <= 22) {
     await triggerSync(); // Sync complète
@@ -984,44 +1053,46 @@ export async function autoSyncPrices() {
 ### 7.4 🔔 Notifications Admin
 
 **Amélioration: Alertes temps réel**
+
 ```typescript
 // Notifications dans AdminDashboard
 export function AdminNotifications() {
   const { data: alerts } = useQuery({
-    queryKey: ['admin-alerts'],
+    queryKey: ["admin-alerts"],
     queryFn: async () => {
       // Services en rupture de stock
       const outOfStock = await supabase
-        .from('services')
-        .select('name, total_available')
-        .lte('total_available', 100)
-        .eq('active', true);
-      
+        .from("services")
+        .select("name, total_available")
+        .lte("total_available", 100)
+        .eq("active", true);
+
       // Pays avec taux < 90%
       const lowSuccessRate = await supabase
-        .from('countries')
-        .select('name, success_rate')
-        .lt('success_rate', 90.0);
-      
+        .from("countries")
+        .select("name, success_rate")
+        .lt("success_rate", 90.0);
+
       // Dernière sync > 6h
       const lastSync = await supabase
-        .from('sync_logs')
-        .select('started_at')
-        .order('started_at', { ascending: false })
+        .from("sync_logs")
+        .select("started_at")
+        .order("started_at", { ascending: false })
         .limit(1)
         .single();
-      
-      const hoursSinceSync = (Date.now() - new Date(lastSync.started_at).getTime()) / 3600000;
-      
+
+      const hoursSinceSync =
+        (Date.now() - new Date(lastSync.started_at).getTime()) / 3600000;
+
       return {
         outOfStock: outOfStock.data || [],
         lowSuccessRate: lowSuccessRate.data || [],
-        syncTooOld: hoursSinceSync > 6
+        syncTooOld: hoursSinceSync > 6,
       };
     },
-    refetchInterval: 60000 // Check every minute
+    refetchInterval: 60000, // Check every minute
   });
-  
+
   return (
     <div className="alerts">
       {alerts?.outOfStock.length > 0 && (
@@ -1031,7 +1102,8 @@ export function AdminNotifications() {
       )}
       {alerts?.syncTooOld && (
         <Alert variant="warning">
-          ⚠️ Dernière sync il y a {hoursSinceSync.toFixed(1)}h - Sync recommandée
+          ⚠️ Dernière sync il y a {hoursSinceSync.toFixed(1)}h - Sync
+          recommandée
         </Alert>
       )}
     </div>
@@ -1046,6 +1118,7 @@ export function AdminNotifications() {
 ### Phase 1: Corrections Critiques (FAIT ✅)
 
 **1.1 Corriger erreur `interval is not defined`**
+
 - ✅ Fichier: `/src/hooks/useSmsPolling.ts`
 - ✅ Ligne 184: Supprimé référence variable inexistante
 - ✅ Changé `clearInterval` → `clearTimeout`
@@ -1053,6 +1126,7 @@ export function AdminNotifications() {
 - ✅ Testé: Polling fonctionne correctement
 
 **Résultat:**
+
 ```
 ✅ Polling SMS fonctionnel
 ✅ Détection en 3-30s selon stratégie adaptive
@@ -1063,6 +1137,7 @@ export function AdminNotifications() {
 ### Phase 2: Optimisations Court Terme (1-2 jours)
 
 **2.1 Créer sync-service-counts Background Job**
+
 ```bash
 # Créer Edge Function
 cd supabase/functions
@@ -1076,6 +1151,7 @@ supabase functions deploy sync-service-counts
 ```
 
 **2.2 Créer get-country-availability Edge Function**
+
 ```bash
 supabase functions new get-country-availability
 # Code (voir section 7.2)
@@ -1083,50 +1159,57 @@ supabase functions deploy get-country-availability
 ```
 
 **2.3 Modifier DashboardPage.tsx**
+
 ```typescript
 // Utiliser vrais counts depuis DB
 const { data: services } = useQuery({
-  queryKey: ['services'],
+  queryKey: ["services"],
   queryFn: async () => {
     const { data } = await supabase
-      .from('services')
-      .select('*')
-      .gt('total_available', 0)  // ✅ Maintenant à jour via Cron
-      .order('popularity_score', { ascending: false });
+      .from("services")
+      .select("*")
+      .gt("total_available", 0) // ✅ Maintenant à jour via Cron
+      .order("popularity_score", { ascending: false });
     return data;
   },
-  staleTime: 30000
+  staleTime: 30000,
 });
 
 // Utiliser vrais counts pays
 const { data: countries } = useQuery({
-  queryKey: ['countries', selectedService?.code],
+  queryKey: ["countries", selectedService?.code],
   queryFn: async () => {
-    const { data } = await supabase.functions.invoke('get-country-availability', {
-      body: { 
-        service: selectedService.code,
-        countries: [187, 4, 6, 22, 12]
+    const { data } = await supabase.functions.invoke(
+      "get-country-availability",
+      {
+        body: {
+          service: selectedService.code,
+          countries: [187, 4, 6, 22, 12],
+        },
       }
-    });
+    );
     // Mapper avec vraies quantités
-  }
+  },
 });
 ```
 
 ### Phase 3: Optimisations Moyen Terme (1 semaine)
 
 **3.1 Sync Partielle Intelligente**
+
 - Implémenter `syncPopularServicesOnly()`
 - Détecter changements de prix (delta sync)
 - Cron jobs différenciés peak/off-peak
 
 **3.2 Dashboard Admin Amélioré**
+
 - Notifications temps réel (ruptures stock, taux bas)
 - Graphiques évolution prix
 - Historique sync détaillé
 - Logs performance API
 
 **3.3 Cache Redis (optionnel)**
+
 - Upstash Redis pour cache distribué
 - TTL 5 minutes pour counts
 - Réduction charge DB
@@ -1134,17 +1217,20 @@ const { data: countries } = useQuery({
 ### Phase 4: Optimisations Long Terme (1 mois)
 
 **4.1 Webhooks SMS-Activate**
+
 - Configuration webhooks pour détection <1s
 - Fallback polling si webhook fail
 - Logs détaillés réception SMS
 
 **4.2 Analytics Avancés**
+
 - Services les plus vendus
 - Pays les plus populaires
 - Revenus par service/pays
 - Taux conversion
 
 **4.3 Auto-scaling**
+
 - Monitoring disponibilité services
 - Auto-disable services rupture stock
 - Auto-enable quand stock revient
@@ -1164,10 +1250,12 @@ const { data: countries } = useQuery({
 ### ⚠️ Problèmes Identifiés
 
 2. **Services: `total_available` pas mis à jour**
+
    - Frontend contourne via `get-services-counts`
    - Solution: Cron job toutes les 5 min
 
 3. **Pays: Counts approximatifs (`999`)**
+
    - Données statiques hardcodées
    - Solution: Edge Function `get-country-availability`
 
@@ -1194,12 +1282,14 @@ ADMIN FLOW:
 ### 📈 Performances
 
 **Actuelles:**
+
 - Services load: 1-2s (Edge Function + 3 pays)
 - Pays load: <1s (Statiques + pricing_rules)
 - Prix sync: 30-45s (15,247 règles BATCH 250)
 - SMS detection: 3-30s (Adaptive polling)
 
 **Cibles après optimisations:**
+
 - Services load: <500ms (DB directe + Cron)
 - Pays load: <500ms (Edge Function + cache)
 - Prix sync: 10-15s (Delta sync + populaires)
@@ -1243,33 +1333,33 @@ npx supabase functions serve get-services-counts
 
 ```sql
 -- Vérifier counts services
-SELECT code, name, total_available 
-FROM services 
-WHERE active = true 
-ORDER BY popularity_score DESC 
+SELECT code, name, total_available
+FROM services
+WHERE active = true
+ORDER BY popularity_score DESC
 LIMIT 20;
 
 -- Vérifier pricing rules
-SELECT service_code, country_code, 
-       activation_cost, activation_price, 
+SELECT service_code, country_code,
+       activation_cost, activation_price,
        available_count, last_synced_at
-FROM pricing_rules 
-WHERE active = true 
-ORDER BY last_synced_at DESC 
+FROM pricing_rules
+WHERE active = true
+ORDER BY last_synced_at DESC
 LIMIT 50;
 
 -- Stats globales
-SELECT 
+SELECT
   COUNT(DISTINCT service_code) as total_services,
   COUNT(DISTINCT country_code) as total_countries,
   COUNT(*) as total_rules,
   SUM(available_count) as total_available
-FROM pricing_rules 
+FROM pricing_rules
 WHERE active = true;
 
 -- Dernière sync
-SELECT * FROM sync_logs 
-ORDER BY started_at DESC 
+SELECT * FROM sync_logs
+ORDER BY started_at DESC
 LIMIT 1;
 ```
 
@@ -1278,12 +1368,14 @@ LIMIT 1;
 ## 📞 SUPPORT
 
 **Questions / Problèmes:**
+
 1. Consulter ce document
 2. Vérifier logs Edge Functions: `npx supabase functions logs`
 3. Vérifier logs Frontend: `pm2 logs`
 4. Vérifier DB: Utiliser SQL queries ci-dessus
 
 **Monitoring:**
+
 - Admin Dashboard: https://app.onesms.com/admin
 - Supabase Dashboard: https://supabase.com/dashboard
 - Database: PostgreSQL via Supabase
@@ -1292,5 +1384,5 @@ LIMIT 1;
 ---
 
 **FIN DU RAPPORT**  
-*Généré le: 24 Novembre 2024*  
-*Version: 1.0*
+_Généré le: 24 Novembre 2024_  
+_Version: 1.0_

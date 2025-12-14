@@ -27,6 +27,7 @@ La Phase 2 (Optimisations Court Terme) a été **complétée avec succès**. Tou
 **Localisation:** `/supabase/functions/sync-service-counts/index.ts`
 
 **Fonctionnalité:**
+
 - Scanne TOP 5 pays: USA (187), Philippines (4), Indonesia (6), India (22), England (12)
 - Appelle SMS-Activate API `getNumbersStatus` en parallèle
 - Agrège les counts par service (ex: wa, tg, fb)
@@ -34,12 +35,14 @@ La Phase 2 (Optimisations Court Terme) a été **complétée avec succès**. Tou
 - Log dans `sync_logs` table
 
 **Performance:**
+
 - ⏱️ Durée: 5-10s pour 5 pays
 - 📡 Requêtes: 5 API calls parallèles
 - 💾 Update: 200-250 services en 1 BATCH
 - ✅ Fiabilité: Fallback + error logging
 
 **Déploiement:**
+
 ```bash
 ✅ Deployed: sync-service-counts (script size: 66.44kB)
 ✅ URL: https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-service-counts
@@ -47,6 +50,7 @@ La Phase 2 (Optimisations Court Terme) a été **complétée avec succès**. Tou
 ```
 
 **Exemple response:**
+
 ```json
 {
   "success": true,
@@ -70,18 +74,21 @@ La Phase 2 (Optimisations Court Terme) a été **complétée avec succès**. Tou
 **Localisation:** `/supabase/functions/get-country-availability/index.ts`
 
 **Fonctionnalité:**
+
 - Reçoit: `{ service: "wa", countries: [187, 4, 6, ...] }`
 - Scanne chaque pays pour le service spécifique
 - Retourne quantités précises par pays
 - Tri automatique par disponibilité DESC
 
 **Performance:**
+
 - ⏱️ Durée: 2-5s pour 10 pays
 - 📡 Requêtes: 10 API calls parallèles
 - ✅ Filtering: Seulement pays disponibles
 - 🎯 Précision: Counts réels API SMS-Activate
 
 **Déploiement:**
+
 ```bash
 ✅ Deployed: get-country-availability (script size: 22.02kB)
 ✅ URL: https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-country-availability
@@ -89,6 +96,7 @@ La Phase 2 (Optimisations Court Terme) a été **complétée avec succès**. Tou
 ```
 
 **Exemple response:**
+
 ```json
 {
   "success": true,
@@ -122,96 +130,105 @@ La Phase 2 (Optimisations Court Terme) a été **complétée avec succès**. Tou
 ### DashboardPage.tsx - Changements
 
 **AVANT (ligne 125-172):**
+
 ```typescript
 // ❌ ANCIEN: Appel Edge Function à chaque chargement
 const { data: services } = useQuery({
   queryFn: async () => {
     const staticServices = getAllServices();
-    const { data } = await supabase.functions.invoke('get-services-counts', {
-      body: { countries: [187, 4, 6] }
+    const { data } = await supabase.functions.invoke("get-services-counts", {
+      body: { countries: [187, 4, 6] },
     });
-    return staticServices.map(s => ({
+    return staticServices.map((s) => ({
       ...s,
-      count: data.counts[s.code] || 0
+      count: data.counts[s.code] || 0,
     }));
   },
-  staleTime: 30000
+  staleTime: 30000,
 });
 ```
 
 **APRÈS:**
+
 ```typescript
 // ✅ NOUVEAU: Lecture directe DB (mise à jour par Cron)
 const { data: services } = useQuery({
   queryFn: async () => {
     const { data: dbServices } = await supabase
-      .from('services')
-      .select('code, name, total_available, ...')
-      .eq('active', true)
-      .gt('total_available', 0)
-      .order('popularity_score', { ascending: false });
-    
-    return dbServices.map(s => ({
+      .from("services")
+      .select("code, name, total_available, ...")
+      .eq("active", true)
+      .gt("total_available", 0)
+      .order("popularity_score", { ascending: false });
+
+    return dbServices.map((s) => ({
       id: s.code,
       name: s.display_name || s.name,
       code: s.code,
-      count: s.total_available
+      count: s.total_available,
     }));
   },
-  staleTime: 30000
+  staleTime: 30000,
 });
 ```
 
 **AVANT (ligne 228-268):**
+
 ```typescript
 // ❌ ANCIEN: Données statiques, counts approximatifs (999)
 const { data: countries } = useQuery({
   queryFn: async () => {
-    const topCountries = SMS_ACTIVATE_COUNTRIES.filter(c => c.popular);
-    return topCountries.map(c => ({
+    const topCountries = SMS_ACTIVATE_COUNTRIES.filter((c) => c.popular);
+    return topCountries.map((c) => ({
       ...c,
       count: 999, // Approximatif
-      successRate: 95
+      successRate: 95,
     }));
-  }
+  },
 });
 ```
 
 **APRÈS:**
+
 ```typescript
 // ✅ NOUVEAU: Vraies quantités via Edge Function
 const { data: countries } = useQuery({
   queryFn: async () => {
-    const { data } = await supabase.functions.invoke('get-country-availability', {
-      body: { 
-        service: selectedService.code,
-        countries: [187, 4, 6, 22, 12, 36, 78, 43, 52, 10]
+    const { data } = await supabase.functions.invoke(
+      "get-country-availability",
+      {
+        body: {
+          service: selectedService.code,
+          countries: [187, 4, 6, 22, 12, 36, 78, 43, 52, 10],
+        },
       }
-    });
-    
+    );
+
     return data.availability
-      .filter(c => c.available > 0)
-      .map(c => ({
+      .filter((c) => c.available > 0)
+      .map((c) => ({
         id: c.countryId.toString(),
         name: c.countryName,
         code: c.countryCode,
         count: c.available, // ✅ Vraies quantités
         successRate: successRateMap.get(c.countryCode) || 95,
-        price: priceMap.get(c.countryCode) || 1.0
+        price: priceMap.get(c.countryCode) || 1.0,
       }));
   },
-  staleTime: 30000
+  staleTime: 30000,
 });
 ```
 
 ### Performance Frontend
 
 **AVANT:**
+
 - Services load: 1-2s (Edge Function + 3 pays)
 - Pays load: <1s (Statiques)
 - Counts: Approximatifs (999)
 
 **APRÈS:**
+
 - Services load: <500ms (DB directe)
 - Pays load: 2-5s (Edge Function + 10 pays)
 - Counts: ✅ **Précis** (API réelle)
@@ -225,10 +242,11 @@ const { data: countries } = useQuery({
 **Fichier créé:** `.github/workflows/sync-service-counts.yml`
 
 **Configuration:**
+
 ```yaml
 on:
   schedule:
-    - cron: '*/5 * * * *' # Toutes les 5 minutes
+    - cron: "*/5 * * * *" # Toutes les 5 minutes
   workflow_dispatch: # Déclenchement manuel
 
 jobs:
@@ -244,11 +262,13 @@ jobs:
 ```
 
 **Activation:**
+
 1. ✅ Fichier créé dans `.github/workflows/`
 2. ⏳ À faire: Push sur GitHub
 3. ⏳ À faire: Configurer secret `SUPABASE_SERVICE_ROLE_KEY`
 
 **Avantages:**
+
 - ✅ Gratuit (2000 minutes/mois)
 - ✅ Logs détaillés
 - ✅ Retry automatique
@@ -258,6 +278,7 @@ jobs:
 ### Option 2: Cron-job.org
 
 **Configuration:**
+
 - URL: `https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-service-counts`
 - Schedule: `*/5 * * * *`
 - Method: POST
@@ -266,6 +287,7 @@ jobs:
 ### Option 3: PostgreSQL pg_cron
 
 **SQL à exécuter:**
+
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
@@ -285,16 +307,19 @@ SELECT cron.schedule(
 ### Performance Gains
 
 **Services:**
+
 - ⚡ **Load time:** 1-2s → **<500ms** (60% plus rapide)
 - 📡 **API calls:** À chaque requête → **Jamais** (cache DB)
 - 🎯 **Fraîcheur:** Temps réel → **Max 5 min retard** (acceptable)
 
 **Pays:**
+
 - 🎯 **Counts:** Approximatifs (999) → **Précis** (API réelle)
 - 📊 **Pays scannés:** 5-10 → **10 pays** (meilleure couverture)
 - ⏱️ **Load time:** <1s → **2-5s** (acceptable pour précision)
 
 **Utilisateur:**
+
 - ✅ Services disponibles toujours à jour
 - ✅ Quantités précises par pays
 - ✅ Meilleure expérience de sélection
@@ -335,6 +360,7 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sync-service
 ### ⏳ Test 4: Cron Job (À faire)
 
 Après activation GitHub Actions:
+
 1. Vérifier logs GitHub Actions
 2. Vérifier `sync_logs` table
 3. Vérifier `services.total_available` mis à jour
@@ -346,6 +372,7 @@ Après activation GitHub Actions:
 ### 1. CONFIGURATION_CRON_JOBS.md
 
 **Contenu:**
+
 - 3 options de configuration Cron
 - Instructions détaillées pour chaque option
 - Commandes SQL pour pg_cron
@@ -355,8 +382,9 @@ Après activation GitHub Actions:
 ### 2. .github/workflows/sync-service-counts.yml
 
 **Contenu:**
+
 - Workflow GitHub Actions prêt à l'emploi
-- Cron schedule: */5 * * * *
+- Cron schedule: _/5 _ \* \* \*
 - Error handling et logs
 - Manual trigger enabled
 
@@ -367,6 +395,7 @@ Après activation GitHub Actions:
 ### Immédiat (À faire maintenant)
 
 1. **Push GitHub Actions workflow**
+
    ```bash
    git add .github/workflows/sync-service-counts.yml
    git commit -m "feat: Add GitHub Actions cron for sync-service-counts"
@@ -374,6 +403,7 @@ Après activation GitHub Actions:
    ```
 
 2. **Configurer Secret GitHub**
+
    - Aller dans Settings → Secrets → Actions
    - Créer `SUPABASE_SERVICE_ROLE_KEY`
    - Valeur: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzYyNDgyOCwiZXhwIjoyMDc5MjAwODI4fQ.i31PDBp-K02RqZs35gfqEUQp9OHtxEQ6FqwfBV33wac`
@@ -386,6 +416,7 @@ Après activation GitHub Actions:
 ### Court terme (Cette semaine)
 
 4. **Corriger auth Edge Function**
+
    - Modifier Edge Functions pour accepter service_role_key
    - Ou utiliser anon key + vérification interne
 
@@ -407,15 +438,15 @@ Après activation GitHub Actions:
 
 ### Objectifs Phase 2
 
-| Métrique | Avant | Après | Objectif | Statut |
-|----------|-------|-------|----------|--------|
-| Services load time | 1-2s | <500ms | <500ms | ✅ Atteint |
-| Pays load time | <1s | 2-5s | <5s | ✅ Atteint |
-| Counts précision | Approximatif | Précis | Précis | ✅ Atteint |
-| API calls services | Chaque req | Jamais | Jamais | ✅ Atteint |
-| API calls pays | 0 | 10 | <15 | ✅ Atteint |
-| Edge Functions | 1 | 3 | 2+ | ✅ Dépassé |
-| Cron jobs | 0 | 1 | 1 | ✅ Config prête |
+| Métrique           | Avant        | Après  | Objectif | Statut          |
+| ------------------ | ------------ | ------ | -------- | --------------- |
+| Services load time | 1-2s         | <500ms | <500ms   | ✅ Atteint      |
+| Pays load time     | <1s          | 2-5s   | <5s      | ✅ Atteint      |
+| Counts précision   | Approximatif | Précis | Précis   | ✅ Atteint      |
+| API calls services | Chaque req   | Jamais | Jamais   | ✅ Atteint      |
+| API calls pays     | 0            | 10     | <15      | ✅ Atteint      |
+| Edge Functions     | 1            | 3      | 2+       | ✅ Dépassé      |
+| Cron jobs          | 0            | 1      | 1        | ✅ Config prête |
 
 ### KPIs
 
@@ -459,9 +490,9 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-country-
 
 ```sql
 -- Vérifier dernières syncs
-SELECT * FROM sync_logs 
+SELECT * FROM sync_logs
 WHERE sync_type = 'services'
-ORDER BY started_at DESC 
+ORDER BY started_at DESC
 LIMIT 10;
 
 -- Vérifier services mis à jour
@@ -483,13 +514,13 @@ LIMIT 20;
 ✅ **Performance** améliorée de 60%  
 ✅ **Cron job** configuré (GitHub Actions)  
 ✅ **Documentation** complète créée  
-✅ **Build & Deploy** réussi (#124)  
+✅ **Build & Deploy** réussi (#124)
 
 **Prochaine étape:** Activer GitHub Actions et passer à la Phase 3! 🚀
 
 ---
 
 **FIN DU RAPPORT PHASE 2**  
-*Généré le: 24 Novembre 2024*  
-*Durée totale: ~30 minutes*  
-*Version: 1.0*
+_Généré le: 24 Novembre 2024_  
+_Durée totale: ~30 minutes_  
+_Version: 1.0_

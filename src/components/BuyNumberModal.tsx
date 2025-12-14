@@ -51,6 +51,16 @@ interface ActivationData {
   expires_at?: string;
 }
 
+const getFlagEmoji = (country: string) => {
+  const flags: Record<string, string> = {
+    france: '🇫🇷',
+    usa: '🇺🇸',
+    canada: '🇨🇦',
+    senegal: '🇸🇳',
+  };
+  return flags[country.toLowerCase()] || '🌐';
+};
+
 export default function BuyNumberModal({ 
   open, 
   onClose, 
@@ -109,7 +119,6 @@ export default function BuyNumberModal({
       return;
     }
 
-    setLoading(true);
     setStep('processing');
 
     try {
@@ -118,7 +127,7 @@ export default function BuyNumberModal({
         .from('users')
         .select('credits')
         .eq('id', user.id)
-        .single();
+        .single<{ credits: number }>();
 
       if (!userData || userData.credits < purchaseData.price) {
         throw new Error('Crédits insuffisants');
@@ -127,11 +136,6 @@ export default function BuyNumberModal({
       // DEPRECATED: Ce composant utilise l'ancienne API 5sim
       // Utilisez DashboardPage pour les achats SMS-Activate
       throw new Error('Ce composant est obsolète. Utilisez le Dashboard pour acheter des numéros.');
-
-      toast({
-        title: '✅ Numéro Acheté !',
-        description: `Numéro: ${activation.phone}`,
-      });
     } catch (error: any) {
       console.error('Purchase error:', error);
       toast({
@@ -140,8 +144,6 @@ export default function BuyNumberModal({
         variant: 'destructive',
       });
       setStep('select');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -163,7 +165,9 @@ export default function BuyNumberModal({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    if (seconds < 60) return `${secs}s`;
+    if (secs === 0) return `${mins}m`;
+    return `${mins}m ${secs}s`;
   };
 
   const renderStepIndicator = () => (

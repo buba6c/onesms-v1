@@ -1,8 +1,9 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.org/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,41 +32,94 @@ const SERVICE_CODE_MAP: Record<string, string> = {
   'steam': 'st'
 }
 
-// Country code mapping
+// Country code mapping (ISO 2-letter codes to SMS-Activate IDs)
 const COUNTRY_CODE_MAP: Record<string, number> = {
-  'russia': 0,
-  'ukraine': 1,
-  'kazakhstan': 2,
-  'china': 3,
-  'philippines': 4,
-  'indonesia': 6,
-  'malaysia': 7,
-  'vietnam': 10,
-  'kyrgyzstan': 11,
-  'england': 12,
-  'usa': 187,
-  'canada': 36,
-  'india': 22,
-  'thailand': 52,
-  'poland': 15,
-  'brazil': 73,
-  'romania': 32,
-  'colombia': 33,
-  'argentina': 39,
-  'italy': 58,
-  'spain': 56,
-  'france': 78,
-  'germany': 43,
-  'mexico': 82,
-  'australia': 175
+  // Par noms complets (legacy)
+  'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
+  'myanmar': 5, 'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'tanzania': 9,
+  'vietnam': 10, 'kyrgyzstan': 11, 'england': 12, 'israel': 13, 'hongkong': 14,
+  'poland': 15, 'egypt': 16, 'nigeria': 17, 'morocco': 19, 'ghana': 20,
+  'argentina': 21, 'india': 22, 'uzbekistan': 23, 'cambodia': 24, 'germany': 27,
+  'romania': 32, 'colombia': 33, 'canada': 36, 'mexico': 38, 'spain': 40,
+  'thailand': 52, 'portugal': 56, 'italy': 58, 'brazil': 45, 'france': 78,
+  'australia': 175, 'usa': 187,
+  // Par codes ISO 2 lettres (priorité) - COMPLET
+  'ru': 0, 'ua': 1, 'kz': 2, 'cn': 3, 'ph': 4,
+  'mm': 5, 'id': 6, 'my': 7, 'ke': 8, 'tz': 9,
+  'vn': 10, 'kg': 11, 'gb': 12, 'uk': 12, 'il': 13, 'hk': 14,
+  'pl': 15, 'eg': 16, 'ng': 17, 'mo': 18, 'ma': 19,
+  'gh': 20, 'ar': 21, 'in': 22, 'uz': 23, 'kh': 24,
+  'cm': 25, 'td': 26, 'de': 27, 'lt': 28, 'hr': 29,
+  'se': 30, 'iq': 31, 'ro': 32, 'co': 33, 'at': 34,
+  'by': 35, 'ca': 36, 'sa': 37, 'mx': 38, 'za': 39,
+  'es': 40, 'ir': 41, 'dz': 42, 'nl': 43, 'bd': 44,
+  'br': 45, 'tr': 46, 'jp': 47, 'kr': 48, 'tw': 49,
+  'sg': 50, 'ae': 51, 'th': 52, 'pk': 53, 'np': 54,
+  'lk': 55, 'pt': 56, 'nz': 57, 'it': 58, 'be': 59,
+  'ch': 60, 'gr': 61, 'cz': 62, 'hu': 63, 'dk': 64,
+  'no': 65, 'fi': 66, 'ie': 67, 'sk': 68, 'bg': 69,
+  'rs': 70, 'si': 71, 'mk': 72, 'pe': 73, 'cl': 74,
+  'ec': 75, 've': 76, 'bo': 77, 'fr': 78, 'py': 79, 'uy': 80,
+  'cr': 81, 'pa': 82, 'do': 83, 'sv': 84, 'gt': 85,
+  'hn': 86, 'ni': 87, 'cu': 88, 'ht': 89, 'jm': 90,
+  'tt': 91, 'pr': 92, 'bb': 93, 'bs': 94,
+  'af': 108, 'la': 117, 'sd': 129, 'jo': 141, 'ps': 163,
+  'bh': 165, 'et': 172, 'au': 175, 'us': 187
 }
 
 const mapServiceCode = (code: string): string => {
   return SERVICE_CODE_MAP[code.toLowerCase()] || code
 }
 
-const mapCountryCode = (country: string): number => {
-  return COUNTRY_CODE_MAP[country.toLowerCase()] || 2 // Default: Kazakhstan
+const mapCountryCode = (country: string | number): number => {
+  // Accepte soit un code ISO (string), soit un ID numérique déjà prêt
+  if (typeof country === 'number') {
+    return Number.isFinite(country) ? country : 2
+  }
+  const trimmed = (country || '').toString().trim().toLowerCase()
+  if (!trimmed) return 2
+  // Si on reçoit un code numérique sous forme de string, on le renvoie directement
+  const maybeNum = Number(trimmed)
+  if (!Number.isNaN(maybeNum)) return maybeNum
+  return COUNTRY_CODE_MAP[trimmed] ?? 2 // Default: Kazakhstan (2)
+}
+
+// Normalise la date de fin retournée par SMS-Activate (string, seconds, ms) vers un ISO UTC
+const normalizeEndDate = (raw: unknown, rentTimeHours: number): string => {
+  const now = Date.now()
+  const expectedMs = rentTimeHours * 3600 * 1000
+  const fallback = () => new Date(now + expectedMs).toISOString()
+
+  const coerce = (val: number | string): number | null => {
+    if (typeof val === 'number') {
+      const ts = val < 1e12 ? val * 1000 : val
+      return Number.isFinite(ts) ? ts : null
+    }
+    if (typeof val === 'string') {
+      const trimmed = val.trim()
+      // Priorité: date/time brute "YYYY-MM-DD HH:mm:ss" => ne PAS ajouter de fuseau, on la parse comme locale puis on la remet en ISO UTC
+      const isoish = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T')
+      const parsedLocal = Date.parse(isoish)
+      if (!Number.isNaN(parsedLocal)) return parsedLocal
+      const num = Number(trimmed)
+      if (!Number.isNaN(num)) {
+        const ts = num < 1e12 ? num * 1000 : num
+        return Number.isFinite(ts) ? ts : null
+      }
+    }
+    return null
+  }
+
+  const parsed = coerce(raw)
+  if (parsed === null) return fallback()
+
+  // Si l'écart est trop loin de la durée attendue (> 45 min), on force la durée nominale
+  const delta = parsed - now
+  if (Math.abs(delta - expectedMs) > 45 * 60 * 1000) {
+    return fallback()
+  }
+
+  return new Date(parsed).toISOString()
 }
 
 // Rent duration in hours
@@ -84,19 +138,23 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const authHeader = req.headers.get('Authorization') ?? ''
+
+    // User-scoped client (for auth) + admin client (bypasses RLS for writes)
+    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } }
+    })
+
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
 
     const {
       data: { user },
-    } = await supabaseClient.auth.getUser()
+    } = await supabaseUser.auth.getUser()
 
     if (!user) {
       throw new Error('Unauthorized')
@@ -111,7 +169,7 @@ serve(async (req) => {
     let serviceName = product
     
     if (product !== 'full') {
-      const { data: serviceData, error: serviceError } = await supabaseClient
+      const { data: serviceData, error: serviceError } = await supabaseAdmin
         .from('services')
         .select('*')
         .eq('code', product)
@@ -172,9 +230,9 @@ serve(async (req) => {
     console.log(`💰 [BUY-RENT] Final rent price: $${price} for ${rentTime} hours using service: ${actualService}`)
 
     // 3. Check user balance
-    const { data: userProfile, error: profileError } = await supabaseClient
+    const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('users')
-      .select('balance')
+      .select('balance, frozen_balance')
       .eq('id', userId)
       .single()
 
@@ -217,6 +275,8 @@ serve(async (req) => {
       phone: { id: rentId, number: phone, endDate }
     } = rentData
 
+    const normalizedEndDate = normalizeEndDate(endDate, rentTime)
+
     console.log('📞 [BUY-RENT] Number rented:', {
       rentId,
       phone,
@@ -225,8 +285,8 @@ serve(async (req) => {
       duration: rentTime
     })
 
-    // 5. Create rental record
-    const { data: rental, error: rentalError } = await supabaseClient
+    // 5. Create rental record (avec frozen_amount pour refléter le gel)
+    const { data: rental, error: rentalError } = await supabaseAdmin
       .from('rentals')
       .insert({
         user_id: userId,
@@ -239,12 +299,13 @@ serve(async (req) => {
         total_cost: price,
         hourly_rate: price / rentTime,
         status: 'active',
-        end_date: endDate,
-        expires_at: endDate, // Duplicate for compatibility
+        end_date: normalizedEndDate,
+        expires_at: normalizedEndDate, // Duplicate for compatibility
         rent_hours: rentTime,
         duration_hours: rentTime, // Duplicate for compatibility
         provider: 'sms-activate',
-        message_count: 0
+        message_count: 0,
+        frozen_amount: price
       })
       .select()
       .single()
@@ -275,25 +336,35 @@ serve(async (req) => {
       duration_hours: rental.duration_hours
     })
 
-    // 6. Deduct balance and create transaction
-    const { error: balanceError } = await supabaseClient
-      .from('users')
-      .update({ balance: userProfile.balance - price })
-      .eq('id', userId)
+    // 6. Freeze atomique via RPC (ledger + users + rental.frozen_amount)
+    const { data: freezeResult, error: freezeError } = await supabaseAdmin.rpc('secure_freeze_balance', {
+      p_user_id: userId,
+      p_amount: price,
+      p_rental_id: rental.id,
+      p_reason: `Freeze for rent ${serviceName} ${country} (${duration})`
+    })
 
-    if (balanceError) {
-      console.error('❌ [BUY-RENT] Failed to deduct balance:', balanceError)
+    if (freezeError || !freezeResult?.success) {
+      // Rollback provider rent to avoid orphan number
+      try {
+        await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rentId}&status=2`)
+      } catch (e) {
+        console.error('Failed to cancel rent on SMS-Activate after freeze failure:', e)
+      }
+      throw new Error(`Failed to freeze balance: ${freezeError?.message || 'unknown error'}`)
     }
 
-    const { error: transactionError } = await supabaseClient
+    const { error: transactionError } = await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: userId,
         type: 'rental',
         amount: -price,
         description: `Rent ${serviceName} in ${country} for ${duration}`,
-        status: 'completed',
-        related_rental_id: rental.id
+        status: 'pending',
+        related_rental_id: rental.id,
+        balance_before: userProfile.balance,
+        balance_after: userProfile.balance
       })
 
     if (transactionError) {
@@ -320,8 +391,8 @@ serve(async (req) => {
           price: price,
           total_cost: price,
           status: 'active',
-          expires: endDate,
-          end_date: endDate,
+          expires: normalizedEndDate,
+          end_date: normalizedEndDate,
           duration_hours: rentTime,
           rent_hours: rentTime
         }

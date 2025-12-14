@@ -1,0 +1,520 @@
+-- ========================================================================
+-- WALLET SECURITY: Fonctions RPC Atomiques
+-- ========================================================================
+-- Ce fichier implémente les opérations wallet avec:
+-- 1. FOR UPDATE (verrouillage pessimiste)
+-- 2. Transactions DB atomiques
+-- 3. Logs dans balance_operations
+-- 4. Validations strictes
+-- ========================================================================
+
+-- Drop existing table if exists to recreate cleanly
+DROP TABLE IF EXISTS balance_operations CASCADE;
+
+-- Créer table balance_operations pour audit trail
+CREATE TABLE balance_operations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  activation_id UUID REFERENCES activations(id) ON DELETE SET NULL,
+  rental_id UUID REFERENCES rentals(id) ON DELETE SET NULL,
+  related_transaction_id UUID,  -- Store transaction ID without FK constraint
+  
+  operation_type TEXT NOT NULL CHECK (operation_type IN ('freeze', 'commit', 'refund')),
+  amount DECIMAL NOT NULL CHECK (amount > 0),
+  
+  balance_before DECIMAL NOT NULL,
+  balance_after DECIMAL NOT NULL,
+  frozen_before DECIMAL NOT NULL,
+  frozen_after DECIMAL NOT NULL,
+  
+  reason TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  
+  -- Constraints inline
+  CONSTRAINT valid_balance CHECK (balance_after >= 0),
+  CONSTRAINT valid_frozen CHECK (frozen_after >= 0 AND frozen_after <= balance_after),
+  CONSTRAINT valid_freeze_op CHECK (
+    -- Freeze: balance diminue, frozen augmente
+    (operation_type = 'freeze' AND balance_after = balance_before - amount AND frozen_after = frozen_before + amount)
+    OR
+    -- Commit: balance inchangé, frozen diminue
+    (operation_type = 'commit' AND balance_after = balance_before AND frozen_after = frozen_before - amount)
+    OR
+    -- Refund: balance augmente, frozen diminue
+    (operation_type = 'refund' AND balance_after = balance_before + amount AND frozen_after = frozen_before - amount)
+  )
+);
+
+CREATE INDEX idx_balance_ops_user ON balance_operations(user_id, created_at DESC);
+CREATE INDEX idx_balance_ops_activation ON balance_operations(activation_id);
+CREATE INDEX idx_balance_ops_rental ON balance_operations(rental_id);
+CREATE INDEX idx_balance_ops_related_tx ON balance_operations(related_transaction_id);
+CREATE INDEX idx_balance_ops_type ON balance_operations(operation_type, created_at DESC);
+
+-- ========================================================================
+-- FONCTION 1: FREEZE (Réservation de fonds)
+-- ========================================================================
+-- Utilisé lors de l'achat: balance -= prix, frozen += prix
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION atomic_freeze(
+  p_user_id UUID,
+  p_amount DECIMAL,
+  p_transaction_id UUID,
+  p_activation_id UUID DEFAULT NULL,
+  p_rental_id UUID DEFAULT NULL,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+  v_user RECORD;
+  v_available DECIMAL;
+  v_new_balance DECIMAL;
+  v_new_frozen DECIMAL;
+BEGIN
+  -- Validation
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Amount must be positive: %', p_amount;
+  END IF;
+  
+  -- 1. LOCK USER (FOR UPDATE - empêche race conditions)
+  SELECT balance, frozen_balance
+  INTO v_user
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User not found: %', p_user_id;
+  END IF;
+  
+  -- 2. CHECK AVAILABLE BALANCE
+  v_available := v_user.balance - v_user.frozen_balance;
+  IF v_available < p_amount THEN
+    RAISE EXCEPTION 'Insufficient balance: % available, % required', v_available, p_amount;
+  END IF;
+  
+  -- 3. CALCULATE NEW VALUES
+  v_new_balance := v_user.balance - p_amount;
+  v_new_frozen := v_user.frozen_balance + p_amount;
+  
+  -- 4. UPDATE USER
+  UPDATE users
+  SET 
+    balance = v_new_balance,
+    frozen_balance = v_new_frozen,
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  -- 5. UPDATE ACTIVATION/RENTAL frozen_amount
+  IF p_activation_id IS NOT NULL THEN
+    UPDATE activations
+    SET frozen_amount = p_amount
+    WHERE id = p_activation_id;
+  END IF;
+  
+  IF p_rental_id IS NOT NULL THEN
+    UPDATE rentals
+    SET frozen_amount = p_amount
+    WHERE id = p_rental_id;
+  END IF;
+  
+  -- 6. LOG OPERATION
+  INSERT INTO balance_operations (
+    user_id, 
+    activation_id,
+    rental_id,
+    related_transaction_id,
+    operation_type, 
+    amount,
+    balance_before, 
+    balance_after,
+    frozen_before, 
+    frozen_after,
+    reason
+  ) VALUES (
+    p_user_id, 
+    p_activation_id,
+    p_rental_id,
+    p_transaction_id,
+    'freeze', 
+    p_amount,
+    v_user.balance, 
+    v_new_balance,
+    v_user.frozen_balance, 
+    v_new_frozen,
+    COALESCE(p_reason, 'Credits frozen for purchase')
+  );
+  
+  -- 7. RETURN RESULT
+  RETURN json_build_object(
+    'success', true,
+    'balance_before', v_user.balance,
+    'balance_after', v_new_balance,
+    'frozen_before', v_user.frozen_balance,
+    'frozen_after', v_new_frozen,
+    'available', v_new_balance - v_new_frozen
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- FONCTION 2: COMMIT (SMS reçu / Succès)
+-- ========================================================================
+-- Utilisé quand SMS reçu: frozen -= prix, balance inchangé
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION atomic_commit(
+  p_user_id UUID,
+  p_activation_id UUID DEFAULT NULL,
+  p_rental_id UUID DEFAULT NULL,
+  p_transaction_id UUID DEFAULT NULL,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+  v_user RECORD;
+  v_frozen_amount DECIMAL;
+  v_unfreeze DECIMAL;
+  v_new_frozen DECIMAL;
+BEGIN
+  -- 1. LOCK USER
+  SELECT balance, frozen_balance
+  INTO v_user
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User not found: %', p_user_id;
+  END IF;
+  
+  -- 2. GET frozen_amount FROM ACTIVATION OR RENTAL
+  IF p_activation_id IS NOT NULL THEN
+    SELECT frozen_amount INTO v_frozen_amount
+    FROM activations
+    WHERE id = p_activation_id
+    FOR UPDATE;
+    
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Activation not found: %', p_activation_id;
+    END IF;
+  ELSIF p_rental_id IS NOT NULL THEN
+    SELECT frozen_amount INTO v_frozen_amount
+    FROM rentals
+    WHERE id = p_rental_id
+    FOR UPDATE;
+    
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Rental not found: %', p_rental_id;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'Either activation_id or rental_id must be provided';
+  END IF;
+  
+  -- 3. CALCULATE UNFREEZE (sécurisé: min entre frozen_amount et frozen_balance)
+  v_unfreeze := LEAST(v_frozen_amount, v_user.frozen_balance);
+  v_new_frozen := GREATEST(0, v_user.frozen_balance - v_unfreeze);
+  
+  -- 4. UPDATE USER (ONLY UNFREEZE, DON'T TOUCH BALANCE)
+  UPDATE users
+  SET 
+    frozen_balance = v_new_frozen,
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  -- 5. RESET frozen_amount ON ACTIVATION/RENTAL
+  IF p_activation_id IS NOT NULL THEN
+    UPDATE activations
+    SET 
+      frozen_amount = 0,
+      status = CASE WHEN status = 'waiting' THEN 'success' ELSE status END,
+      updated_at = NOW()
+    WHERE id = p_activation_id;
+  END IF;
+  
+  IF p_rental_id IS NOT NULL THEN
+    UPDATE rentals
+    SET 
+      frozen_amount = 0,
+      status = CASE WHEN status = 'active' THEN 'completed' ELSE status END,
+      updated_at = NOW()
+    WHERE id = p_rental_id;
+  END IF;
+  
+  -- 6. UPDATE TRANSACTION
+  IF p_transaction_id IS NOT NULL THEN
+    UPDATE transactions
+    SET status = 'completed', updated_at = NOW()
+    WHERE id = p_transaction_id AND status = 'pending';
+  END IF;
+  
+  -- 7. LOG OPERATION
+  INSERT INTO balance_operations (
+    user_id, 
+    activation_id,
+    rental_id,
+    related_transaction_id,
+    operation_type, 
+    amount,
+    balance_before, 
+    balance_after,
+    frozen_before, 
+    frozen_after,
+    reason
+  ) VALUES (
+    p_user_id, 
+    p_activation_id,
+    p_rental_id,
+    p_transaction_id,
+    'commit', 
+    v_unfreeze,
+    v_user.balance,
+    v_user.balance,  -- Balance inchangé
+    v_user.frozen_balance, 
+    v_new_frozen,
+    COALESCE(p_reason, 'Credits committed after success')
+  );
+  
+  -- 8. RETURN RESULT
+  RETURN json_build_object(
+    'success', true,
+    'unfrozen', v_unfreeze,
+    'balance', v_user.balance,
+    'frozen_before', v_user.frozen_balance,
+    'frozen_after', v_new_frozen
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- FONCTION 3: REFUND (Annulation / Expiration)
+-- ========================================================================
+-- Utilisé lors annulation: frozen -= prix, balance += prix
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION atomic_refund(
+  p_user_id UUID,
+  p_activation_id UUID DEFAULT NULL,
+  p_rental_id UUID DEFAULT NULL,
+  p_transaction_id UUID DEFAULT NULL,
+  p_reason TEXT DEFAULT NULL
+)
+RETURNS JSON AS $$
+DECLARE
+  v_user RECORD;
+  v_frozen_amount DECIMAL;
+  v_refund DECIMAL;
+  v_new_balance DECIMAL;
+  v_new_frozen DECIMAL;
+BEGIN
+  -- 1. LOCK USER
+  SELECT balance, frozen_balance
+  INTO v_user
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'User not found: %', p_user_id;
+  END IF;
+  
+  -- 2. GET frozen_amount FROM ACTIVATION OR RENTAL
+  IF p_activation_id IS NOT NULL THEN
+    SELECT frozen_amount INTO v_frozen_amount
+    FROM activations
+    WHERE id = p_activation_id
+    FOR UPDATE;
+    
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Activation not found: %', p_activation_id;
+    END IF;
+  ELSIF p_rental_id IS NOT NULL THEN
+    SELECT frozen_amount INTO v_frozen_amount
+    FROM rentals
+    WHERE id = p_rental_id
+    FOR UPDATE;
+    
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Rental not found: %', p_rental_id;
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'Either activation_id or rental_id must be provided';
+  END IF;
+  
+  -- 3. CALCULATE REFUND (sécurisé: min entre frozen_amount et frozen_balance)
+  v_refund := LEAST(v_frozen_amount, v_user.frozen_balance);
+  v_new_balance := v_user.balance + v_refund;
+  v_new_frozen := GREATEST(0, v_user.frozen_balance - v_refund);
+  
+  -- 4. UPDATE USER (UNFREEZE + REFUND)
+  UPDATE users
+  SET 
+    balance = v_new_balance,
+    frozen_balance = v_new_frozen,
+    updated_at = NOW()
+  WHERE id = p_user_id;
+  
+  -- 5. RESET frozen_amount AND UPDATE STATUS
+  IF p_activation_id IS NOT NULL THEN
+    UPDATE activations
+    SET 
+      frozen_amount = 0,
+      status = CASE 
+        WHEN status IN ('pending', 'waiting') THEN 'cancelled'
+        ELSE status 
+      END,
+      updated_at = NOW()
+    WHERE id = p_activation_id;
+  END IF;
+  
+  IF p_rental_id IS NOT NULL THEN
+    UPDATE rentals
+    SET 
+      frozen_amount = 0,
+      status = CASE 
+        WHEN status = 'active' THEN 'cancelled'
+        ELSE status 
+      END,
+      updated_at = NOW()
+    WHERE id = p_rental_id;
+  END IF;
+  
+  -- 6. UPDATE TRANSACTION
+  IF p_transaction_id IS NOT NULL THEN
+    UPDATE transactions
+    SET status = 'refunded', updated_at = NOW()
+    WHERE id = p_transaction_id AND status = 'pending';
+  END IF;
+  
+  -- 7. LOG OPERATION
+  INSERT INTO balance_operations (
+    user_id, 
+    activation_id,
+    rental_id,
+    related_transaction_id,
+    operation_type, 
+    amount,
+    balance_before, 
+    balance_after,
+    frozen_before, 
+    frozen_after,
+    reason
+  ) VALUES (
+    p_user_id, 
+    p_activation_id,
+    p_rental_id,
+    p_transaction_id,
+    'refund', 
+    v_refund,
+    v_user.balance,
+    v_new_balance,
+    v_user.frozen_balance, 
+    v_new_frozen,
+    COALESCE(p_reason, 'Credits refunded after cancellation')
+  );
+  
+  -- 8. RETURN RESULT
+  RETURN json_build_object(
+    'success', true,
+    'refunded', v_refund,
+    'balance_before', v_user.balance,
+    'balance_after', v_new_balance,
+    'frozen_before', v_user.frozen_balance,
+    'frozen_after', v_new_frozen
+  );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- VUE: Santé des Wallets
+-- ========================================================================
+-- Détecte les incohérences entre frozen_balance et somme des frozen_amount
+-- ========================================================================
+
+-- Drop existing view first to avoid column rename conflicts
+DROP VIEW IF EXISTS v_frozen_balance_health CASCADE;
+
+CREATE VIEW v_frozen_balance_health AS
+SELECT 
+  u.id AS user_id,
+  u.email,
+  u.balance,
+  u.frozen_balance,
+  COALESCE(SUM(a.frozen_amount), 0) AS total_frozen_in_activations,
+  COALESCE(SUM(r.frozen_amount), 0) AS total_frozen_in_rentals,
+  (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0)) AS expected_frozen,
+  u.frozen_balance - (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0)) AS frozen_diff,
+  CASE
+    WHEN u.balance < 0 THEN 'CRITICAL: Negative balance'
+    WHEN u.frozen_balance > u.balance THEN 'CRITICAL: Frozen > Balance'
+    WHEN ABS(u.frozen_balance - (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0))) > 0.01 
+      THEN 'WARNING: Frozen mismatch'
+    ELSE 'OK'
+  END AS health_status,
+  NOW() AS checked_at
+FROM users u
+LEFT JOIN activations a ON a.user_id = u.id AND a.status IN ('pending', 'waiting') AND a.frozen_amount > 0
+LEFT JOIN rentals r ON r.user_id = u.id AND r.status = 'active' AND r.frozen_amount > 0
+GROUP BY u.id, u.email, u.balance, u.frozen_balance
+HAVING 
+  u.balance < 0
+  OR u.frozen_balance > u.balance
+  OR ABS(u.frozen_balance - (COALESCE(SUM(a.frozen_amount), 0) + COALESCE(SUM(r.frozen_amount), 0))) > 0.01;
+
+-- Index pour performance
+CREATE INDEX IF NOT EXISTS idx_activations_frozen ON activations(user_id, status) WHERE frozen_amount > 0;
+CREATE INDEX IF NOT EXISTS idx_rentals_frozen ON rentals(user_id, status) WHERE frozen_amount > 0;
+
+-- ========================================================================
+-- FONCTION UTILITAIRE: Lock User Wallet (pour lecture seule)
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION lock_user_wallet(p_user_id UUID)
+RETURNS TABLE(
+  balance DECIMAL,
+  frozen_balance DECIMAL,
+  available_balance DECIMAL
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    u.balance, 
+    u.frozen_balance,
+    u.balance - u.frozen_balance AS available_balance
+  FROM users u
+  WHERE u.id = p_user_id
+  FOR UPDATE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ========================================================================
+-- PERMISSIONS
+-- ========================================================================
+
+-- Les fonctions sont SECURITY DEFINER par défaut (exécutées avec privilèges owner)
+-- Autoriser service_role et authenticated à les appeler
+
+GRANT EXECUTE ON FUNCTION atomic_freeze TO service_role, authenticated;
+GRANT EXECUTE ON FUNCTION atomic_commit TO service_role, authenticated;
+GRANT EXECUTE ON FUNCTION atomic_refund TO service_role, authenticated;
+GRANT EXECUTE ON FUNCTION lock_user_wallet TO service_role, authenticated;
+
+-- Table balance_operations: lecture pour authenticated, écriture pour functions
+GRANT SELECT ON balance_operations TO authenticated;
+GRANT INSERT ON balance_operations TO service_role;
+
+-- Vue santé: lecture pour authenticated et anon
+GRANT SELECT ON v_frozen_balance_health TO authenticated, anon;
+
+-- ========================================================================
+-- COMMENTAIRES
+-- ========================================================================
+
+COMMENT ON FUNCTION atomic_freeze IS 'Gèle des crédits de manière atomique avec FOR UPDATE. Utilisé lors de l''achat d''une activation ou location.';
+COMMENT ON FUNCTION atomic_commit IS 'Dégèle des crédits après succès (SMS reçu). Ne touche pas au balance, juste unfreeze.';
+COMMENT ON FUNCTION atomic_refund IS 'Rembourse et dégèle des crédits après annulation ou expiration.';
+COMMENT ON TABLE balance_operations IS 'Audit trail complet de toutes les opérations wallet (freeze/commit/refund). related_transaction_id stocke l''ID de transaction sans contrainte FK.';
+COMMENT ON VIEW v_frozen_balance_health IS 'Vue de santé des wallets détectant les incohérences frozen_balance.';

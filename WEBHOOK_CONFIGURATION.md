@@ -3,6 +3,7 @@
 ## 📋 Résumé des améliorations
 
 ✅ **8 nouvelles Edge Functions déployées:**
+
 1. `webhook-sms-activate` - Réception SMS en temps réel
 2. `retry-sms-activate` - Demander un autre SMS
 3. `finish-sms-activate` - Marquer activation comme terminée
@@ -13,6 +14,7 @@
 8. `continue-rent` - Prolonger une location
 
 ✅ **Frontend amélioré:**
+
 - Bouton "Demander un autre SMS" dans le menu dropdown
 - Bouton "Marquer comme terminé" pour les SMS reçus
 - Indicateur "Listening" dans le header quand activations actives
@@ -20,6 +22,7 @@
 - Migration vers getNumberV2 (JSON au lieu de texte)
 
 ✅ **Base de données:**
+
 - Tables `rentals` et `webhook_logs` prêtes
 - Script SQL manuel: `CREATE_TABLES_MANUAL.sql`
 
@@ -37,6 +40,7 @@
 3. Cliquer sur **New Query**
 
 4. Copier-coller TOUT le contenu du fichier:
+
    ```
    CREATE_TABLES_MANUAL.sql
    ```
@@ -66,6 +70,7 @@ Si l'option A ne fonctionne pas:
 ### 2.1 Récupérer votre URL Webhook
 
 Votre URL Webhook Supabase:
+
 ```
 https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/webhook-sms-activate
 ```
@@ -77,6 +82,7 @@ https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/webhook-sms-activate
 2. Aller dans **Profile** → **API Settings** → **Webhooks**
 
 3. Configurer:
+
    - **Webhook URL**: `https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/webhook-sms-activate`
    - **Events**: Cocher "SMS Received"
    - **IP Whitelist**: (déjà configuré côté function)
@@ -84,6 +90,7 @@ https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/webhook-sms-activate
      - 142.91.156.119
 
 4. **Tester le webhook**:
+
    - Cliquer sur "Test Webhook"
    - Vérifier que vous recevez un statut 200 OK
 
@@ -96,12 +103,13 @@ Dans Supabase SQL Editor, exécuter:
 
 ```sql
 -- Vérifier les logs de webhook
-SELECT * FROM webhook_logs 
-ORDER BY created_at DESC 
+SELECT * FROM webhook_logs
+ORDER BY created_at DESC
 LIMIT 10;
 ```
 
 Vous devriez voir les webhooks reçus avec:
+
 - `activation_id`
 - `payload` (données JSON)
 - `ip_address`
@@ -140,21 +148,23 @@ Vous devriez voir les webhooks reçus avec:
 ### 4.1 Vérifier les services disponibles
 
 Dans le terminal:
+
 ```bash
 curl "https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-rent-services?rent_time=4&country=187" \
   -H "Authorization: Bearer YOUR_USER_JWT_TOKEN"
 ```
 
 Réponse attendue:
+
 ```json
 {
   "success": true,
   "services": {
-    "wa": {"cost": 21.95, "quant": 20},
-    "tg": {"cost": 7.68, "quant": 55}
+    "wa": { "cost": 21.95, "quant": 20 },
+    "tg": { "cost": 7.68, "quant": 55 }
   },
-  "countries": {"0": 187},
-  "operators": {"0": "any", "1": "verizon"}
+  "countries": { "0": 187 },
+  "operators": { "0": "any", "1": "verizon" }
 }
 ```
 
@@ -198,6 +208,7 @@ curl -X POST "https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/set-rent-sta
 ### 5.1 Vérifier les logs Edge Functions
 
 Dans Supabase Dashboard:
+
 1. Aller dans **Edge Functions**
 2. Cliquer sur `webhook-sms-activate`
 3. Onglet **Logs**
@@ -207,7 +218,7 @@ Dans Supabase Dashboard:
 
 ```sql
 -- Activations récentes
-SELECT 
+SELECT
   id,
   phone,
   service_code,
@@ -223,7 +234,7 @@ LIMIT 20;
 
 ```sql
 -- Webhooks des dernières 24h
-SELECT 
+SELECT
   activation_id,
   payload->>'code' as code,
   payload->>'text' as text,
@@ -239,7 +250,7 @@ ORDER BY received_at DESC;
 
 ```sql
 -- Locations actives
-SELECT 
+SELECT
   rent_id,
   phone,
   service_code,
@@ -257,11 +268,13 @@ ORDER BY created_at DESC;
 ## ⚡ PERFORMANCES
 
 ### Avant (Polling uniquement):
+
 - ⏱️ Délai moyen: **5-10 secondes**
 - 📡 Requêtes: **~240 par numéro** (20 min × 12 req/min)
 - 💰 Coût API: Élevé
 
 ### Après (Webhook + Polling intelligent):
+
 - ⚡ Délai moyen: **< 1 seconde** (instantané)
 - 📡 Requêtes: **~100 par numéro** (polling adaptatif)
 - 💰 Coût API: Réduit de 60%
@@ -274,6 +287,7 @@ ORDER BY created_at DESC;
 ### v1.5.0 - Webhooks & Rent API (24 Nov 2024)
 
 **Nouvelles fonctionnalités:**
+
 - ✅ Webhooks SMS temps réel (< 1s)
 - ✅ Retry SMS (demander un autre code)
 - ✅ Finish activation (marquer comme terminé)
@@ -283,12 +297,14 @@ ORDER BY created_at DESC;
 - ✅ Migration getNumberV2 (JSON response)
 
 **Améliorations:**
+
 - 🚀 Performance: 60% moins de requêtes API
 - ⚡ Rapidité: SMS instantanés au lieu de 5-10s
 - 💪 Fiabilité: Webhook + fallback polling
 - 🎨 UX: Boutons Retry et Finish dans dropdown
 
 **Tables créées:**
+
 - `rentals` - Gestion des locations
 - `webhook_logs` - Logs des webhooks reçus
 
@@ -299,11 +315,13 @@ ORDER BY created_at DESC;
 ### Webhook ne fonctionne pas
 
 1. **Vérifier l'URL dans SMS-Activate:**
+
    ```
    https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/webhook-sms-activate
    ```
 
 2. **Tester manuellement:**
+
    ```bash
    curl -X POST "https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/webhook-sms-activate" \
      -H "Content-Type: application/json" \

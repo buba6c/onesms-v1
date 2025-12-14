@@ -3,41 +3,49 @@
 ## ❌ PROBLÈMES CRITIQUES IDENTIFIÉS
 
 ### 1. AUCUNE ACTIVATION DANS LA BASE DE DONNÉES
+
 **Statut**: 🚨 CRITIQUE
 **Impact**: Les utilisateurs ne peuvent PAS activer de numéros
 **Cause**: Le processus d'activation ne fonctionne pas du tout
 
 **Preuve**:
+
 ```
 Total activations (dernières 24h): 0
 Total activations (all time): 0
 ```
 
 ### 2. FONCTION BUY-SMS-ACTIVATE-NUMBER NE FONCTIONNE PAS
+
 **Statut**: 🚨 CRITIQUE  
 **Impact**: Impossible d'acheter des numéros
 **Cause**: Problème d'authentification ou d'insertion DB
 
 **Code problématique**:
-- Frontend appelle `buy-sms-activate-number` 
+
+- Frontend appelle `buy-sms-activate-number`
 - Fonction essaie d'insérer dans `activations` table
 - Insertion échoue (probablement à cause de RLS ou contraintes)
 
 ### 3. "999" AFFICHÉ AU LIEU DU VRAI NOMBRE
-**Statut**: ⚠️  MOYEN
+
+**Statut**: ⚠️ MOYEN
 **Impact**: UX dégradée, utilisateurs confus
 **Cause**: Fallback hardcodé dans le code
 
 **Localisation**:
+
 - `src/pages/DashboardPage.tsx` ligne 363: `count: 999`
 - Utilisé quand l'API échoue à charger les services
 
 ### 4. PRICING_RULES UTILISE `country_code` PAS `country_id`
+
 **Statut**: ℹ️ INFO
 **Impact**: Confusion dans le code
 **Fix**: Le système utilise correctement `country_code` (string)
 
 **Structure actuelle**:
+
 ```javascript
 pricing_rules {
   service_code: 'tinder',
@@ -58,17 +66,20 @@ pricing_rules {
 ## 🎯 ACTIONS REQUISES (PAR PRIORITÉ)
 
 ### PRIORITÉ 1: Débloquer les activations
+
 1. **Vérifier RLS (Row Level Security)** sur table `activations`
 2. **Vérifier contraintes** foreign keys (user_id existe ?)
 3. **Tester insertion directe** avec service_role key valide
 4. **Vérifier logs** Supabase Functions pour erreurs buy-sms-activate-number
 
 ### PRIORITÉ 2: Corriger l'affichage "999"
+
 1. **Supprimer fallback hardcodé** ligne 363 DashboardPage.tsx
 2. **Utiliser `total_available`** depuis la table services
 3. **Gérer erreur API** avec message explicite au lieu de "999"
 
 ### PRIORITÉ 3: Améliorer UX
+
 1. **Messages d'erreur clairs** quand activation échoue
 2. **Loading states** pendant l'appel API
 3. **Toast notifications** pour feedback utilisateur
@@ -81,6 +92,7 @@ pricing_rules {
 **Activations**: 0 (TABLE VIDE 🚨)
 
 **Services populaires disponibles en Indonesia**:
+
 - 99app: 25000 dispos, 40.08 FCFA
 - Discord: 25000 dispos, 19.20 FCFA
 - PayPal: 25000 dispos, 40.08 FCFA
@@ -98,6 +110,7 @@ pricing_rules {
 ## 📝 NOTES TECHNIQUES
 
 **Frontend Flow**:
+
 ```
 User selects service
   → handleServiceSelect()
@@ -112,6 +125,7 @@ User selects service
 ```
 
 **Backend Flow**:
+
 ```
 buy-sms-activate-number
   → Vérifie auth ✅
@@ -123,6 +137,7 @@ buy-sms-activate-number
 ```
 
 **Hypothèses problème activation**:
+
 - RLS bloque INSERT sur activations
 - Colonne manquante (external_id ?)
 - Foreign key invalide (user_id)

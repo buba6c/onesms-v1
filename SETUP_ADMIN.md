@@ -1,6 +1,7 @@
 # Configuration de l'Administrateur Initial
 
 ## Problème Actuel
+
 L'application utilise encore les valeurs par défaut car les vraies credentials Supabase ne sont pas configurées.
 
 ## Solution: Configuration en Base de Données
@@ -55,7 +56,7 @@ INSERT INTO users (
   created_at,
   updated_at
 )
-SELECT 
+SELECT
   id,
   'admin@onesms.test',
   'Admin Test',
@@ -80,13 +81,13 @@ SET role = 'admin',
 
 ```sql
 -- Mettre à jour l'URL Supabase
-UPDATE system_settings 
-SET value = 'https://VOTRE-PROJET-ID.supabase.co' 
+UPDATE system_settings
+SET value = 'https://VOTRE-PROJET-ID.supabase.co'
 WHERE key = 'supabase_url';
 
 -- Mettre à jour la clé anon
-UPDATE system_settings 
-SET value = 'VOTRE_ANON_KEY_ICI' 
+UPDATE system_settings
+SET value = 'VOTRE_ANON_KEY_ICI'
 WHERE key = 'supabase_anon_key';
 ```
 
@@ -107,6 +108,7 @@ pm2 restart onesms-frontend
 ### Étape 6: Configurer les autres API (optionnel)
 
 Une fois connecté, allez dans Admin Settings pour configurer:
+
 - 5sim API (pour les numéros virtuels)
 - PayTech API (pour les paiements)
 

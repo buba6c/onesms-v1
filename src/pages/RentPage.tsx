@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/authStore'
@@ -192,10 +193,14 @@ const RentPage = () => {
   const getRemainingTime = (endDate: string) => {
     const diff = new Date(endDate).getTime() - Date.now()
     if (diff <= 0) return t('rent.expired')
-    const hours = Math.floor(diff / 3600000)
-    const mins = Math.floor((diff % 3600000) / 60000)
+    const totalSeconds = Math.floor(diff / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const mins = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
     if (hours > 24) return `${Math.floor(hours/24)}j ${hours%24}h`
-    return `${hours}h ${mins}m`
+    if (hours > 0) return `${hours}h ${mins}m`
+    if (mins > 0) return `${mins}m ${secs}s`
+    return `${secs}s`
   }
 
   return (
@@ -252,7 +257,7 @@ const RentPage = () => {
               <div className="text-center py-8 text-muted-foreground">{t('rent.noServices')}</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
-                {filteredServices.map(s=><Button key={s.code} variant={selectedService?.code===s.code?'default':'outline'} className="h-auto py-4 flex flex-col gap-2 relative" onClick={()=>{setSelectedService(s);setCurrentStep('duration')}}><img src={getServiceLogo(s.code)} alt={s.code} className="w-8 h-8" onError={(e)=>(e.target as HTMLImageElement).src='/placeholder-service.png'}/><span className="text-sm font-medium">{s.code.toUpperCase()}</span><span className="text-xs text-muted-foreground">{s.available} {t('rent.available')}</span></Button>)}
+                {filteredServices.map(s=><Button key={s.code} variant={selectedService?.code===s.code?'default':'outline'} className="h-auto py-4 flex flex-col gap-2 relative" onClick={()=>{setSelectedService(s);setCurrentStep('duration')}}><img src={getServiceLogo(s.code)} alt={`Logo ${s.name || s.code}`} className="w-8 h-8" onError={(e)=>(e.target as HTMLImageElement).src='/placeholder-service.png'}/><span className="text-sm font-medium">{s.code.toUpperCase()}</span><span className="text-xs text-muted-foreground">{s.available} {t('rent.available')}</span></Button>)}
               </div>
             )}
           </div>
@@ -297,7 +302,7 @@ const RentalCard=({rental,expanded,onToggle,onCopy,onExtend,onFetchInbox,getRema
   return(
     <Card className="p-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1"><img src={getServiceLogo(rental.service_code)} alt={rental.service_code} className="w-10 h-10"/><div><div className="font-medium">{rental.phone}</div><div className="text-sm text-muted-foreground">{rental.service_code} • {rental.country_code}</div></div></div>
+        <div className="flex items-center gap-3 flex-1"><img src={getServiceLogo(rental.service_code)} alt={`Service ${rental.service_code}`} className="w-10 h-10"/><div><div className="font-medium">{rental.phone}</div><div className="text-sm text-muted-foreground">{rental.service_code} • {rental.country_code}</div></div></div>
         <div className="flex items-center gap-2"><div className="text-right mr-4"><div className="text-sm font-medium">{getRemainingTime(rental.end_date)}</div><div className="text-xs text-muted-foreground">${rental.price.toFixed(2)}</div></div><Button variant="outline" size="sm" onClick={()=>onCopy(rental.phone)}><Copy className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={()=>onExtend(rental.id)}><Plus className="w-4 h-4"/></Button><Button variant="ghost" size="sm" onClick={handleExpand}>{expanded?<ChevronUp className="w-4 h-4"/>:<ChevronDown className="w-4 h-4"/>}</Button></div>
       </div>
       {expanded&&<div className="mt-4 pt-4 border-t space-y-3"><div className="flex justify-between mb-2"><h4 className="font-medium">{t('rent.smsInbox')} ({messages.length})</h4><Button variant="outline" size="sm" onClick={handleExpand} disabled={loading}><RefreshCw className={`w-3 h-3 ${loading?'animate-spin':''}`}/></Button></div>{loading?<div className="text-center py-4 text-muted-foreground">{t('rent.loading')}</div>:messages.length===0?<div className="text-center py-4 text-muted-foreground">{t('rent.noMessages')}</div>:<div className="space-y-2 max-h-64 overflow-y-auto">{messages.map((m,i)=><Card key={i} className="p-3"><div className="flex justify-between mb-1"><span className="text-xs text-muted-foreground">{m.service}</span><span className="text-xs text-muted-foreground">{new Date(m.date).toLocaleString()}</span></div><div className="text-sm">{m.text}</div>{m.code&&<div className="mt-2 flex items-center gap-2"><code className="bg-muted px-2 py-1 rounded text-sm font-mono">{m.code}</code><Button variant="ghost" size="sm" onClick={()=>onCopy(m.code!)}><Copy className="w-3 h-3"/></Button></div>}</Card>)}</div>}</div>}

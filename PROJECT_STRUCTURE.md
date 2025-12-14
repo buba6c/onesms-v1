@@ -89,6 +89,7 @@ ONE SMS V1/
 ## 🎯 Fonctionnalités Implémentées
 
 ### ✅ Infrastructure
+
 - React 18 + TypeScript + Vite
 - Tailwind CSS + shadcn/ui
 - React Router v6
@@ -97,7 +98,9 @@ ONE SMS V1/
 - i18next (internationalisation)
 
 ### ✅ Base de Données
+
 - **10 tables Supabase:**
+
   1. users - Profils utilisateurs
   2. credits_history - Historique crédits
   3. virtual_numbers - Numéros virtuels
@@ -117,6 +120,7 @@ ONE SMS V1/
   - update_updated_at_column() - MAJ timestamps
 
 ### ✅ Authentification
+
 - Email/Password
 - Google OAuth
 - Apple OAuth
@@ -127,6 +131,7 @@ ONE SMS V1/
 ### ✅ API Intégrations
 
 **5sim.net:**
+
 - getCountries() - Liste pays
 - getServices() - Liste services
 - getPrices() - Tarifs en temps réel
@@ -139,6 +144,7 @@ ONE SMS V1/
 - getOrders() - Historique commandes
 
 **Paytech:**
+
 - requestPayment() - Demande paiement
 - getPaymentStatus() - Status paiement
 - verifyIPN() - Vérification IPN
@@ -149,6 +155,7 @@ ONE SMS V1/
 - getAccountInfo() - Info compte
 
 ### ✅ UI/UX
+
 - Design responsive mobile-first
 - Composants réutilisables shadcn
 - Notifications toast
@@ -158,6 +165,7 @@ ONE SMS V1/
 - Error handling
 
 ### ✅ Internationalisation
+
 - Français / Anglais
 - Switch langue dynamique
 - Traductions complètes interface
@@ -166,6 +174,7 @@ ONE SMS V1/
 ## 🔧 Technologies Utilisées
 
 ### Frontend
+
 - **React 18.2** - UI library
 - **TypeScript 5.3** - Type safety
 - **Vite 5.0** - Build tool
@@ -177,11 +186,13 @@ ONE SMS V1/
 - **i18next** - Translations
 
 ### State Management
+
 - **Zustand 4.4** - Global state
 - **TanStack Query 5** - Server state
 - **React Hook Form** - Forms (à installer)
 
 ### Backend/Database
+
 - **Supabase** - BaaS platform
 - **PostgreSQL** - Database
 - **Supabase Auth** - Authentication
@@ -189,11 +200,13 @@ ONE SMS V1/
 - **Row Level Security** - Data security
 
 ### APIs
+
 - **5sim.net** - Virtual numbers provider
 - **Paytech** - Payment gateway (Senegal)
 - **Axios** - HTTP client
 
 ### Dev Tools
+
 - **ESLint** - Linting
 - **Prettier** - Formatting (à configurer)
 - **Vitest** - Testing (à installer)
@@ -201,6 +214,7 @@ ONE SMS V1/
 ## 📊 Schéma Base de Données
 
 ### Relations principales:
+
 ```
 users (1) ----< (N) credits_history
 users (1) ----< (N) virtual_numbers
@@ -215,6 +229,7 @@ pricing_rules (N) ----< (1) services
 ```
 
 ### Indexes créés:
+
 - idx_users_email
 - idx_users_role
 - idx_credits_history_user_id
@@ -233,6 +248,7 @@ pricing_rules (N) ----< (1) services
 ## 🔐 Sécurité
 
 ### Implémentée:
+
 - ✅ JWT authentication
 - ✅ Row Level Security (RLS)
 - ✅ API key encryption
@@ -243,6 +259,7 @@ pricing_rules (N) ----< (1) services
 - ✅ CSRF tokens ready
 
 ### À configurer:
+
 - [ ] Rate limiting
 - [ ] IP whitelisting
 - [ ] 2FA (Two-Factor Auth)
@@ -255,6 +272,7 @@ pricing_rules (N) ----< (1) services
 ## 📈 Scalabilité
 
 ### Optimisations présentes:
+
 - Lazy loading components
 - Query caching (TanStack Query)
 - Database indexes
@@ -263,6 +281,7 @@ pricing_rules (N) ----< (1) services
 - Code splitting (Vite)
 
 ### Recommandations futures:
+
 - Redis pour cache
 - CloudFlare CDN
 - Load balancer
@@ -273,6 +292,7 @@ pricing_rules (N) ----< (1) services
 ## 🎨 Design System
 
 ### Couleurs:
+
 - **Primary:** #3B82F6 (Bleu)
 - **Secondary:** Gris
 - **Success:** Vert
@@ -280,14 +300,17 @@ pricing_rules (N) ----< (1) services
 - **Warning:** Orange
 
 ### Typography:
+
 - Font: System font stack
 - Scales: text-sm, text-base, text-lg, text-xl, etc.
 
 ### Spacing:
+
 - Base: 4px
 - Scale: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64px
 
 ### Breakpoints:
+
 - sm: 640px
 - md: 768px
 - lg: 1024px
@@ -323,6 +346,7 @@ npm install --save-dev @types/crypto-js
 ## 📝 Prochaines Étapes (Par Priorité)
 
 ### Haute Priorité:
+
 1. ✅ Installer dépendances: `npm install`
 2. ✅ Configurer Supabase (créer projet + exécuter schema.sql)
 3. ✅ Configurer .env avec clés API
@@ -334,6 +358,7 @@ npm install --save-dev @types/crypto-js
 9. ⚠️ Implémenter rechargement crédits
 
 ### Moyenne Priorité:
+
 10. ⚠️ Implémenter Transactions + Export
 11. ⚠️ Implémenter Admin Pricing
 12. ⚠️ Implémenter autres pages admin
@@ -341,6 +366,7 @@ npm install --save-dev @types/crypto-js
 14. ⚠️ Tests E2E
 
 ### Basse Priorité:
+
 15. ⚠️ Analytics détaillées
 16. ⚠️ Notifications push
 17. ⚠️ Email notifications
@@ -351,6 +377,7 @@ npm install --save-dev @types/crypto-js
 ## 🐛 Problèmes Connus
 
 ### Erreurs TypeScript (Normales avant npm install):
+
 - Cannot find module 'react'
 - Cannot find module 'react-router-dom'
 - Cannot find module '@supabase/supabase-js'
@@ -360,6 +387,7 @@ npm install --save-dev @types/crypto-js
 - Cannot find module 'crypto-js' ← **À installer manuellement**
 
 ### À résoudre:
+
 - [ ] Ajouter crypto-js au package.json
 - [ ] Configurer prettier
 - [ ] Ajouter tests
@@ -369,6 +397,7 @@ npm install --save-dev @types/crypto-js
 ## 💡 Conseils
 
 ### Développement:
+
 - Utiliser les types TypeScript
 - Suivre les conventions de nommage
 - Commenter code complexe
@@ -376,6 +405,7 @@ npm install --save-dev @types/crypto-js
 - Tester régulièrement
 
 ### Performance:
+
 - Lazy load routes
 - Optimiser images
 - Minimiser bundle size
@@ -383,6 +413,7 @@ npm install --save-dev @types/crypto-js
 - Surveiller re-renders
 
 ### Sécurité:
+
 - Ne jamais commit .env
 - Valider inputs utilisateur
 - Sanitize données

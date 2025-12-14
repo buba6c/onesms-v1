@@ -7,11 +7,13 @@
 **Page**: http://localhost:3001/admin/services
 
 **À vérifier**:
+
 1. **Total Numbers** ne doit PAS afficher 5,000,000 ou 10,000,000
 2. **Pricing rules** doit afficher le vrai nombre (pas 1000)
 3. Console browser doit afficher: `[STATS] Pricing rules: XXXX, Total available: XXXX (from YYYY records)`
 
 **Console Browser (F12)**:
+
 ```
 📊 [STATS] Services: 2433 Active: XX Popular: XX Pricing rules: 25835 Total available: XXXXXXX (from 25835 records)
 ```
@@ -23,12 +25,14 @@
 **Page**: http://localhost:3001/admin/services
 
 **Actions**:
+
 1. Ouvrir la console browser (F12)
 2. Cliquer sur "Synchroniser avec SMS-Activate"
 3. Attendre la fin (5-10 secondes)
 4. Vérifier le toast de succès
 
 **Résultat attendu**:
+
 ```
 Toast: "Sync completed!"
 Description: "Synced 1024 services, 205 countries, 2000+ prices"
@@ -42,6 +46,7 @@ Description: "Synced 1024 services, 205 countries, 2000+ prices"
 
 **À vérifier**:
 Les 10 premiers services doivent être dans cet ordre:
+
 1. **Instagram** (ig)
 2. **WhatsApp** (wa)
 3. **Telegram** (tg)
@@ -54,11 +59,12 @@ Les 10 premiers services doivent être dans cet ordre:
 10. **Discord** (ds)
 
 **❌ Ordre INCORRECT (avant correction)**:
+
 1. WhatsApp
 2. Telegram
 3. PayPal
 4. Badoo
-...
+   ...
 
 ---
 
@@ -67,15 +73,18 @@ Les 10 premiers services doivent être dans cet ordre:
 **Page**: http://localhost:3001 (Dashboard)
 
 **Actions**:
+
 1. Sélectionner service: **WhatsApp**
 2. Sélectionner pays: **United States**
 3. Vérifier le nombre affiché
 
 **Résultat attendu**:
+
 - **Avant**: 999 numbers available
 - **Après**: ~73,000 numbers available
 
 **Autres exemples**:
+
 - Philippines: ~29,000 numbers
 - Indonesia: ~70,000 numbers
 - India: ~2,700 numbers
@@ -88,6 +97,7 @@ Les 10 premiers services doivent être dans cet ordre:
 **Page**: http://localhost:3001 (Dashboard)
 
 **À vérifier**:
+
 - WhatsApp USA: $2.50
 - WhatsApp Philippines: $0.28
 - WhatsApp Indonesia: $0.18
@@ -95,6 +105,7 @@ Les 10 premiers services doivent être dans cet ordre:
 - WhatsApp Canada: $0.40
 
 **❌ Prix INCORRECTS (avant)**:
+
 - Tous à 999 ou mélangés
 
 ---
@@ -102,12 +113,14 @@ Les 10 premiers services doivent être dans cet ordre:
 ## 🔧 Commandes Terminal (si nécessaire)
 
 ### Nettoyer les anciennes pricing_rules
+
 ```bash
 cd "/Users/mac/Desktop/ONE SMS V1"
 node cleanup_old_rules.mjs
 ```
 
 **Output attendu**:
+
 ```
 🧹 Nettoyage des anciennes pricing_rules...
 
@@ -115,7 +128,7 @@ node cleanup_old_rules.mjs
    sms-activate: 17 total (17 actives)
    5sim: 25000 total (20000 actives)
    ...
-   
+
    TOTAL: 25835 règles
 
 🗑️  Suppression des règles NON sms-activate...
@@ -127,6 +140,7 @@ node cleanup_old_rules.mjs
 ---
 
 ### Test Complet Automatisé
+
 ```bash
 cd "/Users/mac/Desktop/ONE SMS V1"
 ./test_full_sync.sh
@@ -139,6 +153,7 @@ cd "/Users/mac/Desktop/ONE SMS V1"
 ## 🐛 Problèmes Connus
 
 ### Erreur DNS (Node.js)
+
 ```
 TypeError: fetch failed
 Caused by: Error: getaddrinfo ENOTFOUND qepxgaozywhjbnvqkgfr.supabase.co
@@ -147,6 +162,7 @@ Caused by: Error: getaddrinfo ENOTFOUND qepxgaozywhjbnvqkgfr.supabase.co
 **Solution**: Utiliser l'interface web (localhost:3001) au lieu des scripts Node.js
 
 ### Serveur Dev ne démarre pas
+
 ```bash
 # Vérifier si port 3001 est occupé
 lsof -ti:3001
@@ -163,6 +179,7 @@ npm run dev
 ## 📸 Captures d'Écran Attendues
 
 ### Admin Panel - Stats
+
 ```
 ┌─────────────────────────────────────────┐
 │ Total Services: 2433                    │
@@ -173,6 +190,7 @@ npm run dev
 ```
 
 ### Dashboard - Services Order
+
 ```
 1. 📷 Instagram      150,000 numbers
 2. 💬 WhatsApp       543,868 numbers
@@ -183,6 +201,7 @@ npm run dev
 ```
 
 ### Dashboard - WhatsApp Countries
+
 ```
 United States       73,520 numbers    $2.50
 Philippines         29,954 numbers    $0.28
@@ -213,6 +232,7 @@ Avant de dire "C'est bon!":
 Quand TOUT fonctionne localement:
 
 1. Commit les changements:
+
    ```bash
    git add .
    git commit -m "fix: corrections stats pagination + ordre services SMS-Activate"
@@ -220,6 +240,7 @@ Quand TOUT fonctionne localement:
    ```
 
 2. Déployer sur Netlify:
+
    - Netlify va automatiquement builder et déployer
    - Attendre 2-3 minutes
    - Tester sur https://onesms-v1.netlify.app

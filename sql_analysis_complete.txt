@@ -1,0 +1,2796 @@
+🔬 ANALYSE SQL ULTRA-PROFONDE
+================================================================================
+📅 05/12/2025 10:35:26
+================================================================================
+
+🔌 Connexion...
+
+✅ Connecté !
+
+📊 1. STRUCTURE COMPLÈTE DES TABLES
+--------------------------------------------------------------------------------
+
+📦 TABLE: activation_packages
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ activations: integer NOT NULL [UNIQUE]
+   ├─ price_xof: numeric NOT NULL
+   ├─ price_eur: numeric NOT NULL
+   ├─ price_usd: numeric NOT NULL
+   ├─ is_popular: boolean NULL DEFAULT false
+   ├─ savings_percentage: integer NULL DEFAULT 0
+   ├─ is_active: boolean NULL DEFAULT true
+   ├─ display_order: integer NULL DEFAULT 0
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: activations
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ user_id: uuid NOT NULL
+   ├─ order_id: text NOT NULL [UNIQUE]
+   ├─ phone: text NOT NULL
+   ├─ service_code: text NOT NULL
+   ├─ country_code: text NOT NULL
+   ├─ operator: text NOT NULL
+   ├─ price: numeric NULL
+   ├─ status: text NOT NULL DEFAULT 'pending'::text
+   ├─ sms_code: text NULL
+   ├─ sms_text: text NULL
+   ├─ sms_received_at: timestamp with time zone NULL
+   ├─ expires_at: timestamp with time zone NOT NULL
+   ├─ cancelled_at: timestamp with time zone NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+   ├─ charged: boolean NULL DEFAULT false
+   ├─ provider: text NULL DEFAULT 'sms-activate'::text
+   ├─ external_id: text NULL
+   ├─ frozen_amount: numeric NULL DEFAULT 0
+
+📦 TABLE: activity_logs
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ user_id: uuid NULL
+   ├─ action: text NOT NULL
+   ├─ entity_type: text NULL
+   ├─ entity_id: uuid NULL
+   ├─ details: jsonb NULL
+   ├─ ip_address: text NULL
+   ├─ user_agent: text NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: balance_operations
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid() [PRIMARY KEY]
+   ├─ user_id: uuid NOT NULL
+   ├─ activation_id: uuid NULL
+   ├─ rental_id: uuid NULL
+   ├─ related_transaction_id: uuid NULL
+   ├─ operation_type: text NOT NULL [CHECK]
+   ├─ operation_type: text NOT NULL [CHECK]
+   ├─ amount: numeric NOT NULL [CHECK]
+   ├─ amount: numeric NOT NULL [CHECK]
+   ├─ balance_before: numeric NOT NULL [CHECK]
+   ├─ balance_after: numeric NOT NULL [CHECK]
+   ├─ balance_after: numeric NOT NULL [CHECK]
+   ├─ frozen_before: numeric NOT NULL [CHECK]
+   ├─ frozen_after: numeric NOT NULL [CHECK]
+   ├─ reason: text NULL
+   ├─ metadata: jsonb NULL DEFAULT '{}'::jsonb
+   ├─ created_at: timestamp without time zone NULL DEFAULT now()
+
+📦 TABLE: contact_settings
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid() [PRIMARY KEY]
+   ├─ email: character varying NOT NULL DEFAULT 'support@onesms-sn.com'::character varyi
+   ├─ whatsapp: character varying NULL DEFAULT '+221 77 123 45 67'::character varying
+   ├─ address: character varying NULL DEFAULT 'Dakar, Sénégal'::character varying
+   ├─ address_detail: character varying NULL DEFAULT 'Afrique de l''Ouest'::character varying
+   ├─ hours_weekday: character varying NULL DEFAULT 'Lundi - Vendredi: 9h - 18h'::character 
+   ├─ hours_saturday: character varying NULL DEFAULT 'Samedi: 9h - 14h'::character varying
+   ├─ hours_sunday: character varying NULL DEFAULT 'Dimanche: Fermé'::character varying
+   ├─ email_response_time: character varying NULL DEFAULT 'Réponse sous 24h'::character varying
+   ├─ whatsapp_hours: character varying NULL DEFAULT 'Lun-Sam, 9h-18h'::character varying
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: countries
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ code: text NOT NULL [UNIQUE]
+   ├─ name: text NOT NULL
+   ├─ flag_emoji: text NULL DEFAULT '🌍'::text
+   ├─ active: boolean NULL DEFAULT true
+   ├─ price_multiplier: numeric NULL DEFAULT 1.00
+   ├─ available_numbers: integer NULL DEFAULT 0
+   ├─ provider: text NULL DEFAULT '5sim'::text
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+   ├─ success_rate: numeric NULL DEFAULT 99.00
+   ├─ display_order: integer NULL DEFAULT 0
+   ├─ popularity_score: integer NULL DEFAULT 0
+   ├─ flag_url: text NULL
+
+📦 TABLE: favorite_services
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ user_id: uuid NULL [UNIQUE]
+   ├─ service_code: text NOT NULL [UNIQUE]
+   ├─ service_name: text NOT NULL
+   ├─ country: text NOT NULL [UNIQUE]
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: logs_provider
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ provider: text NOT NULL DEFAULT 'sms-activate'::text
+   ├─ action: text NOT NULL
+   ├─ request_url: text NOT NULL
+   ├─ request_params: jsonb NULL
+   ├─ response_status: integer NULL
+   ├─ response_body: text NULL
+   ├─ response_time_ms: integer NULL
+   ├─ user_id: uuid NULL
+   ├─ activation_id: uuid NULL
+   ├─ rental_id: uuid NULL
+   ├─ error_message: text NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: notifications
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ user_id: uuid NULL
+   ├─ title: text NOT NULL
+   ├─ message: text NOT NULL
+   ├─ type: text NULL DEFAULT 'info'::text [CHECK]
+   ├─ read: boolean NULL DEFAULT false
+   ├─ action_url: text NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: popular_services
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ service_code: text NOT NULL [UNIQUE]
+   ├─ country_code: text NOT NULL [UNIQUE]
+   ├─ type: text NOT NULL [CHECK]
+   ├─ type: text NOT NULL [UNIQUE]
+   ├─ display_order: integer NULL DEFAULT 0
+   ├─ is_featured: boolean NULL DEFAULT false
+   ├─ icon_url: text NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: pricing_rules_archive
+   ├─ id: uuid NULL
+   ├─ service_code: text NULL
+   ├─ country_code: text NULL
+   ├─ activation_cost: numeric NULL
+   ├─ activation_price: numeric NULL
+   ├─ rent_cost: numeric NULL
+   ├─ rent_price: numeric NULL
+   ├─ active: boolean NULL
+   ├─ archived_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: rental_messages
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid() [PRIMARY KEY]
+   ├─ rental_id: uuid NULL
+   ├─ rent_id: text NOT NULL
+   ├─ phone_from: text NULL
+   ├─ text: text NOT NULL
+   ├─ service: text NULL
+   ├─ received_at: timestamp with time zone NOT NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: rentals
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid() [PRIMARY KEY]
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid()
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid()
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid()
+   ├─ user_id: uuid NOT NULL
+   ├─ rent_id: text NOT NULL [UNIQUE]
+   ├─ phone: text NOT NULL
+   ├─ service_code: text NOT NULL
+   ├─ country_code: text NOT NULL
+   ├─ operator: text NULL DEFAULT 'any'::text
+   ├─ start_date: timestamp with time zone NOT NULL DEFAULT now()
+   ├─ end_date: timestamp with time zone NOT NULL
+   ├─ rent_hours: integer NOT NULL
+   ├─ hourly_rate: numeric NULL
+   ├─ total_cost: numeric NULL
+   ├─ refund_amount: numeric NULL DEFAULT 0
+   ├─ status: text NOT NULL DEFAULT 'active'::text [CHECK]
+   ├─ last_message_date: timestamp with time zone NULL
+   ├─ message_count: integer NULL DEFAULT 0
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+   ├─ duration_hours: integer NULL
+   ├─ expires_at: timestamp with time zone NULL
+   ├─ rental_id: text NULL
+   ├─ provider: text NULL DEFAULT 'sms-activate'::text
+   ├─ frozen_amount: numeric NULL DEFAULT 0
+   ├─ service: text NULL
+   ├─ service_name: text NULL
+   ├─ country: text NULL
+   ├─ phone_number: text NULL
+   ├─ price: numeric NULL
+   ├─ sms_messages: jsonb NULL DEFAULT '[]'::jsonb
+   ├─ metadata: jsonb NULL DEFAULT '{}'::jsonb
+
+📦 TABLE: service_icons
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ service_code: text NOT NULL [UNIQUE]
+   ├─ icon_url: text NULL
+   ├─ icon_emoji: text NULL DEFAULT '📱'::text
+   ├─ icon_type: text NULL DEFAULT 'emoji'::text [CHECK]
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: services
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ code: text NOT NULL [UNIQUE]
+   ├─ code: text NOT NULL
+   ├─ name: text NOT NULL
+   ├─ display_name: text NULL
+   ├─ category: text NULL DEFAULT 'other'::text
+   ├─ icon: text NULL DEFAULT '📱'::text
+   ├─ active: boolean NULL DEFAULT true
+   ├─ popularity_score: integer NULL DEFAULT 0
+   ├─ total_available: integer NULL DEFAULT 0
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+   ├─ icon_url: text NULL
+   ├─ provider: text NULL DEFAULT 'sms-activate'::text
+
+📦 TABLE: sms_messages
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ virtual_number_id: uuid NULL
+   ├─ user_id: uuid NULL
+   ├─ phone_number: text NOT NULL
+   ├─ sender: text NULL
+   ├─ content: text NOT NULL
+   ├─ code: text NULL
+   ├─ received_at: timestamp with time zone NULL DEFAULT now()
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: system_logs
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid() [PRIMARY KEY]
+   ├─ level: text NOT NULL [CHECK]
+   ├─ category: text NOT NULL [CHECK]
+   ├─ message: text NOT NULL
+   ├─ metadata: jsonb NULL DEFAULT '{}'::jsonb
+   ├─ user_id: uuid NULL
+   ├─ ip_address: text NULL
+   ├─ user_agent: text NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: system_settings
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ key: text NOT NULL [UNIQUE]
+   ├─ value: text NULL
+   ├─ category: text NULL
+   ├─ description: text NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: transactions
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ user_id: uuid NULL
+   ├─ type: text NOT NULL
+   ├─ amount: numeric NOT NULL
+   ├─ balance_before: numeric NOT NULL
+   ├─ balance_after: numeric NOT NULL
+   ├─ status: text NULL DEFAULT 'pending'::text [CHECK]
+   ├─ description: text NULL
+   ├─ reference: text NULL [UNIQUE]
+   ├─ payment_method: text NULL [CHECK]
+   ├─ payment_data: jsonb NULL
+   ├─ virtual_number_id: uuid NULL
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+   ├─ metadata: jsonb NULL DEFAULT '{}'::jsonb
+   ├─ related_rental_id: uuid NULL
+   ├─ related_activation_id: uuid NULL
+
+📦 TABLE: users
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ email: text NOT NULL [UNIQUE]
+   ├─ name: text NULL
+   ├─ phone: text NULL
+   ├─ avatar_url: text NULL
+   ├─ role: text NULL DEFAULT 'user'::text [CHECK]
+   ├─ balance: numeric NULL DEFAULT 0.00
+   ├─ language: text NULL DEFAULT 'fr'::text [CHECK]
+   ├─ notifications_enabled: boolean NULL DEFAULT true
+   ├─ email_notifications: boolean NULL DEFAULT true
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+   ├─ frozen_balance: numeric NULL DEFAULT 0.00 [CHECK]
+
+📦 TABLE: virtual_numbers
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4()
+   ├─ id: uuid NOT NULL DEFAULT uuid_generate_v4() [PRIMARY KEY]
+   ├─ user_id: uuid NULL
+   ├─ phone_number: text NOT NULL
+   ├─ country: text NOT NULL
+   ├─ country_code: text NOT NULL
+   ├─ operator: text NULL
+   ├─ service: text NOT NULL
+   ├─ service_name: text NULL
+   ├─ price: numeric NOT NULL
+   ├─ type: text NULL DEFAULT 'activation'::text [CHECK]
+   ├─ status: text NULL DEFAULT 'active'::text [CHECK]
+   ├─ activation_code: text NULL
+   ├─ sms_received: ARRAY NULL
+   ├─ expires_at: timestamp with time zone NULL
+   ├─ external_id: text NULL [UNIQUE]
+   ├─ provider: text NULL DEFAULT '5sim'::text
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+   ├─ updated_at: timestamp with time zone NULL DEFAULT now()
+
+📦 TABLE: webhook_logs
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid() [PRIMARY KEY]
+   ├─ activation_id: text NOT NULL
+   ├─ payload: jsonb NOT NULL
+   ├─ received_at: timestamp with time zone NOT NULL
+   ├─ ip_address: text NULL
+   ├─ processed: boolean NULL DEFAULT false
+   ├─ created_at: timestamp with time zone NULL DEFAULT now()
+
+🔗 2. RELATIONS (FOREIGN KEYS)
+--------------------------------------------------------------------------------
+📊 Total: 19 relations
+
+
+📦 activations:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 activity_logs:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+
+📦 balance_operations:
+   ├─ activation_id → activations.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+   ├─ rental_id → rentals.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 favorite_services:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 logs_provider:
+   ├─ activation_id → activations.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+   ├─ rental_id → rentals.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+
+📦 notifications:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 rental_messages:
+   ├─ rental_id → rentals.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 service_icons:
+   ├─ service_code → services.code
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 sms_messages:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+   ├─ virtual_number_id → virtual_numbers.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+📦 system_logs:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+
+📦 transactions:
+   ├─ related_activation_id → activations.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+   ├─ virtual_number_id → virtual_numbers.id
+   │  UPDATE: NO ACTION, DELETE: SET NULL
+
+📦 virtual_numbers:
+   ├─ user_id → users.id
+   │  UPDATE: NO ACTION, DELETE: CASCADE
+
+⚙️  3. TRIGGERS DÉTAILLÉS
+--------------------------------------------------------------------------------
+📊 Total: 16 triggers
+
+
+📦 activation_packages:
+
+   ⚡ trigger_update_activation_packages_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_activation_packages_updated_at()...
+
+📦 activations:
+
+   ⚡ activations_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_activations_updated_at()...
+
+   ⚡ protect_frozen_amount_activations
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION prevent_direct_frozen_amount_update()...
+
+📦 contact_settings:
+
+   ⚡ contact_settings_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_contact_settings_updated_at()...
+
+📦 countries:
+
+   ⚡ update_countries_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 popular_services:
+
+   ⚡ update_popular_services_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 rentals:
+
+   ⚡ protect_frozen_amount_rentals
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION prevent_direct_frozen_amount_update()...
+
+   ⚡ update_rentals_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+   ⚡ update_rentals_updated_at_trigger
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_rentals_updated_at()...
+
+📦 service_icons:
+
+   ⚡ update_service_icons_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 services:
+
+   ⚡ update_services_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 system_settings:
+
+   ⚡ update_system_settings_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 transactions:
+
+   ⚡ update_transactions_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 users:
+
+   ⚡ prevent_direct_frozen_amount_update
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION prevent_direct_frozen_amount_update()...
+
+   ⚡ update_users_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+📦 virtual_numbers:
+
+   ⚡ update_virtual_numbers_updated_at
+      ├─ Timing: BEFORE UPDATE
+      ├─ Type: ROW
+      └─ Action: EXECUTE FUNCTION update_updated_at_column()...
+
+🔧 4. FONCTIONS STOCKÉES (STORED FUNCTIONS)
+--------------------------------------------------------------------------------
+📊 Total: 49 fonctions
+
+
+1. 🔧 admin_add_credit
+   ├─ Arguments: p_user_id uuid, p_amount numeric, p_admin_note text DEFAULT NULL::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.admin_add_credit(p_user_id uuid, p_amount numeric, p_admin_note text DEFAULT NULL::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_new_balance DECIMAL;
+        v_transaction_id UUID;
+      BEGIN
+        -- Validation
+        IF p_amount IS NULL OR p_amount <= 0 THEN
+          RAISE EXCEPTION 'Amount must be positive: %', p_amount;
+        END IF;
+        
+        -- 1. LOCK USER et lire balance actuel
+        SELECT id, balance, frozen_balance, email
+        INTO v_user
+        FROM users
+        WHERE id = p_user_id
+      ... (56 lignes supplémentaires)
+
+2. 🔧 atomic_commit
+   ├─ Arguments: p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_transaction_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.atomic_commit(p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_transaction_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_frozen_amount DECIMAL;
+        v_commit DECIMAL;
+        v_new_balance DECIMAL;
+        v_new_frozen DECIMAL;
+      BEGIN
+        -- 1. LOCK USER
+        SELECT balance, frozen_balance
+        INTO v_user
+        FROM users
+        WHERE id = p_user_id
+        FOR UPDATE;
+        
+        IF NOT FOUND THEN
+      ... (116 lignes supplémentaires)
+
+3. 🔧 atomic_commit
+   ├─ Arguments: p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT 'Service completed'::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.atomic_commit(p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT 'Service completed'::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_frozen_amount DECIMAL := 0;
+      BEGIN
+        SELECT id, balance, frozen_balance INTO v_user
+        FROM users WHERE id = p_user_id FOR UPDATE;
+      
+        IF NOT FOUND THEN
+          RETURN json_build_object('success', false, 'error', 'User not found');
+        END IF;
+      
+        IF p_activation_id IS NOT NULL THEN
+          SELECT frozen_amount INTO v_frozen_amount
+          FROM activations
+          WHERE id = p_activation_id AND user_id = p_user_id FOR UPDATE;
+      ... (46 lignes supplémentaires)
+
+4. 🔧 atomic_freeze
+   ├─ Arguments: p_user_id uuid, p_amount numeric, p_transaction_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.atomic_freeze(p_user_id uuid, p_amount numeric, p_transaction_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_available DECIMAL;
+        v_new_frozen DECIMAL;
+      BEGIN
+        -- Validation
+        IF p_amount <= 0 THEN
+          RAISE EXCEPTION 'Amount must be positive: %', p_amount;
+        END IF;
+        
+        -- 1. LOCK USER (FOR UPDATE - empêche race conditions)
+        SELECT balance, frozen_balance
+        INTO v_user
+        FROM users
+        WHERE id = p_user_id
+      ... (74 lignes supplémentaires)
+
+5. 🔧 atomic_refund
+   ├─ Arguments: p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_transaction_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.atomic_refund(p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_transaction_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_frozen_amount DECIMAL;
+        v_refund DECIMAL;
+        v_new_frozen DECIMAL;
+      BEGIN
+        -- 1. LOCK USER
+        SELECT balance, frozen_balance
+        INTO v_user
+        FROM users
+        WHERE id = p_user_id
+        FOR UPDATE;
+        
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'User not found: %', p_user_id;
+      ... (116 lignes supplémentaires)
+
+6. 🔧 atomic_refund
+   ├─ Arguments: p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT 'Refund'::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.atomic_refund(p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT 'Refund'::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_result JSON;
+      BEGIN
+        v_result := secure_unfreeze_balance(
+          p_user_id, p_activation_id, p_rental_id, TRUE, p_reason
+        );
+      
+        IF (v_result->>'success')::boolean THEN
+          IF p_activation_id IS NOT NULL THEN
+            UPDATE activations
+            SET status = CASE 
+                WHEN status = 'pending' THEN 'timeout'
+                WHEN status = 'waiting' THEN 'cancelled'
+                ELSE status
+              END,
+      ... (21 lignes supplémentaires)
+
+7. 🔧 atomic_refund_direct
+   ├─ Arguments: p_user_id uuid, p_amount numeric, p_transaction_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.atomic_refund_direct(p_user_id uuid, p_amount numeric, p_transaction_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT NULL::text)
+       RETURNS json
+       LANGUAGE plpgsql
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_amount_to_refund DECIMAL;
+        v_new_frozen DECIMAL;
+      BEGIN
+        -- Validation
+        IF p_amount IS NULL OR p_amount <= 0 THEN
+          RAISE EXCEPTION 'Amount must be positive: %', p_amount;
+        END IF;
+        
+        -- 1. LOCK USER et lire les valeurs
+        SELECT balance, frozen_balance
+        INTO v_user
+        FROM users
+        WHERE id = p_user_id
+        FOR UPDATE;
+      ... (61 lignes supplémentaires)
+
+8. 🔧 bytea_to_text
+   ├─ Arguments: data bytea
+   ├─ Retour: text
+   ├─ Langage: c
+   ├─ Volatilité: IMMUTABLE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.bytea_to_text(data bytea)
+       RETURNS text
+       LANGUAGE c
+       IMMUTABLE STRICT
+      AS '$libdir/http', $function$bytea_to_text$function$
+      
+
+9. 🔧 cleanup_old_logs
+   ├─ Arguments: none
+   ├─ Retour: void
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.cleanup_old_logs()
+       RETURNS void
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      BEGIN
+        DELETE FROM system_logs
+        WHERE created_at < NOW() - INTERVAL '30 days';
+      END;
+      $function$
+      
+
+10. 🔧 cleanup_old_provider_logs
+   ├─ Arguments: retention_days integer DEFAULT 90
+   ├─ Retour: integer
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.cleanup_old_provider_logs(retention_days integer DEFAULT 90)
+       RETURNS integer
+       LANGUAGE plpgsql
+      AS $function$
+      DECLARE
+        deleted_count INTEGER;
+      BEGIN
+        DELETE FROM logs_provider
+        WHERE created_at < NOW() - (retention_days || ' days')::INTERVAL;
+        
+        GET DIAGNOSTICS deleted_count = ROW_COUNT;
+        
+        RETURN deleted_count;
+      END;
+      $function$
+      
+
+11. 🔧 expire_rentals
+   ├─ Arguments: none
+   ├─ Retour: integer
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.expire_rentals()
+       RETURNS integer
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+          expired_count INTEGER;
+      BEGIN
+          -- Marquer comme expirées les locations dont la date est dépassée
+          UPDATE public.rentals
+          SET status = 'expired'
+          WHERE status = 'active'
+          AND expires_at < now();
+          
+          GET DIAGNOSTICS expired_count = ROW_COUNT;
+          
+          RETURN expired_count;
+      END;
+      $function$
+      
+
+12. 🔧 fix_frozen_balance_discrepancy
+   ├─ Arguments: p_user_id uuid
+   ├─ Retour: jsonb
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.fix_frozen_balance_discrepancy(p_user_id uuid)
+       RETURNS jsonb
+       LANGUAGE plpgsql
+      AS $function$
+      DECLARE
+          v_calculated DECIMAL(10,2);
+          v_actual DECIMAL(10,2);
+          v_balance DECIMAL(10,2);
+          v_activation_frozen DECIMAL(10,2);
+          v_rental_frozen DECIMAL(10,2);
+      BEGIN
+          -- Calculer ce que frozen_balance DEVRAIT être (activations)
+          SELECT COALESCE(SUM(frozen_amount), 0)
+          INTO v_activation_frozen
+          FROM activations
+          WHERE user_id = p_user_id
+          AND status IN ('pending', 'waiting')
+          AND frozen_amount > 0;
+          
+          -- Calculer ce que frozen_balance DEVRAIT être (rentals)
+      ... (65 lignes supplémentaires)
+
+13. 🔧 get_cron_jobs
+   ├─ Arguments: none
+   ├─ Retour: TABLE(job_id bigint, job_name text, schedule text, is_active boolean)
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.get_cron_jobs()
+       RETURNS TABLE(job_id bigint, job_name text, schedule text, is_active boolean)
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      BEGIN
+        RETURN QUERY
+        SELECT 
+          j.jobid,
+          j.jobname::text,
+          j.schedule::text,
+          j.active
+        FROM cron.job j
+        ORDER BY j.jobname;
+      END;
+      $function$
+      
+
+14. 🔧 get_setting
+   ├─ Arguments: setting_key character varying
+   ├─ Retour: text
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.get_setting(setting_key character varying)
+       RETURNS text
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      BEGIN
+        RETURN (SELECT value FROM system_settings WHERE key = setting_key);
+      END;
+      $function$
+      
+
+15. 🔧 handle_new_user
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.handle_new_user()
+       RETURNS trigger
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      BEGIN
+        -- Auto-confirmer l'email immédiatement
+        UPDATE auth.users
+        SET email_confirmed_at = NOW()
+        WHERE id = NEW.id AND email_confirmed_at IS NULL;
+        
+        -- Supprimer d'abord l'ancien enregistrement s'il existe avec le même email mais un ID différent
+        DELETE FROM public.users 
+        WHERE email = NEW.email AND id != NEW.id;
+        
+        -- Insérer ou mettre à jour l'utilisateur
+        INSERT INTO public.users (id, email, name, avatar_url, role, balance, created_at, updated_at)
+        VALUES (
+          NEW.id,
+          NEW.email,
+      ... (22 lignes supplémentaires)
+
+16. 🔧 http
+   ├─ Arguments: request http_request
+   ├─ Retour: http_response
+   ├─ Langage: c
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http(request http_request)
+       RETURNS http_response
+       LANGUAGE c
+      AS '$libdir/http', $function$http_request$function$
+      
+
+17. 🔧 http_delete
+   ├─ Arguments: uri character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_delete(uri character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('DELETE', $1, NULL, NULL, NULL)::public.http_request) $function$
+      
+
+18. 🔧 http_delete
+   ├─ Arguments: uri character varying, content character varying, content_type character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_delete(uri character varying, content character varying, content_type character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('DELETE', $1, NULL, $3, $2)::public.http_request) $function$
+      
+
+19. 🔧 http_get
+   ├─ Arguments: uri character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_get(uri character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('GET', $1, NULL, NULL, NULL)::public.http_request) $function$
+      
+
+20. 🔧 http_get
+   ├─ Arguments: uri character varying, data jsonb
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_get(uri character varying, data jsonb)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$
+              SELECT public.http(('GET', $1 || '?' || public.urlencode($2), NULL, NULL, NULL)::public.http_request)
+          $function$
+      
+
+21. 🔧 http_head
+   ├─ Arguments: uri character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_head(uri character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('HEAD', $1, NULL, NULL, NULL)::public.http_request) $function$
+      
+
+22. 🔧 http_header
+   ├─ Arguments: field character varying, value character varying
+   ├─ Retour: http_header
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_header(field character varying, value character varying)
+       RETURNS http_header
+       LANGUAGE sql
+      AS $function$ SELECT $1, $2 $function$
+      
+
+23. 🔧 http_list_curlopt
+   ├─ Arguments: none
+   ├─ Retour: TABLE(curlopt text, value text)
+   ├─ Langage: c
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_list_curlopt()
+       RETURNS TABLE(curlopt text, value text)
+       LANGUAGE c
+      AS '$libdir/http', $function$http_list_curlopt$function$
+      
+
+24. 🔧 http_patch
+   ├─ Arguments: uri character varying, content character varying, content_type character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_patch(uri character varying, content character varying, content_type character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('PATCH', $1, NULL, $3, $2)::public.http_request) $function$
+      
+
+25. 🔧 http_post
+   ├─ Arguments: uri character varying, content character varying, content_type character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_post(uri character varying, content character varying, content_type character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('POST', $1, NULL, $3, $2)::public.http_request) $function$
+      
+
+26. 🔧 http_post
+   ├─ Arguments: uri character varying, data jsonb
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_post(uri character varying, data jsonb)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$
+              SELECT public.http(('POST', $1, NULL, 'application/x-www-form-urlencoded', public.urlencode($2))::public.http_request)
+          $function$
+      
+
+27. 🔧 http_put
+   ├─ Arguments: uri character varying, content character varying, content_type character varying
+   ├─ Retour: http_response
+   ├─ Langage: sql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_put(uri character varying, content character varying, content_type character varying)
+       RETURNS http_response
+       LANGUAGE sql
+      AS $function$ SELECT public.http(('PUT', $1, NULL, $3, $2)::public.http_request) $function$
+      
+
+28. 🔧 http_reset_curlopt
+   ├─ Arguments: none
+   ├─ Retour: boolean
+   ├─ Langage: c
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_reset_curlopt()
+       RETURNS boolean
+       LANGUAGE c
+      AS '$libdir/http', $function$http_reset_curlopt$function$
+      
+
+29. 🔧 http_set_curlopt
+   ├─ Arguments: curlopt character varying, value character varying
+   ├─ Retour: boolean
+   ├─ Langage: c
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.http_set_curlopt(curlopt character varying, value character varying)
+       RETURNS boolean
+       LANGUAGE c
+      AS '$libdir/http', $function$http_set_curlopt$function$
+      
+
+30. 🔧 lock_user_wallet
+   ├─ Arguments: p_user_id uuid
+   ├─ Retour: TABLE(balance numeric, frozen_balance numeric, available_balance numeric)
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.lock_user_wallet(p_user_id uuid)
+       RETURNS TABLE(balance numeric, frozen_balance numeric, available_balance numeric)
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+        RETURN QUERY
+        SELECT 
+          u.balance, 
+          u.frozen_balance,
+          u.balance - u.frozen_balance AS available_balance
+        FROM users u
+        WHERE u.id = p_user_id
+        FOR UPDATE;
+      END;
+      $function$
+      
+
+31. 🔧 log_event
+   ├─ Arguments: p_level text, p_category text, p_message text, p_metadata jsonb DEFAULT '{}'::jsonb, p_user_id uuid DEFAULT NULL::uuid
+   ├─ Retour: uuid
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.log_event(p_level text, p_category text, p_message text, p_metadata jsonb DEFAULT '{}'::jsonb, p_user_id uuid DEFAULT NULL::uuid)
+       RETURNS uuid
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_log_id UUID;
+      BEGIN
+        INSERT INTO system_logs (level, category, message, metadata, user_id)
+        VALUES (p_level, p_category, p_message, p_metadata, p_user_id)
+        RETURNING id INTO v_log_id;
+        
+        RETURN v_log_id;
+      END;
+      $function$
+      
+
+32. 🔧 prevent_direct_frozen_amount_update
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.prevent_direct_frozen_amount_update()
+       RETURNS trigger
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+        -- Permettre aux fonctions SECURITY DEFINER (atomic_*) d'opérer
+        IF current_user = 'postgres' THEN
+          RETURN NEW;
+        END IF;
+        
+        -- Bloquer les modifications directes
+        IF OLD.frozen_balance IS DISTINCT FROM NEW.frozen_balance THEN
+          RAISE EXCEPTION 'Direct update of frozen_amount is forbidden. Use atomic_freeze, atomic_commit, or atomic_refund functions.';
+        END IF;
+        
+        RETURN NEW;
+      END;
+      $function$
+      
+
+33. 🔧 process_expired_activations
+   ├─ Arguments: none
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.process_expired_activations()
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_activation RECORD;
+        v_user RECORD;
+        v_processed_count INTEGER := 0;
+        v_refunded_total DECIMAL := 0;
+        v_errors INTEGER := 0;
+        v_result JSON;
+      BEGIN
+        RAISE NOTICE 'Starting expired activations processing at %', NOW();
+        
+        FOR v_activation IN
+          SELECT id, user_id, price, frozen_amount, order_id, service_code, expires_at
+          FROM activations 
+          WHERE status IN ('pending', 'waiting') 
+            AND expires_at < NOW()
+      ... (66 lignes supplémentaires)
+
+34. 🔧 reconcile_frozen_balance
+   ├─ Arguments: p_user_id uuid
+   ├─ Retour: TABLE(calculated_frozen numeric, actual_frozen numeric, difference numeric, needs_correction boolean)
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.reconcile_frozen_balance(p_user_id uuid)
+       RETURNS TABLE(calculated_frozen numeric, actual_frozen numeric, difference numeric, needs_correction boolean)
+       LANGUAGE plpgsql
+      AS $function$
+      DECLARE
+          v_calculated DECIMAL(10,2);
+          v_actual DECIMAL(10,2);
+          v_activation_frozen DECIMAL(10,2);
+          v_rental_frozen DECIMAL(10,2);
+      BEGIN
+          -- Calculer la somme des frozen_amount pour les activations actives
+          SELECT COALESCE(SUM(frozen_amount), 0)
+          INTO v_activation_frozen
+          FROM activations
+          WHERE user_id = p_user_id
+          AND status IN ('pending', 'waiting')
+          AND frozen_amount > 0;
+          
+          -- Calculer la somme des frozen_amount pour les rentals actives
+          SELECT COALESCE(SUM(frozen_amount), 0)
+      ... (23 lignes supplémentaires)
+
+35. 🔧 reconcile_orphan_freezes
+   ├─ Arguments: none
+   ├─ Retour: TABLE(activation_id uuid, user_id uuid, frozen_amount numeric, status text, refund_applied boolean, error text)
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.reconcile_orphan_freezes()
+       RETURNS TABLE(activation_id uuid, user_id uuid, frozen_amount numeric, status text, refund_applied boolean, error text)
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+       SET search_path TO 'public'
+      AS $function$
+      DECLARE
+        v_activation RECORD;
+        v_refund_exists BOOLEAN;
+        v_refund_result jsonb;
+      BEGIN
+        FOR v_activation IN
+          SELECT a.id, a.user_id, a.frozen_amount, a.status
+          FROM activations a
+          WHERE a.frozen_amount > 0
+            AND a.status IN ('timeout', 'failed', 'cancelled')
+            AND a.charged = false
+          ORDER BY a.created_at DESC
+          LIMIT 50
+        LOOP
+      ... (42 lignes supplémentaires)
+
+36. 🔧 reconcile_rentals_orphan_freezes
+   ├─ Arguments: none
+   ├─ Retour: TABLE(rental_id uuid, user_id uuid, frozen_amount numeric, status text, refund_applied boolean, error text)
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.reconcile_rentals_orphan_freezes()
+       RETURNS TABLE(rental_id uuid, user_id uuid, frozen_amount numeric, status text, refund_applied boolean, error text)
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+       SET search_path TO 'public'
+      AS $function$
+      DECLARE
+        v_rental RECORD;
+        v_refund_exists BOOLEAN;
+        v_refund_result jsonb;
+      BEGIN
+        FOR v_rental IN
+          SELECT r.id, r.user_id, r.frozen_amount, r.status
+          FROM rentals r
+          WHERE r.frozen_amount > 0
+            AND r.status IN ('expired', 'failed', 'cancelled')
+          ORDER BY r.created_at DESC
+          LIMIT 50
+        LOOP
+          SELECT EXISTS(
+      ... (41 lignes supplémentaires)
+
+37. 🔧 secure_freeze_balance
+   ├─ Arguments: p_user_id uuid, p_amount numeric, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT 'Balance freeze'::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.secure_freeze_balance(p_user_id uuid, p_amount numeric, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_reason text DEFAULT 'Balance freeze'::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_available DECIMAL;
+      BEGIN
+        SELECT id, balance, frozen_balance INTO v_user
+        FROM users WHERE id = p_user_id FOR UPDATE;
+      
+        IF NOT FOUND THEN
+          RETURN json_build_object('success', false, 'error', 'User not found');
+        END IF;
+      
+        v_available := v_user.balance - COALESCE(v_user.frozen_balance, 0);
+      
+        IF v_available < p_amount THEN
+          RETURN json_build_object('success', false, 'error', 'Insufficient balance');
+      ... (27 lignes supplémentaires)
+
+38. 🔧 secure_unfreeze_balance
+   ├─ Arguments: p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_refund_to_balance boolean DEFAULT false, p_refund_reason text DEFAULT 'Refund'::text
+   ├─ Retour: json
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.secure_unfreeze_balance(p_user_id uuid, p_activation_id uuid DEFAULT NULL::uuid, p_rental_id uuid DEFAULT NULL::uuid, p_refund_to_balance boolean DEFAULT false, p_refund_reason text DEFAULT 'Refund'::text)
+       RETURNS json
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        v_user RECORD;
+        v_frozen_amount DECIMAL := 0;
+        v_operation_type TEXT;
+      BEGIN
+        SELECT id, balance, frozen_balance INTO v_user
+        FROM users WHERE id = p_user_id FOR UPDATE;
+      
+        IF NOT FOUND THEN
+          RETURN json_build_object('success', false, 'error', 'User not found');
+        END IF;
+      
+        IF p_activation_id IS NOT NULL THEN
+          SELECT frozen_amount INTO v_frozen_amount
+          FROM activations
+      ... (41 lignes supplémentaires)
+
+39. 🔧 text_to_bytea
+   ├─ Arguments: data text
+   ├─ Retour: bytea
+   ├─ Langage: c
+   ├─ Volatilité: IMMUTABLE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.text_to_bytea(data text)
+       RETURNS bytea
+       LANGUAGE c
+       IMMUTABLE STRICT
+      AS '$libdir/http', $function$text_to_bytea$function$
+      
+
+40. 🔧 transfer_service_stock
+   ├─ Arguments: source_code text, target_code text
+   ├─ Retour: void
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.transfer_service_stock(source_code text, target_code text)
+       RETURNS void
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+        -- Vérifier si les deux services existent
+        IF NOT EXISTS (SELECT 1 FROM services WHERE code = source_code) THEN
+          RAISE NOTICE 'Service source % n''existe pas, skip', source_code;
+          RETURN;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM services WHERE code = target_code) THEN
+          RAISE NOTICE 'Service target % n''existe pas, skip', target_code;
+          RETURN;
+        END IF;
+        
+        -- Transférer le total_available
+        UPDATE services
+        SET total_available = COALESCE(total_available, 0) + (
+          SELECT COALESCE(total_available, 0) 
+      ... (33 lignes supplémentaires)
+
+41. 🔧 update_activation_packages_updated_at
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.update_activation_packages_updated_at()
+       RETURNS trigger
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+      END;
+      $function$
+      
+
+42. 🔧 update_activations_updated_at
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.update_activations_updated_at()
+       RETURNS trigger
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $function$
+      
+
+43. 🔧 update_contact_settings_updated_at
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.update_contact_settings_updated_at()
+       RETURNS trigger
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $function$
+      
+
+44. 🔧 update_rentals_updated_at
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.update_rentals_updated_at()
+       RETURNS trigger
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+          NEW.updated_at = now();
+          RETURN NEW;
+      END;
+      $function$
+      
+
+45. 🔧 update_setting
+   ├─ Arguments: setting_key character varying, setting_value text
+   ├─ Retour: boolean
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.update_setting(setting_key character varying, setting_value text)
+       RETURNS boolean
+       LANGUAGE plpgsql
+       SECURITY DEFINER
+      AS $function$
+      DECLARE
+        user_role VARCHAR;
+      BEGIN
+        -- Check if user is admin
+        SELECT role INTO user_role FROM users WHERE id = auth.uid();
+        
+        IF user_role != 'admin' THEN
+          RAISE EXCEPTION 'Only admins can update settings';
+        END IF;
+        
+        -- Update setting
+        UPDATE system_settings 
+        SET value = setting_value, updated_at = NOW()
+        WHERE key = setting_key;
+        
+      ... (4 lignes supplémentaires)
+
+46. 🔧 update_updated_at_column
+   ├─ Arguments: none
+   ├─ Retour: trigger
+   ├─ Langage: plpgsql
+   ├─ Volatilité: VOLATILE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+       RETURNS trigger
+       LANGUAGE plpgsql
+      AS $function$
+      BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+      END;
+      $function$
+      
+
+47. 🔧 urlencode
+   ├─ Arguments: data jsonb
+   ├─ Retour: text
+   ├─ Langage: c
+   ├─ Volatilité: IMMUTABLE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.urlencode(data jsonb)
+       RETURNS text
+       LANGUAGE c
+       IMMUTABLE STRICT
+      AS '$libdir/http', $function$urlencode_jsonb$function$
+      
+
+48. 🔧 urlencode
+   ├─ Arguments: string character varying
+   ├─ Retour: text
+   ├─ Langage: c
+   ├─ Volatilité: IMMUTABLE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.urlencode(string character varying)
+       RETURNS text
+       LANGUAGE c
+       IMMUTABLE STRICT
+      AS '$libdir/http', $function$urlencode$function$
+      
+
+49. 🔧 urlencode
+   ├─ Arguments: string bytea
+   ├─ Retour: text
+   ├─ Langage: c
+   ├─ Volatilité: IMMUTABLE
+   └─ Définition:
+      CREATE OR REPLACE FUNCTION public.urlencode(string bytea)
+       RETURNS text
+       LANGUAGE c
+       IMMUTABLE STRICT
+      AS '$libdir/http', $function$urlencode$function$
+      
+
+🔐 5. POLITIQUES RLS DÉTAILLÉES
+--------------------------------------------------------------------------------
+📊 Total: 69 policies
+
+
+📦 TABLE: activation_packages
+
+   🔐 Admin full access
+      ├─ Commande: ALL
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Public read access
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+📦 TABLE: activations
+
+   🔐 Admins can read all activations
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Authenticated users can insert activations
+      ├─ Commande: INSERT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         (auth.uid() = user_id)
+
+   🔐 Service role can manage activations
+      ├─ Commande: ALL
+      ├─ Rôles: {service_role}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Service role can update activations
+      ├─ Commande: UPDATE
+      ├─ Rôles: {service_role}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Service role full access
+      ├─ Commande: ALL
+      ├─ Rôles: {service_role}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Users can read own activations
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users insert own activations
+      ├─ Commande: INSERT
+      ├─ Rôles: {anon,authenticated}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         ((user_id = auth.uid()) OR ((user_id)::text = ((current_setting('request.jwt.claims'::text, true))::json ->> 'sub'::text)))
+
+   🔐 Users update own activations
+      ├─ Commande: UPDATE
+      ├─ Rôles: {anon,authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  ((user_id = auth.uid()) OR ((user_id)::text = ((current_setting('request.jwt.claims'::text, true))::json ->> 'sub'::text)))
+      └─ Vérification (WITH CHECK):
+         ((user_id = auth.uid()) OR ((user_id)::text = ((current_setting('request.jwt.claims'::text, true))::json ->> 'sub'::text)))
+
+   🔐 Users view own activations
+      ├─ Commande: SELECT
+      ├─ Rôles: {anon,authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  ((user_id = auth.uid()) OR ((user_id)::text = ((current_setting('request.jwt.claims'::text, true))::json ->> 'sub'::text)))
+      └─ Pas de WITH CHECK
+
+📦 TABLE: activity_logs
+
+   🔐 Admins can view logs
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+📦 TABLE: contact_settings
+
+   🔐 Admins can insert contact settings
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+
+   🔐 Admins can update contact settings
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Anyone can read contact settings
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+📦 TABLE: countries
+
+   🔐 Admins can manage countries
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Anyone can view active countries
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  ((active = true) OR (auth.uid() IS NOT NULL))
+      └─ Pas de WITH CHECK
+
+   🔐 Authenticated users can view countries
+      ├─ Commande: SELECT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+   🔐 Public can view countries
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+📦 TABLE: favorite_services
+
+   🔐 Users can manage own favorites
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: logs_provider
+
+   🔐 Admins can view all logs
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Service role can insert logs
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         true
+
+📦 TABLE: notifications
+
+   🔐 Users can update own notifications
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users can view own notifications
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: popular_services
+
+   🔐 Admins can manage popular services
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (((auth.jwt() ->> 'role'::text) = 'admin'::text) OR ((auth.jwt() ->> 'user_role'::text) = 'admin'::text))
+      └─ Pas de WITH CHECK
+
+   🔐 Public can view popular services
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+📦 TABLE: rental_messages
+
+   🔐 Service role can insert rental messages
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Users can view their rental messages
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM rentals
+  WHERE ((rentals.id = rental_messages.rental_id) AND (rentals.user_id = auth.uid()))))
+      └─ Pas de WITH CHECK
+
+📦 TABLE: rentals
+
+   🔐 Admins can update all rentals
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Admins can view all rentals
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Service role full access rentals
+      ├─ Commande: ALL
+      ├─ Rôles: {service_role}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Users can create their own rentals
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         (auth.uid() = user_id)
+
+   🔐 Users can insert own rentals
+      ├─ Commande: INSERT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         (auth.uid() = user_id)
+
+   🔐 Users can update own rentals
+      ├─ Commande: UPDATE
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users can update their own rentals
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users can view own rentals
+      ├─ Commande: SELECT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users can view their own rentals
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: service_icons
+
+   🔐 Admins can manage service icons
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Anyone can view service icons
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+   🔐 Authenticated users can view service icons
+      ├─ Commande: SELECT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+   🔐 Public can view service icons
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+📦 TABLE: services
+
+   🔐 Admins can manage services
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Anyone can view active services
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  ((active = true) OR (auth.uid() IS NOT NULL))
+      └─ Pas de WITH CHECK
+
+   🔐 Anyone can view services
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+   🔐 Authenticated users can view services
+      ├─ Commande: SELECT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+   🔐 Public can view services
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+📦 TABLE: sms_messages
+
+   🔐 System can insert messages
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Users can view own messages
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: system_logs
+
+   🔐 Admin can view all logs
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 System can insert logs
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         true
+
+📦 TABLE: system_settings
+
+   🔐 Admin full access to system_settings
+      ├─ Commande: ALL
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Admins can manage settings
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+📦 TABLE: transactions
+
+   🔐 Admins can view all transactions
+      ├─ Commande: SELECT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = ANY (ARRAY['admin'::text, 'super_admin'::text])))))
+      └─ Pas de WITH CHECK
+
+   🔐 Users can view own transactions
+      ├─ Commande: SELECT
+      ├─ Rôles: {authenticated}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: users
+
+   🔐 Admins can delete users
+      ├─ Commande: DELETE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users users_1
+  WHERE ((users_1.id = auth.uid()) AND (users_1.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Anyone can read users
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  true
+      └─ Pas de WITH CHECK
+
+   🔐 Enable insert for authenticated users
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         (auth.uid() = id)
+
+   🔐 Enable user registration
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         true
+
+   🔐 Service role can manage all users
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  ((((current_setting('request.jwt.claims'::text, true))::json ->> 'role'::text) = 'service_role'::text) OR ((auth.uid() = id) AND (role = 'admin'::text)))
+      └─ Pas de WITH CHECK
+
+   🔐 Service role full access
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (((current_setting('request.jwt.claims'::text, true))::json ->> 'role'::text) = 'service_role'::text)
+      └─ Pas de WITH CHECK
+
+   🔐 Users and admins can update
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  ((auth.uid() = id) OR (EXISTS ( SELECT 1
+   FROM users users_1
+  WHERE ((users_1.id = auth.uid()) AND (users_1.role = 'admin'::text)))))
+      └─ Pas de WITH CHECK
+
+   🔐 Users can update own data
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users can view own data
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users update own profile
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: virtual_numbers
+
+   🔐 Admins can view all numbers
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (EXISTS ( SELECT 1
+   FROM users
+  WHERE ((users.id = auth.uid()) AND (users.role = 'admin'::text))))
+      └─ Pas de WITH CHECK
+
+   🔐 Users can insert own numbers
+      ├─ Commande: INSERT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      └─ Vérification (WITH CHECK):
+         (auth.uid() = user_id)
+
+   🔐 Users can update own numbers
+      ├─ Commande: UPDATE
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+   🔐 Users can view own numbers
+      ├─ Commande: SELECT
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.uid() = user_id)
+      └─ Pas de WITH CHECK
+
+📦 TABLE: webhook_logs
+
+   🔐 Service role can manage webhook logs
+      ├─ Commande: ALL
+      ├─ Rôles: {public}
+      ├─ Type: PERMISSIVE
+      ├─ Condition (USING):
+      │  (auth.role() = 'service_role'::text)
+      └─ Pas de WITH CHECK
+
+⚠️  TABLES SANS POLICIES RLS (2):
+   ❌ balance_operations
+   ❌ pricing_rules_archive
+
+⚡ 6. INDEX DÉTAILLÉS
+--------------------------------------------------------------------------------
+📊 Total: 114 index
+
+🔝 Top 10 plus gros index:
+
+1. idx_services_name_search (256 kB)
+   ├─ Table: services
+   └─ Définition: CREATE INDEX idx_services_name_search ON public.services USING gin (to_tsvector(...
+2. idx_services_popularity_sort (224 kB)
+   ├─ Table: services
+   └─ Définition: CREATE INDEX idx_services_popularity_sort ON public.services USING btree (popula...
+3. idx_services_popularity (208 kB)
+   ├─ Table: services
+   └─ Définition: CREATE INDEX idx_services_popularity ON public.services USING btree (popularity_...
+4. idx_services_icon_url (168 kB)
+   ├─ Table: services
+   └─ Définition: CREATE INDEX idx_services_icon_url ON public.services USING btree (icon_url) WHE...
+5. services_pkey (168 kB)
+   ├─ Table: services
+   └─ Définition: CREATE UNIQUE INDEX services_pkey ON public.services USING btree (id)...
+6. idx_services_code (160 kB)
+   ├─ Table: services
+   └─ Définition: CREATE INDEX idx_services_code ON public.services USING btree (code)...
+7. services_code_key (160 kB)
+   ├─ Table: services
+   └─ Définition: CREATE UNIQUE INDEX services_code_key ON public.services USING btree (code)...
+8. idx_service_icons_code (120 kB)
+   ├─ Table: service_icons
+   └─ Définition: CREATE INDEX idx_service_icons_code ON public.service_icons USING btree (service...
+9. idx_services_category (120 kB)
+   ├─ Table: services
+   └─ Définition: CREATE INDEX idx_services_category ON public.services USING btree (category)...
+10. service_icons_service_code_key (104 kB)
+   ├─ Table: service_icons
+   └─ Définition: CREATE UNIQUE INDEX service_icons_service_code_key ON public.service_icons USING...
+
+
+📋 Index par table:
+
+
+📦 services:
+   ├─ idx_services_name_search (256 kB)
+   ├─ idx_services_popularity_sort (224 kB)
+   ├─ idx_services_popularity (208 kB)
+   ├─ idx_services_icon_url (168 kB)
+   ├─ services_pkey (168 kB)
+   ├─ idx_services_code (160 kB)
+   ├─ services_code_key (160 kB)
+
+📦 service_icons:
+   ├─ idx_service_icons_code (120 kB)
+
+📦 services:
+   ├─ idx_services_category (120 kB)
+
+📦 service_icons:
+   ├─ service_icons_service_code_key (104 kB)
+
+📦 services:
+   ├─ idx_services_active (104 kB)
+
+📦 service_icons:
+   ├─ service_icons_pkey (88 kB)
+
+📦 services:
+   ├─ idx_services_category_active (72 kB)
+   ├─ idx_services_provider (64 kB)
+
+📦 transactions:
+   ├─ idx_transactions_metadata (56 kB)
+
+📦 countries:
+   ├─ countries_code_key (40 kB)
+   ├─ idx_countries_code (40 kB)
+   ├─ countries_pkey (40 kB)
+
+📦 transactions:
+   ├─ transactions_pkey (40 kB)
+
+📦 system_logs:
+   ├─ idx_system_logs_metadata (24 kB)
+
+📦 activations:
+   ├─ idx_activations_order_id (16 kB)
+   ├─ idx_activations_status (16 kB)
+   ├─ idx_activations_created_at (16 kB)
+   ├─ idx_activations_charged (16 kB)
+   ├─ idx_activations_provider (16 kB)
+   ├─ idx_activations_user_status (16 kB)
+   ├─ idx_activations_frozen (16 kB)
+
+📦 countries:
+   ├─ idx_countries_active (16 kB)
+   ├─ idx_countries_provider (16 kB)
+   ├─ idx_countries_popularity (16 kB)
+   ├─ idx_countries_display_order (16 kB)
+
+📦 popular_services:
+   ├─ idx_popular_services_type (16 kB)
+
+📦 rental_messages:
+   ├─ rental_messages_pkey (16 kB)
+   ├─ idx_rental_messages_rental_id (16 kB)
+   ├─ idx_rental_messages_rent_id (16 kB)
+   ├─ idx_rental_messages_unique (16 kB)
+
+📦 users:
+   ├─ idx_users_email (16 kB)
+   ├─ idx_users_role (16 kB)
+   ├─ users_pkey (16 kB)
+   ├─ users_email_key (16 kB)
+   ├─ idx_users_frozen_balance (16 kB)
+
+📦 transactions:
+   ├─ idx_transactions_user_id (16 kB)
+   ├─ idx_transactions_type (16 kB)
+   ├─ idx_transactions_status (16 kB)
+   ├─ idx_transactions_reference (16 kB)
+   ├─ transactions_reference_key (16 kB)
+   ├─ idx_transactions_related_rental_id (16 kB)
+
+📦 activations:
+   ├─ idx_activations_reconcile (16 kB)
+   ├─ activations_pkey (16 kB)
+   ├─ activations_order_id_key (16 kB)
+   ├─ idx_activations_user_id (16 kB)
+
+📦 rentals:
+   ├─ idx_rentals_user_id (16 kB)
+   ├─ idx_rentals_rent_id (16 kB)
+   ├─ idx_rentals_status (16 kB)
+   ├─ idx_rentals_created_at (16 kB)
+   ├─ idx_rentals_frozen (16 kB)
+
+📦 balance_operations:
+   ├─ balance_operations_pkey (16 kB)
+   ├─ idx_balance_ops_user (16 kB)
+   ├─ idx_balance_ops_activation (16 kB)
+   ├─ idx_balance_ops_rental (16 kB)
+   ├─ idx_balance_ops_related_tx (16 kB)
+   ├─ idx_balance_ops_type (16 kB)
+
+📦 system_logs:
+   ├─ system_logs_pkey (16 kB)
+   ├─ idx_system_logs_created_at (16 kB)
+   ├─ idx_system_logs_level (16 kB)
+   ├─ idx_system_logs_category (16 kB)
+   ├─ idx_system_logs_user_id (16 kB)
+
+📦 logs_provider:
+   ├─ logs_provider_pkey (16 kB)
+   ├─ idx_logs_provider_provider (16 kB)
+   ├─ idx_logs_provider_action (16 kB)
+   ├─ idx_logs_provider_created_at (16 kB)
+   ├─ idx_logs_provider_action_status (16 kB)
+
+📦 popular_services:
+   ├─ popular_services_pkey (16 kB)
+   ├─ popular_services_service_code_country_code_type_key (16 kB)
+   ├─ idx_popular_services_featured (16 kB)
+
+📦 contact_settings:
+   ├─ contact_settings_pkey (16 kB)
+
+📦 system_settings:
+   ├─ system_settings_pkey (16 kB)
+   ├─ system_settings_key_key (16 kB)
+
+📦 activation_packages:
+   ├─ activation_packages_pkey (16 kB)
+   ├─ activation_packages_activations_key (16 kB)
+   ├─ idx_activation_packages_order (16 kB)
+   ├─ idx_activation_packages_active (16 kB)
+
+📦 rentals:
+   ├─ idx_rentals_expires_at (16 kB)
+   ├─ idx_rentals_rental_id (16 kB)
+   ├─ idx_rentals_phone (16 kB)
+   ├─ idx_rentals_service (16 kB)
+   ├─ idx_rentals_country (16 kB)
+   ├─ rentals_pkey (16 kB)
+   ├─ rentals_rent_id_unique (16 kB)
+
+📦 activity_logs:
+   ├─ idx_activity_logs_user_id (8192 bytes)
+   ├─ idx_activity_logs_created_at (8192 bytes)
+
+📦 webhook_logs:
+   ├─ idx_webhook_logs_created_at (8192 bytes)
+
+📦 rentals:
+   ├─ idx_rentals_reconcile (8192 bytes)
+
+📦 activity_logs:
+   ├─ activity_logs_pkey (8192 bytes)
+
+📦 notifications:
+   ├─ notifications_pkey (8192 bytes)
+   ├─ idx_notifications_read (8192 bytes)
+   ├─ idx_notifications_user_id (8192 bytes)
+
+📦 favorite_services:
+   ├─ favorite_services_user_id_service_code_country_key (8192 bytes)
+   ├─ favorite_services_pkey (8192 bytes)
+
+📦 sms_messages:
+   ├─ sms_messages_pkey (8192 bytes)
+   ├─ idx_sms_messages_user_id (8192 bytes)
+   ├─ idx_sms_messages_virtual_number_id (8192 bytes)
+
+📦 countries:
+   ├─ idx_countries_flag_url (8192 bytes)
+
+📦 virtual_numbers:
+   ├─ virtual_numbers_external_id_key (8192 bytes)
+   ├─ virtual_numbers_pkey (8192 bytes)
+   ├─ idx_virtual_numbers_external_id (8192 bytes)
+   ├─ idx_virtual_numbers_status (8192 bytes)
+
+📦 logs_provider:
+   ├─ idx_logs_provider_user_id (8192 bytes)
+   ├─ idx_logs_provider_activation_id (8192 bytes)
+
+📦 virtual_numbers:
+   ├─ idx_virtual_numbers_user_id (8192 bytes)
+
+📦 logs_provider:
+   ├─ idx_logs_provider_error (8192 bytes)
+
+📦 webhook_logs:
+   ├─ webhook_logs_pkey (8192 bytes)
+   ├─ idx_webhook_logs_activation_id (8192 bytes)
+   ├─ idx_webhook_logs_processed (8192 bytes)
+
+🧊 7. ANALYSE FROZEN AMOUNTS LOGIC
+--------------------------------------------------------------------------------
+🔧 Fonctions liées au frozen:
+
+
+1. Fonction:
+CREATE OR REPLACE FUNCTION public.fix_frozen_balance_discrepancy(p_user_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_calculated DECIMAL(10,2);
+    v_actual DECIMAL(10,2);
+    v_balance DECIMAL(10,2);
+    v_activation_frozen DECIMAL(10,2);
+    v_rental_frozen DECIMAL(10,2);
+BEGIN
+    -- Calculer ce que frozen_balance DEVRAIT être (activations)
+    SELECT COALESCE(SUM(frozen_amount), 0)
+    INTO v_activation_frozen
+    FROM activations
+    WHERE user_id = p_user_id
+    AND status IN ('pending', 'waiting')
+    AND frozen_amount > 0;
+    
+    -- Calculer ce que frozen_balance DEVRAIT être (rentals)
+    SELECT COALESCE(SUM(frozen_amount), 0)
+    INTO v_rental_frozen
+    FROM rentals
+    WHERE user_id = p_user_id
+    AND status = 'active'
+    AND frozen_amount > 0;
+    
+    -- Total
+    v_calculated := v_activation_frozen + v_rental_frozen;
+    
+    -- Récupérer les valeurs actuelles
+    SELECT balance, COALESCE(frozen_balance, 0)
+    INTO v_balance, v_actual
+    FROM users
+    WHERE id = p_user_id
+    FOR UPDATE;
+    
+    -- Si pas de différence significative, retourner
+    IF ABS(v_actual - v_calculated) < 0.01 THEN
+        RETURN jsonb_build_object(
+            'success', true,
+            'correction_needed', false,
+            'frozen_balance', v_actual,
+            'activation_frozen', v_activation_frozen,
+            'rental_frozen', v_rental_frozen
+        );
+    END IF;
+    
+    -- Corriger
+    UPDATE users
+    SET frozen_balance = v_calculated
+    WHERE id = p_user_id;
+    
+    -- Logger la correction
+    INSERT INTO balance_operations (
+        user_id, activation_id, operation_type, amount,
+        balance_before, balance_after,
+        frozen_before, frozen_after,
+        reason, metadata
+    ) VALUES (
+        p_user_id, NULL, 'correction', v_actual - v_calculated,
+        v_balance, v_balance,
+        v_actual, v_calculated,
+        'Automatic frozen balance reconciliation',
+        jsonb_build_object(
+            'old_frozen', v_actual,
+            'new_frozen', v_calculated,
+            'difference', v_actual - v_calculated,
+            'activation_frozen', v_activation_frozen,
+            'rental_frozen', v_rental_frozen
+        )
+    );
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'correction_needed', true,
+        'old_frozen', v_actual,
+        'new_frozen', v_calculated,
+        'difference', v_actual - v_calculated,
+        'activation_frozen', v_activation_frozen,
+        'rental_frozen', v_rental_frozen
+    );
+END;
+$function$
+
+
+
+2. Fonction:
+CREATE OR REPLACE FUNCTION public.prevent_direct_frozen_amount_update()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  -- Permettre aux fonctions SECURITY DEFINER (atomic_*) d'opérer
+  IF current_user = 'postgres' THEN
+    RETURN NEW;
+  END IF;
+  
+  -- Bloquer les modifications directes
+  IF OLD.frozen_balance IS DISTINCT FROM NEW.frozen_balance THEN
+    RAISE EXCEPTION 'Direct update of frozen_amount is forbidden. Use atomic_freeze, atomic_commit, or atomic_refund functions.';
+  END IF;
+  
+  RETURN NEW;
+END;
+$function$
+
+
+
+3. Fonction:
+CREATE OR REPLACE FUNCTION public.reconcile_frozen_balance(p_user_id uuid)
+ RETURNS TABLE(calculated_frozen numeric, actual_frozen numeric, difference numeric, needs_correction boolean)
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_calculated DECIMAL(10,2);
+    v_actual DECIMAL(10,2);
+    v_activation_frozen DECIMAL(10,2);
+    v_rental_frozen DECIMAL(10,2);
+BEGIN
+    -- Calculer la somme des frozen_amount pour les activations actives
+    SELECT COALESCE(SUM(frozen_amount), 0)
+    INTO v_activation_frozen
+    FROM activations
+    WHERE user_id = p_user_id
+    AND status IN ('pending', 'waiting')
+    AND frozen_amount > 0;
+    
+    -- Calculer la somme des frozen_amount pour les rentals actives
+    SELECT COALESCE(SUM(frozen_amount), 0)
+    INTO v_rental_frozen
+    FROM rentals
+    WHERE user_id = p_user_id
+    AND status = 'active'
+    AND frozen_amount > 0;
+    
+    -- Total calculé
+    v_calculated := v_activation_frozen + v_rental_frozen;
+    
+    -- Récupérer le frozen_balance actuel
+    SELECT COALESCE(frozen_balance, 0)
+    INTO v_actual
+    FROM users
+    WHERE id = p_user_id;
+    
+    RETURN QUERY SELECT 
+        v_calculated,
+        v_actual,
+        v_actual - v_calculated,
+        ABS(v_actual - v_calculated) > 0.01;
+END;
+$function$
+
+
+⚡ Triggers protect_frozen_amount:
+
+
+📦 activations:
+   Trigger: protect_frozen_amount_activations
+   Définition: CREATE TRIGGER protect_frozen_amount_activations BEFORE UPDATE ON public.activations FOR EACH ROW EXECUTE FUNCTION prevent_direct_frozen_amount_update()
+
+📦 rentals:
+   Trigger: protect_frozen_amount_rentals
+   Définition: CREATE TRIGGER protect_frozen_amount_rentals BEFORE UPDATE ON public.rentals FOR EACH ROW EXECUTE FUNCTION prevent_direct_frozen_amount_update()
+
+📦 users:
+   Trigger: prevent_direct_frozen_amount_update
+   Définition: CREATE TRIGGER prevent_direct_frozen_amount_update BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION prevent_direct_frozen_amount_update()
+
+
+📊 État actuel des frozen amounts:
+
+👥 Users:
+   ├─ Avec frozen: 2/45
+   ├─ Total frozen: 70 XOF
+   └─ Max frozen: 60 XOF
+
+📱 Activations avec frozen:
+   ├─ pending: 5 (70 XOF)
+   ├─ received: 1 (5 XOF)
+
+🏠 Rentals avec frozen:
+   ├─ active: 3 (15 XOF)
+
+
+⚠️  INCOHÉRENCES FROZEN:
+
+❌ 1 utilisateurs avec incohérence:
+
+buba6c@gmail.com:
+   ├─ Frozen user: 60 XOF
+   ├─ Frozen activations: 195 XOF
+   ├─ Frozen rentals: 60 XOF
+   ├─ Total attendu: 255 XOF
+   └─ Différence: -195 XOF
+
+💼 8. ANALYSE BALANCE OPERATIONS
+--------------------------------------------------------------------------------
+📋 Structure de balance_operations:
+
+   ├─ id: uuid NOT NULL DEFAULT gen_random_uuid()
+   ├─ user_id: uuid NOT NULL
+   ├─ activation_id: uuid NULL
+   ├─ rental_id: uuid NULL
+   ├─ related_transaction_id: uuid NULL
+   ├─ operation_type: text NOT NULL
+   ├─ amount: numeric NOT NULL
+   ├─ balance_before: numeric NOT NULL
+   ├─ balance_after: numeric NOT NULL
+   ├─ frozen_before: numeric NOT NULL
+   ├─ frozen_after: numeric NOT NULL
+   ├─ reason: text NULL
+   ├─ metadata: jsonb NULL DEFAULT '{}'::jsonb
+   ├─ created_at: timestamp without time zone NULL DEFAULT now()
+
+
+📊 Stats par type d'opération:
+
+freeze:
+   ├─ Nombre: 116
+   ├─ Total: 774 XOF
+   ├─ Moyenne: 6,672 XOF
+   ├─ Première: 02/12/2025 22:12:35
+   └─ Dernière: 04/12/2025 16:30:33
+refund:
+   ├─ Nombre: 91
+   ├─ Total: 590 XOF
+   ├─ Moyenne: 6,484 XOF
+   ├─ Première: 02/12/2025 23:23:26
+   └─ Dernière: 03/12/2025 22:35:52
+commit:
+   ├─ Nombre: 1
+   ├─ Total: 5 XOF
+   ├─ Moyenne: 5 XOF
+   ├─ Première: 03/12/2025 01:30:19
+   └─ Dernière: 03/12/2025 01:30:19
+
+
+⚠️  OPÉRATIONS PROBLÉMATIQUES:
+
+❌ 10 opérations avec calcul incorrect:
+
+1. freeze - buba6c@gmail.com
+   ├─ Balance avant: 60
+   ├─ Montant: 50
+   ├─ Balance après (attendue): 110
+   ├─ Balance après (réelle): 60
+   └─ Différence: -50
+2. freeze - kawdpc@gmail.com
+   ├─ Balance avant: 143
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 148
+   ├─ Balance après (réelle): 143
+   └─ Différence: -5
+3. freeze - kawdpc@gmail.com
+   ├─ Balance avant: 143
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 148
+   ├─ Balance après (réelle): 143
+   └─ Différence: -5
+4. refund - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+5. refund - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+6. refund - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+7. freeze - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+8. freeze - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+9. freeze - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+10. freeze - buba6c@gmail.com
+   ├─ Balance avant: 55
+   ├─ Montant: 5
+   ├─ Balance après (attendue): 60
+   ├─ Balance après (réelle): 55
+   └─ Différence: -5
+
+
+🏆 Top 5 users par opérations:
+
+1. buba6c@gmail.com: 178 opérations (1 138 XOF)
+2. kawdpc@gmail.com: 28 opérations (221 XOF)
+3. buba-test-1764770395684@example.com: 2 opérations (10 XOF)
+
+👁️  9. VUES (VIEWS)
+--------------------------------------------------------------------------------
+📊 Total: 9 vues
+
+
+1. 👁️  activation_stats
+   Définition:
+    SELECT user_id,
+    count(*) AS total_activations,
+    count(*) FILTER (WHERE (status = 'received'::text)) AS successful_activations,
+    count(*) FILTER (WHERE (status = 'timeout'::text)) AS timeout...
+
+2. 👁️  available_services
+   Définition:
+    SELECT DISTINCT activations.service_code,
+    activations.country_code,
+    'activation'::text AS type,
+    count(*) AS usage_count,
+    max(activations.created_at) AS last_used
+   FROM activations
+ ...
+
+3. 👁️  v_country_health
+   Définition:
+    SELECT country_code,
+    count(*) AS total_activations_24h,
+    sum(
+        CASE
+            WHEN (status = 'received'::text) THEN 1
+            ELSE 0
+        END) AS successful_activations,
+    ro...
+
+4. 👁️  v_dashboard_stats
+   Définition:
+    SELECT count(*) AS total_activations_24h,
+    sum(
+        CASE
+            WHEN (status = 'received'::text) THEN 1
+            ELSE 0
+        END) AS successful_24h,
+    sum(
+        CASE
+          ...
+
+5. 👁️  v_frozen_balance_health
+   Définition:
+    SELECT (( SELECT COALESCE(sum(activations.frozen_amount), (0)::numeric) AS "coalesce"
+           FROM activations
+          WHERE ((activations.status = ANY (ARRAY['pending'::text, 'waiting'::text]))...
+
+6. 👁️  v_frozen_balance_health_reconciliation
+   Définition:
+    WITH user_frozen_sums AS (
+         SELECT combined.user_id,
+            COALESCE(sum(combined.frozen_amount), (0)::numeric) AS total_frozen_activations
+           FROM ( SELECT activations.user_id,
+...
+
+7. 👁️  v_provider_stats_24h
+   Définition:
+    SELECT provider,
+    action,
+    count(*) AS total_calls,
+    count(*) FILTER (WHERE (response_status = 200)) AS success_count,
+    count(*) FILTER (WHERE (error_message IS NOT NULL)) AS error_count,...
+
+8. 👁️  v_service_health
+   Définition:
+    SELECT service_code,
+    count(*) AS total_activations_24h,
+    sum(
+        CASE
+            WHEN (status = 'received'::text) THEN 1
+            ELSE 0
+        END) AS successful_activations,
+    su...
+
+9. 👁️  v_service_response_time
+   Définition:
+    SELECT service_code,
+    count(*) AS successful_count,
+    round(avg((EXTRACT(epoch FROM (sms_received_at - created_at)) / (60)::numeric)), 1) AS avg_wait_minutes,
+    round(min((EXTRACT(epoch FROM (...
+
+🔢 10. SEQUENCES
+--------------------------------------------------------------------------------
+ℹ️  Aucune séquence trouvée (utilisation de UUID)
+
+🧩 11. EXTENSIONS POSTGRESQL
+--------------------------------------------------------------------------------
+📊 Total: 9 extensions
+
+1. http (v1.6)
+2. pg_cron (v1.6.4)
+3. pg_graphql (v1.5.11)
+4. pg_net (v0.19.5)
+5. pg_stat_statements (v1.11)
+6. pgcrypto (v1.3)
+7. plpgsql (v1.0)
+8. supabase_vault (v0.3.1)
+9. uuid-ossp (v1.1)
+
+📈 12. STATISTIQUES DES TABLES
+--------------------------------------------------------------------------------
+❌ Erreur: column "tablename" does not exist
+
+================================================================================
+✅ ANALYSE SQL COMPLÈTE TERMINÉE
+================================================================================

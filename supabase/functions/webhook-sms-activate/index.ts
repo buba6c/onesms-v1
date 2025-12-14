@@ -12,28 +12,16 @@ serve(async (req) => {
   }
 
   try {
-    // Vérifier l'IP source (whitelist SMS-Activate)
+    // Logger l'IP source pour debug
     const forwardedFor = req.headers.get('x-forwarded-for')
     const realIp = req.headers.get('x-real-ip')
     const clientIp = forwardedFor?.split(',')[0] || realIp || 'unknown'
     
     console.log('📥 Webhook received from IP:', clientIp)
 
-    const ALLOWED_IPS = ['188.42.218.183', '142.91.156.119']
-    
-    // En développement, accepter toutes les IPs, en production vérifier
-    const isDevelopment = Deno.env.get('ENVIRONMENT') === 'development'
-    
-    if (!isDevelopment && !ALLOWED_IPS.includes(clientIp)) {
-      console.error('❌ Unauthorized IP:', clientIp)
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized IP address' }),
-        { 
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
+    // IPs SMS-Activate connues (pour référence seulement)
+    // 188.42.218.183, 142.91.156.119
+    // Note: IP filtering désactivé car SMS-Activate peut utiliser des IPs dynamiques
 
     // Parser le payload
     const payload = await req.json()
@@ -90,21 +78,25 @@ serve(async (req) => {
       })
     }
 
-    // Mettre à jour l'activation
-    const { error: updateError } = await supabase
-      .from('activations')
-      .update({
-        status: 'completed',
-        sms_code: code,
-        sms_text: text,
-        received_at: receivedAt || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('order_id', activationId)
+    // 1. Appel unique et atomique : process_sms_received fait update + commit + transaction
+    const { data: processResult, error: processError } = await supabase.rpc('process_sms_received', {
+      p_order_id: activationId,
+      p_code: code,
+      p_text: text,
+      p_source: 'webhook'
+    })
 
-    if (updateError) {
-      console.error('❌ Error updating activation:', updateError)
-      throw updateError
+    if (processError) {
+      console.error('❌ process_sms_received error:', processError)
+      throw processError
+    }
+
+    if (processResult?.idempotent) {
+      console.log('⚠️ Already processed (idempotent)')
+    } else if (processResult?.success) {
+      console.log('✅ process_sms_received SUCCESS:', processResult)
+    } else {
+      console.error('❌ process_sms_received returned error payload:', processResult)
     }
 
     console.log('✅ Activation updated successfully:', activationId)

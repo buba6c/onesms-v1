@@ -3,17 +3,20 @@
 ## 📋 Résumé des Problèmes Identifiés
 
 ### 1. **Stats incorrectes (1000 au lieu de 25835)**
+
 - **Problème**: Query Supabase limitée à 1000 records par défaut
 - **Impact**: `totalAvailable` et `pricingRulesCount` incorrects dans l'admin
 - **Solution**: Implémenté pagination dans `getServiceStats()`
 
 ### 2. **Ordre des services incorrect**
+
 - **Problème**: `popularity_score: 0` pour tous les services SMS-Activate
 - **Impact**: Services dans le mauvais ordre (30% match avec SMS-Activate)
 - **Ordre attendu**: ig, wa, tg, go, fb, vk, tw, ok, vi, ds
 - **Solution**: Ajouté mapping `smsActivateOrder` dans la Edge Function
 
 ### 3. **25,835 pricing_rules mélangées**
+
 - **Problème**: Anciennes règles de multiples providers
 - **Impact**: SMS-Activate (17 règles) mélangées avec 25,818 anciennes règles
 - **Solution**: Script de nettoyage créé (`cleanup_old_rules.mjs`)
@@ -23,6 +26,7 @@
 ## ✅ Fichiers Modifiés
 
 ### 1. `src/lib/sync-service.ts`
+
 ```diff
 - // Récupérer TOUTES les pricing_rules sans limite
 - const { data: pricing } = await supabase
@@ -39,7 +43,7 @@
 + let allPricing: any[] = []
 + let page = 0
 + const pageSize = 1000
-+ 
++
 + while (hasMore) {
 +   const { data: pricingPage } = await supabase
 +     .from('pricing_rules')
@@ -54,6 +58,7 @@
 ---
 
 ### 2. `supabase/functions/sync-sms-activate/index.ts`
+
 ```diff
 - servicesToUpsert.push({
 -   code: serviceCode,
@@ -76,9 +81,9 @@
 +   'ds': 910,       // Discord
 +   ...
 + }
-+ 
++
 + const popularityScore = smsActivateOrder[serviceCode] || 5
-+ 
++
 + servicesToUpsert.push({
 +   code: serviceCode,
 +   ...
@@ -94,7 +99,9 @@
 ## 🧪 Scripts de Test Créés
 
 ### 1. `deep_sync_analysis.mjs`
+
 Analyse complète:
+
 - Count exact des pricing_rules
 - Breakdown par provider
 - Total available calculé
@@ -103,20 +110,26 @@ Analyse complète:
 - Derniers sync_logs
 
 ### 2. `cleanup_old_rules.mjs`
+
 Nettoyage:
+
 - Supprime toutes les règles NON sms-activate
 - Affiche stats avant/après
 - Garde uniquement les règles actuelles
 
 ### 3. `check_current_state.mjs`
+
 État actuel:
+
 - Total pricing_rules
 - Stats par provider
 - Top 15 services (ordre actuel)
 - Comparaison avec ordre attendu
 
 ### 4. `test_full_sync.sh`
+
 Test complet:
+
 1. Nettoie anciennes règles
 2. Lance sync SMS-Activate
 3. Analyse résultats
@@ -129,16 +142,19 @@ Test complet:
 ### À Tester Localement (Port 3001)
 
 1. **Vérifier les stats corrigées**:
+
    - Ouvrir http://localhost:3001/admin/services
    - Vérifier que "Total Numbers" affiche le bon total (pas 5M)
    - Vérifier "Pricing rules" affiche le bon count (pas 1000)
 
 2. **Nettoyer et synchroniser**:
+
    ```bash
    ./test_full_sync.sh
    ```
 
 3. **Vérifier l'ordre des services**:
+
    - Dashboard doit afficher: Instagram, WhatsApp, Telegram, Google, Facebook...
    - Pas: WhatsApp, Telegram, PayPal, Badoo...
 
@@ -152,19 +168,21 @@ Test complet:
 ✅ Ordre des services correct  
 ✅ Stats affichent les vraies valeurs  
 ✅ Sync SMS-Activate fonctionne  
-✅ Pas d'erreurs dans la console  
+✅ Pas d'erreurs dans la console
 
 ---
 
 ## 📊 Résultats Attendus Après Corrections
 
 **Avant**:
+
 - Pricing rules: 1000 (affiché) / 25835 (réel)
 - Total available: 5-10M (fluctuant)
 - Ordre: wa, tg, ts, badoo... (30% match)
 - WhatsApp: 999 numbers
 
 **Après**:
+
 - Pricing rules: ~2000+ (exact count)
 - Total available: 543k+ (SMS-Activate uniquement)
 - Ordre: ig, wa, tg, go, fb... (100% match)

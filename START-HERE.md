@@ -13,6 +13,7 @@ node import-icons.js     # Import complet (10-15 min)
 ## 📦 Ce que ça fait
 
 Génère automatiquement **~7800 icônes** pour vos **1300+ services** :
+
 - 1 SVG optimisé + 5 PNG (32, 64, 128, 256, 512 px)
 - Upload sur S3
 - Update base de données

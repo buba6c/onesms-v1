@@ -3,18 +3,20 @@
 ## 🎯 Problème identifié
 
 ### Symptôme
+
 Les numéros expirés ou déjà utilisés continuent à s'afficher sur le dashboard après expiration.
 
 ### Cause racine
+
 Dans `src/pages/DashboardPage.tsx` lignes 146-150 :
 
 ```typescript
 const { data, error } = await supabase
-  .from('activations')
-  .select('*')
-  .eq('user_id', user.id)
-  .in('status', ['pending', 'waiting'])  // ❌ Problème ici
-  .order('created_at', { ascending: false });
+  .from("activations")
+  .select("*")
+  .eq("user_id", user.id)
+  .in("status", ["pending", "waiting"]) // ❌ Problème ici
+  .order("created_at", { ascending: false });
 ```
 
 Le problème : Les activations expirées ont leur statut qui reste `'pending'` ou `'waiting'` en base de données, même après expiration.
@@ -29,12 +31,12 @@ Le problème : Les activations expirées ont leur statut qui reste `'pending'` o
 
 ```typescript
 const { data, error } = await supabase
-  .from('activations')
-  .select('*')
-  .eq('user_id', user.id)
-  .in('status', ['pending', 'waiting'])
-  .gt('expires_at', new Date().toISOString())  // ✅ Seulement les non expirés
-  .order('created_at', { ascending: false });
+  .from("activations")
+  .select("*")
+  .eq("user_id", user.id)
+  .in("status", ["pending", "waiting"])
+  .gt("expires_at", new Date().toISOString()) // ✅ Seulement les non expirés
+  .order("created_at", { ascending: false });
 ```
 
 ---
@@ -45,30 +47,30 @@ const { data, error } = await supabase
 
 ```typescript
 // supabase/functions/cleanup-expired-activations/index.ts
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 serve(async (req) => {
   const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
   // Mettre à jour les activations expirées
   const { data, error } = await supabase
-    .from('activations')
-    .update({ status: 'timeout' })
-    .in('status', ['pending', 'waiting'])
-    .lt('expires_at', new Date().toISOString())
+    .from("activations")
+    .update({ status: "timeout" })
+    .in("status", ["pending", "waiting"])
+    .lt("expires_at", new Date().toISOString());
 
   return new Response(
-    JSON.stringify({ 
+    JSON.stringify({
       success: !error,
-      updated: data?.length || 0
+      updated: data?.length || 0,
     }),
-    { headers: { 'Content-Type': 'application/json' } }
-  )
-})
+    { headers: { "Content-Type": "application/json" } }
+  );
+});
 ```
 
 **Appeler cette fonction toutes les 5 minutes via Supabase Cron.**
@@ -80,22 +82,26 @@ serve(async (req) => {
 **Dans DashboardPage.tsx, après la récupération:**
 
 ```typescript
-return data?.map(act => {
-  const expiresAt = new Date(act.expires_at).getTime();
-  const now = Date.now();
-  const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+return (
+  data
+    ?.map((act) => {
+      const expiresAt = new Date(act.expires_at).getTime();
+      const now = Date.now();
+      const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
 
-  // ✅ Ne pas inclure les numéros expirés
-  if (timeRemaining === 0) {
-    return null;
-  }
+      // ✅ Ne pas inclure les numéros expirés
+      if (timeRemaining === 0) {
+        return null;
+      }
 
-  return {
-    id: act.id,
-    orderId: act.order_id,
-    // ... rest of the mapping
-  } as ActiveNumber;
-}).filter(Boolean) || [];  // ✅ Supprimer les null
+      return {
+        id: act.id,
+        orderId: act.order_id,
+        // ... rest of the mapping
+      } as ActiveNumber;
+    })
+    .filter(Boolean) || []
+); // ✅ Supprimer les null
 ```
 
 ---
@@ -110,15 +116,16 @@ return data?.map(act => {
 
 ```typescript
 const { data, error } = await supabase
-  .from('activations')
-  .select('*')
-  .eq('user_id', user.id)
-  .in('status', ['pending', 'waiting'])
-  .gt('expires_at', new Date().toISOString())  // ✅ Ajout de ce filtre
-  .order('created_at', { ascending: false });
+  .from("activations")
+  .select("*")
+  .eq("user_id", user.id)
+  .in("status", ["pending", "waiting"])
+  .gt("expires_at", new Date().toISOString()) // ✅ Ajout de ce filtre
+  .order("created_at", { ascending: false });
 ```
 
 **Rebuild:**
+
 ```bash
 cd "/Users/mac/Desktop/ONE SMS V1"
 npm run build
@@ -139,85 +146,85 @@ mkdir -p supabase/functions/cleanup-expired-activations
 **Créer:** `supabase/functions/cleanup-expired-activations/index.ts`
 
 ```typescript
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    console.log('🧹 [CLEANUP] Nettoyage des activations expirées...')
+    console.log("🧹 [CLEANUP] Nettoyage des activations expirées...");
 
     // Mettre à jour les activations expirées
     const { data, error } = await supabase
-      .from('activations')
-      .update({ 
-        status: 'timeout',
-        updated_at: new Date().toISOString()
+      .from("activations")
+      .update({
+        status: "timeout",
+        updated_at: new Date().toISOString(),
       })
-      .in('status', ['pending', 'waiting'])
-      .lt('expires_at', new Date().toISOString())
-      .select()
+      .in("status", ["pending", "waiting"])
+      .lt("expires_at", new Date().toISOString())
+      .select();
 
     if (error) {
-      console.error('❌ [CLEANUP] Erreur:', error)
-      throw error
+      console.error("❌ [CLEANUP] Erreur:", error);
+      throw error;
     }
 
-    const count = data?.length || 0
-    console.log(`✅ [CLEANUP] ${count} activations nettoyées`)
+    const count = data?.length || 0;
+    console.log(`✅ [CLEANUP] ${count} activations nettoyées`);
 
     // Supprimer les transactions pending associées
     if (count > 0) {
-      const activationIds = data.map(act => act.id)
-      
+      const activationIds = data.map((act) => act.id);
+
       await supabase
-        .from('transactions')
+        .from("transactions")
         .delete()
-        .in('metadata->>activation_id', activationIds)
-        .eq('status', 'pending')
-      
-      console.log(`✅ [CLEANUP] Transactions pending supprimées`)
+        .in("metadata->>activation_id", activationIds)
+        .eq("status", "pending");
+
+      console.log(`✅ [CLEANUP] Transactions pending supprimées`);
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         cleaned: count,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
       }
-    )
-
+    );
   } catch (error: any) {
-    console.error('❌ [CLEANUP] Exception:', error)
+    console.error("❌ [CLEANUP] Exception:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: false,
-        error: error.message 
+        error: error.message,
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
       }
-    )
+    );
   }
-})
+});
 ```
 
 #### Étape 2: Déployer la fonction
@@ -265,16 +272,16 @@ Même chose que Solution 1 ci-dessus.
 
 ```sql
 -- Avant nettoyage
-SELECT COUNT(*) FROM activations 
-WHERE status IN ('pending', 'waiting') 
+SELECT COUNT(*) FROM activations
+WHERE status IN ('pending', 'waiting')
 AND expires_at < NOW();
 
 -- Appeler la fonction
 -- (ou attendre 5 minutes si cron configuré)
 
 -- Après nettoyage
-SELECT COUNT(*) FROM activations 
-WHERE status = 'timeout' 
+SELECT COUNT(*) FROM activations
+WHERE status = 'timeout'
 AND expires_at < NOW();
 ```
 
@@ -285,7 +292,7 @@ AND expires_at < NOW();
 ### Compter les activations par statut
 
 ```sql
-SELECT 
+SELECT
   status,
   COUNT(*) as count,
   COUNT(*) FILTER (WHERE expires_at < NOW()) as expired_count
@@ -297,7 +304,7 @@ ORDER BY count DESC;
 ### Lister les numéros expirés toujours actifs
 
 ```sql
-SELECT 
+SELECT
   id,
   order_id,
   phone,
@@ -326,7 +333,7 @@ AND expires_at < NOW();
 DELETE FROM transactions
 WHERE status = 'pending'
 AND metadata->>'activation_id' IN (
-  SELECT id::text FROM activations 
+  SELECT id::text FROM activations
   WHERE status = 'timeout'
 );
 ```
@@ -363,7 +370,7 @@ cat > temp_fix.patch << 'EOF'
        .in('status', ['pending', 'waiting'])
 +      .gt('expires_at', new Date().toISOString())
        .order('created_at', { ascending: false });
- 
+
      if (error) {
 EOF
 

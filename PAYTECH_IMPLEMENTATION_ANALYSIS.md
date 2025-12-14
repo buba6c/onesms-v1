@@ -8,13 +8,13 @@
 
 ## 📊 RÉSUMÉ EXÉCUTIF
 
-| Composant | État | Conforme? | Priorité |
-|-----------|------|-----------|----------|
-| API Client (paytech.ts) | ✅ Complet | ✅ 100% | - |
-| Edge Function IPN | ✅ Complet | ✅ 100% | - |
-| TransactionsPage | ⚠️ 80% | ❌ Bugs | 🔴 HAUTE |
-| TopUpPage | ❌ 0% | ❌ Non connecté | 🔴 CRITIQUE |
-| Variables .env | ⚠️ Placeholders | ❌ Non configuré | 🔴 CRITIQUE |
+| Composant               | État            | Conforme?        | Priorité    |
+| ----------------------- | --------------- | ---------------- | ----------- |
+| API Client (paytech.ts) | ✅ Complet      | ✅ 100%          | -           |
+| Edge Function IPN       | ✅ Complet      | ✅ 100%          | -           |
+| TransactionsPage        | ⚠️ 80%          | ❌ Bugs          | 🔴 HAUTE    |
+| TopUpPage               | ❌ 0%           | ❌ Non connecté  | 🔴 CRITIQUE |
+| Variables .env          | ⚠️ Placeholders | ❌ Non configuré | 🔴 CRITIQUE |
 
 **Verdict:** Implémentation backend excellente, frontend à finaliser
 
@@ -27,12 +27,15 @@
 **Conforme à la documentation officielle:**
 
 ✅ **Base URL correcte:**
+
 ```typescript
-BASE_URL = import.meta.env.VITE_PAYTECH_API_URL || 'https://paytech.sn/api'
+BASE_URL = import.meta.env.VITE_PAYTECH_API_URL || "https://paytech.sn/api";
 ```
+
 📖 **Doc:** `https://paytech.sn/api` ✅
 
 ✅ **Headers corrects:**
+
 ```typescript
 headers: {
   'API_KEY': API_KEY,
@@ -40,15 +43,19 @@ headers: {
   'Content-Type': 'application/json',
 }
 ```
+
 📖 **Doc:** API_KEY + API_SECRET dans headers ✅
 
 ✅ **Endpoint requestPayment:**
+
 ```typescript
-apiPaytech.post('/payment/request-payment', payload)
+apiPaytech.post("/payment/request-payment", payload);
 ```
+
 📖 **Doc:** `POST /payment/request-payment` ✅
 
 ✅ **Paramètres obligatoires:**
+
 ```typescript
 {
   item_name: payment.item_name,      // ✅
@@ -59,42 +66,51 @@ apiPaytech.post('/payment/request-payment', payload)
   env: ENV,                           // ✅
 }
 ```
+
 📖 **Doc:** Tous les paramètres requis présents ✅
 
 ✅ **Paramètres optionnels:**
+
 ```typescript
-if (payment.target_payment) payload.target_payment = payment.target_payment // ✅
-if (payment.custom_field) payload.custom_field = JSON.stringify(payment.custom_field) // ✅
-if (ipnUrl) payload.ipn_url = ipnUrl // ✅
-if (successUrl) payload.success_url = successUrl // ✅
-if (cancelUrl) payload.cancel_url = cancelUrl // ✅
+if (payment.target_payment) payload.target_payment = payment.target_payment; // ✅
+if (payment.custom_field)
+  payload.custom_field = JSON.stringify(payment.custom_field); // ✅
+if (ipnUrl) payload.ipn_url = ipnUrl; // ✅
+if (successUrl) payload.success_url = successUrl; // ✅
+if (cancelUrl) payload.cancel_url = cancelUrl; // ✅
 ```
+
 📖 **Doc:** Implémentation correcte ✅
 
 ✅ **Vérification SHA256:**
+
 ```typescript
 export const verifyIPN = (ipnData: any): boolean => {
-  const expectedKeyHash = CryptoJS.SHA256(API_KEY).toString()
-  const expectedSecretHash = CryptoJS.SHA256(API_SECRET).toString()
+  const expectedKeyHash = CryptoJS.SHA256(API_KEY).toString();
+  const expectedSecretHash = CryptoJS.SHA256(API_SECRET).toString();
   return (
     expectedKeyHash === ipnData.api_key_sha256 &&
     expectedSecretHash === ipnData.api_secret_sha256
-  )
-}
+  );
+};
 ```
+
 📖 **Doc:** Méthode 2 (SHA256 Classique) - Conforme ✅
 
 ✅ **Vérification HMAC (Recommandée):**
+
 ```typescript
 export const verifyHMAC = (amount, refCommand, receivedHmac): boolean => {
-  const message = `${amount}|${refCommand}|${API_KEY}`
-  const expectedHmac = CryptoJS.HmacSHA256(message, API_SECRET).toString()
-  return expectedHmac === receivedHmac
-}
+  const message = `${amount}|${refCommand}|${API_KEY}`;
+  const expectedHmac = CryptoJS.HmacSHA256(message, API_SECRET).toString();
+  return expectedHmac === receivedHmac;
+};
 ```
+
 📖 **Doc:** Méthode 1 (HMAC-SHA256) - Conforme ✅
 
 ✅ **Méthodes additionnelles:**
+
 - `getPaymentStatus(token)` → `GET /payment/get-status?token_payment={token}` ✅
 - `refundPayment(refCommand)` → `POST /payment/refund-payment` ✅
 - `transferFunds(...)` → `POST /transfer/transferFund` ✅
@@ -108,43 +124,60 @@ export const verifyHMAC = (amount, refCommand, receivedHmac): boolean => {
 ### 2. Edge Function IPN (supabase/functions/paytech-ipn/index.ts)
 
 ✅ **Vérification signature:**
-```typescript
-const expectedApiKeyHash = createHmac('sha256', '').update(apiKey).digest('hex');
-const expectedApiSecretHash = createHmac('sha256', '').update(apiSecret).digest('hex');
 
-if (ipnData.api_key_sha256 !== expectedApiKeyHash || 
-    ipnData.api_secret_sha256 !== expectedApiSecretHash) {
-  return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 });
+```typescript
+const expectedApiKeyHash = createHmac("sha256", "")
+  .update(apiKey)
+  .digest("hex");
+const expectedApiSecretHash = createHmac("sha256", "")
+  .update(apiSecret)
+  .digest("hex");
+
+if (
+  ipnData.api_key_sha256 !== expectedApiKeyHash ||
+  ipnData.api_secret_sha256 !== expectedApiSecretHash
+) {
+  return new Response(JSON.stringify({ error: "Invalid signature" }), {
+    status: 401,
+  });
 }
 ```
+
 📖 **Doc:** Méthode SHA256 - Conforme ✅
 
 ✅ **Traitement type_event:**
+
 ```typescript
-const newStatus = ipnData.type_event === 'sale_complete' ? 'completed' : 'failed';
+const newStatus =
+  ipnData.type_event === "sale_complete" ? "completed" : "failed";
 ```
+
 📖 **Doc:** `sale_complete` pour succès, `sale_canceled` pour échec ✅
 
 ✅ **Ajout crédits:**
+
 ```typescript
-if (newStatus === 'completed') {
-  await supabaseClient.rpc('add_credits', {
+if (newStatus === "completed") {
+  await supabaseClient.rpc("add_credits", {
     p_user_id: transaction.user_id,
     p_amount: transaction.amount,
-    p_type: 'recharge',
+    p_type: "recharge",
     p_transaction_id: transaction.id,
     p_description: `Rechargement via PayTech - ${ipnData.ref_command}`,
   });
 }
 ```
+
 📖 **Doc:** Logique correcte ✅
 
 ✅ **Gestion CORS:**
+
 ```typescript
-if (req.method === 'OPTIONS') {
-  return new Response('ok', { headers: corsHeaders });
+if (req.method === "OPTIONS") {
+  return new Response("ok", { headers: corsHeaders });
 }
 ```
+
 📖 **Doc:** Bonne pratique ✅
 
 **Conclusion:** Edge Function 100% conforme et sécurisée ✅
@@ -158,6 +191,7 @@ if (req.method === 'OPTIONS') {
 **Problème 1: process.env au lieu de import.meta.env**
 
 ❌ **Code actuel (lignes 105-107):**
+
 ```typescript
 const payment = await paytech.requestPayment(
   {...},
@@ -168,6 +202,7 @@ const payment = await paytech.requestPayment(
 ```
 
 ✅ **Correction requise:**
+
 ```typescript
 const payment = await paytech.requestPayment(
   {...},
@@ -184,23 +219,27 @@ const payment = await paytech.requestPayment(
 **Problème 2: Pas de vérification redirect_url**
 
 ❌ **Code actuel (ligne 130):**
+
 ```typescript
 onSuccess: (payment) => {
   window.location.href = payment.redirect_url; // ❌ Pas de vérification
-}
+};
 ```
 
 ✅ **Correction requise:**
+
 ```typescript
 onSuccess: (payment) => {
   if (!payment.redirect_url) {
-    throw new Error('Aucune URL de redirection reçue de PayTech');
+    throw new Error("Aucune URL de redirection reçue de PayTech");
   }
   if (payment.success !== 1) {
-    throw new Error(payment.message || 'Erreur lors de la création du paiement');
+    throw new Error(
+      payment.message || "Erreur lors de la création du paiement"
+    );
   }
   window.location.href = payment.redirect_url;
-}
+};
 ```
 
 **Impact:** Erreur silencieuse si PayTech retourne erreur
@@ -212,6 +251,7 @@ onSuccess: (payment) => {
 **Problème: Bouton non fonctionnel (0% implémenté)**
 
 ❌ **Code actuel (ligne 204):**
+
 ```typescript
 <Button className="w-full mt-6 bg-white text-blue-600">
   <CreditCard className="w-5 h-5 mr-2" />
@@ -223,65 +263,70 @@ onSuccess: (payment) => {
 ✅ **Implémentation requise:**
 
 **Étape 1: Imports manquants**
+
 ```typescript
-import paytech from '@/lib/api/paytech';
-import { useAuthStore } from '@/stores/authStore';
-import { useMutation } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
+import paytech from "@/lib/api/paytech";
+import { useAuthStore } from "@/stores/authStore";
+import { useMutation } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 ```
 
 **Étape 2: Créer mutation**
+
 ```typescript
 const { user } = useAuthStore();
 
 const rechargeMutation = useMutation({
   mutationFn: async () => {
     if (!selectedPackage) {
-      throw new Error('Veuillez sélectionner un montant');
+      throw new Error("Veuillez sélectionner un montant");
     }
-    
+
     const ref = `RECHARGE_${user.id}_${Date.now()}`;
-    
+
     // 1. Créer demande de paiement PayTech
     const payment = await paytech.requestPayment(
       {
-        item_name: 'Rechargement crédits ONE SMS',
+        item_name: "Rechargement crédits ONE SMS",
         item_price: selectedPackage,
         currency: selectedCurrency,
         ref_command: ref,
         command_name: `Rechargement de ${selectedPackage} ${selectedCurrency}`,
-        target_payment: selectedProvider === 'paytech' ? undefined : selectedProvider,
+        target_payment:
+          selectedProvider === "paytech" ? undefined : selectedProvider,
         custom_field: {
           user_id: user.id,
-          type: 'recharge',
-          provider: selectedProvider
-        }
+          type: "recharge",
+          provider: selectedProvider,
+        },
       },
       import.meta.env.VITE_PAYTECH_IPN_URL,
       import.meta.env.VITE_PAYTECH_SUCCESS_URL,
       import.meta.env.VITE_PAYTECH_CANCEL_URL
     );
-    
+
     // 2. Vérifier réponse
     if (payment.success !== 1) {
-      throw new Error(payment.message || 'Erreur lors de la création du paiement');
+      throw new Error(
+        payment.message || "Erreur lors de la création du paiement"
+      );
     }
-    
+
     // 3. Créer transaction dans Supabase
-    const { error } = await supabase.from('transactions').insert({
+    const { error } = await supabase.from("transactions").insert({
       user_id: user.id,
-      type: 'recharge',
+      type: "recharge",
       amount: selectedPackage,
       currency: selectedCurrency,
-      status: 'pending',
-      payment_method: 'paytech',
+      status: "pending",
+      payment_method: "paytech",
       payment_ref: ref,
       description: `Rechargement de ${selectedPackage} ${selectedCurrency} via ${selectedProvider}`,
     });
-    
+
     if (error) throw error;
-    
+
     return payment;
   },
   onSuccess: (payment) => {
@@ -289,14 +334,15 @@ const rechargeMutation = useMutation({
     window.location.href = payment.redirect_url;
   },
   onError: (error: any) => {
-    toast.error(error.message || 'Erreur lors du paiement');
-  }
+    toast.error(error.message || "Erreur lors du paiement");
+  },
 });
 ```
 
 **Étape 3: Connecter bouton**
+
 ```typescript
-<Button 
+<Button
   className="w-full mt-6 bg-white text-blue-600"
   onClick={() => rechargeMutation.mutate()}
   disabled={!selectedPackage || !selectedProvider || rechargeMutation.isPending}
@@ -324,6 +370,7 @@ const rechargeMutation = useMutation({
 **Problème: Valeurs placeholder**
 
 ❌ **Configuration actuelle:**
+
 ```bash
 VITE_PAYTECH_API_KEY=your_paytech_api_key_here          # ❌ Placeholder
 VITE_PAYTECH_API_SECRET=your_paytech_api_secret_here    # ❌ Placeholder
@@ -334,6 +381,7 @@ VITE_PAYTECH_CANCEL_URL=https://yourdomain.com/transactions?status=cancelled # �
 ```
 
 ✅ **Configuration requise:**
+
 ```bash
 # 1. Clés API (obtenir depuis PayTech Dashboard)
 VITE_PAYTECH_API_KEY=VRAIE_CLE_API_ICI
@@ -358,17 +406,20 @@ VITE_PAYTECH_CANCEL_URL=https://VOTRE_DOMAINE.com/transactions?status=cancelled
 **Problème: Base URL incorrecte**
 
 ❌ **Actuel:**
+
 ```
 VITE_PAYTECH_API_URL=https://paytech.sn/api/payment
 ```
 
 📖 **Documentation officielle:**
+
 ```
 URL de base: https://paytech.sn/api
 Endpoint: POST /payment/request-payment
 ```
 
 ✅ **Correction:**
+
 ```
 VITE_PAYTECH_API_URL=https://paytech.sn/api
 ```
@@ -406,7 +457,6 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
 - [ ] **1. Fixer TransactionsPage.tsx**
   - [ ] Remplacer `process.env` par `import.meta.env` (3 occurrences)
   - [ ] Ajouter vérification `payment.redirect_url` dans `onSuccess`
-  
 - [ ] **2. Connecter TopUpPage.tsx**
   - [ ] Ajouter imports manquants (5 imports)
   - [ ] Créer `rechargeMutation` avec logique complète
@@ -418,14 +468,12 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
 - [ ] **3. Obtenir clés PayTech**
   - [ ] S'inscrire sur https://paytech.sn
   - [ ] Récupérer API_KEY et API_SECRET depuis Dashboard
-  
 - [ ] **4. Configurer .env**
   - [ ] Remplacer `your_paytech_api_key_here` par vraie clé
   - [ ] Remplacer `your_paytech_api_secret_here` par vraie clé
   - [ ] Corriger `VITE_PAYTECH_API_URL` (retirer `/payment`)
   - [ ] Remplacer `yourdomain.com` par domaine production réel
   - [ ] Configurer `VITE_PAYTECH_IPN_URL` avec URL Supabase Edge Function
-  
 - [ ] **5. Configurer Supabase Secrets**
   - [ ] Ajouter `PAYTECH_API_KEY` dans Edge Function Environment Variables
   - [ ] Ajouter `PAYTECH_API_SECRET` dans Edge Function Environment Variables
@@ -441,7 +489,6 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
   - [ ] Vérifier IPN reçu dans Supabase Logs
   - [ ] Vérifier transaction passée à `completed`
   - [ ] Vérifier crédits ajoutés dans compte utilisateur
-  
 - [ ] **7. Activer Production (si prêt)**
   - [ ] Envoyer email à contact@paytech.sn
   - [ ] Joindre documents requis (NINEA, ID, etc.)
@@ -463,44 +510,44 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
 
 ### Paramètres Request Payment
 
-| Paramètre | Notre Implémentation | Doc Officielle | Statut |
-|-----------|---------------------|----------------|--------|
-| `item_name` | ✅ Présent | ✅ Requis | ✅ Conforme |
-| `item_price` | ✅ Présent | ✅ Requis | ✅ Conforme |
-| `currency` | ✅ Défaut XOF | ✅ Défaut XOF | ✅ Conforme |
-| `ref_command` | ✅ Présent | ✅ Requis | ✅ Conforme |
-| `command_name` | ✅ Présent | ✅ Requis | ✅ Conforme |
-| `env` | ✅ Présent | ✅ Défaut prod | ✅ Conforme |
-| `ipn_url` | ✅ Présent | ⚠️ Recommandé | ✅ Conforme |
-| `success_url` | ✅ Présent | ❌ Optionnel | ✅ Conforme |
-| `cancel_url` | ✅ Présent | ❌ Optionnel | ✅ Conforme |
-| `custom_field` | ✅ JSON.stringify() | ✅ JSON encodé | ✅ Conforme |
-| `target_payment` | ✅ Présent | ❌ Optionnel | ✅ Conforme |
+| Paramètre        | Notre Implémentation | Doc Officielle | Statut      |
+| ---------------- | -------------------- | -------------- | ----------- |
+| `item_name`      | ✅ Présent           | ✅ Requis      | ✅ Conforme |
+| `item_price`     | ✅ Présent           | ✅ Requis      | ✅ Conforme |
+| `currency`       | ✅ Défaut XOF        | ✅ Défaut XOF  | ✅ Conforme |
+| `ref_command`    | ✅ Présent           | ✅ Requis      | ✅ Conforme |
+| `command_name`   | ✅ Présent           | ✅ Requis      | ✅ Conforme |
+| `env`            | ✅ Présent           | ✅ Défaut prod | ✅ Conforme |
+| `ipn_url`        | ✅ Présent           | ⚠️ Recommandé  | ✅ Conforme |
+| `success_url`    | ✅ Présent           | ❌ Optionnel   | ✅ Conforme |
+| `cancel_url`     | ✅ Présent           | ❌ Optionnel   | ✅ Conforme |
+| `custom_field`   | ✅ JSON.stringify()  | ✅ JSON encodé | ✅ Conforme |
+| `target_payment` | ✅ Présent           | ❌ Optionnel   | ✅ Conforme |
 
 **Verdict:** 100% conforme à la documentation ✅
 
 ### Notifications IPN
 
-| Champ IPN | Notre Vérification | Doc Officielle | Statut |
-|-----------|-------------------|----------------|--------|
-| `type_event` | ✅ Vérifié | `sale_complete`, `sale_canceled` | ✅ Conforme |
-| `ref_command` | ✅ Utilisé | Référence commande | ✅ Conforme |
-| `api_key_sha256` | ✅ Vérifié SHA256 | SHA256(API_KEY) | ✅ Conforme |
-| `api_secret_sha256` | ✅ Vérifié SHA256 | SHA256(API_SECRET) | ✅ Conforme |
-| `hmac_compute` | ✅ Fonction créée | HMAC-SHA256 recommandé | ✅ Conforme |
+| Champ IPN           | Notre Vérification | Doc Officielle                   | Statut      |
+| ------------------- | ------------------ | -------------------------------- | ----------- |
+| `type_event`        | ✅ Vérifié         | `sale_complete`, `sale_canceled` | ✅ Conforme |
+| `ref_command`       | ✅ Utilisé         | Référence commande               | ✅ Conforme |
+| `api_key_sha256`    | ✅ Vérifié SHA256  | SHA256(API_KEY)                  | ✅ Conforme |
+| `api_secret_sha256` | ✅ Vérifié SHA256  | SHA256(API_SECRET)               | ✅ Conforme |
+| `hmac_compute`      | ✅ Fonction créée  | HMAC-SHA256 recommandé           | ✅ Conforme |
 
 **Verdict:** 100% conforme à la documentation ✅
 
 ### Méthodes API
 
-| Méthode | Notre Code | Doc Officielle | Statut |
-|---------|-----------|----------------|--------|
-| Demande paiement | `POST /payment/request-payment` | `POST /payment/request-payment` | ✅ Conforme |
-| Statut paiement | `GET /payment/get-status?token_payment={token}` | `GET /payment/get-status?token_payment={token}` | ✅ Conforme |
-| Remboursement | `POST /payment/refund-payment` | `POST /payment/refund-payment` | ✅ Conforme |
-| Transfer | `POST /transfer/transferFund` | `POST /transfer/transferFund` | ✅ Conforme |
-| Statut transfer | `GET /transfer/get-status?id_transfer={id}` | `GET /transfer/get-status?id_transfer={id}` | ✅ Conforme |
-| Info compte | `GET /transfer/get-account-info` | `GET /transfer/get-account-info` | ✅ Conforme |
+| Méthode          | Notre Code                                      | Doc Officielle                                  | Statut      |
+| ---------------- | ----------------------------------------------- | ----------------------------------------------- | ----------- |
+| Demande paiement | `POST /payment/request-payment`                 | `POST /payment/request-payment`                 | ✅ Conforme |
+| Statut paiement  | `GET /payment/get-status?token_payment={token}` | `GET /payment/get-status?token_payment={token}` | ✅ Conforme |
+| Remboursement    | `POST /payment/refund-payment`                  | `POST /payment/refund-payment`                  | ✅ Conforme |
+| Transfer         | `POST /transfer/transferFund`                   | `POST /transfer/transferFund`                   | ✅ Conforme |
+| Statut transfer  | `GET /transfer/get-status?id_transfer={id}`     | `GET /transfer/get-status?id_transfer={id}`     | ✅ Conforme |
+| Info compte      | `GET /transfer/get-account-info`                | `GET /transfer/get-account-info`                | ✅ Conforme |
 
 **Verdict:** 100% conforme à la documentation ✅
 
@@ -508,24 +555,26 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
 
 ## 📊 SCORE FINAL
 
-| Aspect | Score | Détails |
-|--------|-------|---------|
-| **API Client** | 10/10 | 100% conforme, tous endpoints implémentés |
-| **Sécurité** | 10/10 | SHA256 + HMAC-SHA256 implémentés |
-| **Edge Function IPN** | 10/10 | Logique correcte, signature vérifiée |
-| **TransactionsPage** | 7/10 | Logique OK, bugs process.env |
-| **TopUpPage** | 0/10 | UI créée, 0% fonctionnel |
-| **Configuration** | 2/10 | Structure OK, valeurs placeholder |
+| Aspect                | Score | Détails                                   |
+| --------------------- | ----- | ----------------------------------------- |
+| **API Client**        | 10/10 | 100% conforme, tous endpoints implémentés |
+| **Sécurité**          | 10/10 | SHA256 + HMAC-SHA256 implémentés          |
+| **Edge Function IPN** | 10/10 | Logique correcte, signature vérifiée      |
+| **TransactionsPage**  | 7/10  | Logique OK, bugs process.env              |
+| **TopUpPage**         | 0/10  | UI créée, 0% fonctionnel                  |
+| **Configuration**     | 2/10  | Structure OK, valeurs placeholder         |
 
 **MOYENNE GLOBALE: 6.5/10**
 
 **Points forts:**
+
 - ✅ Architecture backend excellente
 - ✅ Sécurité implémentée correctement
 - ✅ Tous les endpoints PayTech couverts
 - ✅ Documentation officielle respectée à 100%
 
 **Points faibles:**
+
 - ❌ Frontend non connecté (TopUpPage 0%)
 - ❌ Variables environnement non configurées
 - ❌ Bugs mineurs dans TransactionsPage
@@ -535,17 +584,20 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
 ## 🎯 PRIORITÉS D'ACTION
 
 ### 🔴 CRITIQUE (Bloquer 100% fonctionnalité)
+
 1. Connecter TopUpPage (30 min)
 2. Obtenir clés API PayTech (dépend inscription)
 3. Configurer variables .env (5 min)
 4. Corriger Base URL (1 min)
 
 ### 🟠 HAUTE (Cause bugs runtime)
+
 5. Fixer process.env → import.meta.env (3 min)
 6. Ajouter vérification redirect_url (2 min)
 7. Configurer Supabase Secrets (5 min)
 
 ### 🟡 MOYENNE (Amélioration)
+
 8. Tester mode sandbox (15 min)
 9. Demander activation production (48h délai)
 
@@ -554,18 +606,22 @@ Si baseURL = `https://paytech.sn/api/payment`, alors endpoint = `https://paytech
 ## ✅ RECOMMANDATIONS
 
 ### Backend ✅
+
 Aucune modification requise - implémentation parfaite
 
 ### Frontend ⚠️
+
 - Fixer TransactionsPage (5 min)
 - Implémenter TopUpPage (30 min)
 
 ### Configuration 🔴
+
 - Obtenir vraies clés PayTech (priorité #1)
 - Configurer URLs production (priorité #2)
 - Corriger Base URL (priorité #3)
 
 ### Tests 🧪
+
 - Mode test d'abord (avant production)
 - Vérifier IPN reçu correctement
 - Valider ajout crédits fonctionne
@@ -577,6 +633,7 @@ Aucune modification requise - implémentation parfaite
 L'implémentation backend est **excellente et 100% conforme** à la documentation officielle PayTech. Le code suit toutes les bonnes pratiques de sécurité (SHA256 + HMAC-SHA256).
 
 Les seuls problèmes sont:
+
 1. **Frontend non finalisé** (TopUpPage 0%, TransactionsPage bugs mineurs)
 2. **Configuration manquante** (clés API, URLs production)
 

@@ -177,11 +177,11 @@
 
 ## 📊 TABLEAU RÉCAPITULATIF
 
-| Étape | Source | Technologie | Qualité | Vitesse | Fallback |
-|-------|--------|-------------|---------|---------|----------|
-| 1️⃣ | Logo.dev API | PNG/SVG vectoriel | ⭐⭐⭐⭐⭐ | Rapide (cached) | Si 404 → Étape 2 |
-| 2️⃣ | SVG généré | Data URI SVG | ⭐⭐⭐⭐ | Instantané | Si erreur → Étape 3 |
-| 3️⃣ | Emoji DB | Unicode natif | ⭐⭐⭐ | Instantané | Toujours fonctionne ✅ |
+| Étape | Source       | Technologie       | Qualité    | Vitesse         | Fallback               |
+| ----- | ------------ | ----------------- | ---------- | --------------- | ---------------------- |
+| 1️⃣    | Logo.dev API | PNG/SVG vectoriel | ⭐⭐⭐⭐⭐ | Rapide (cached) | Si 404 → Étape 2       |
+| 2️⃣    | SVG généré   | Data URI SVG      | ⭐⭐⭐⭐   | Instantané      | Si erreur → Étape 3    |
+| 3️⃣    | Emoji DB     | Unicode natif     | ⭐⭐⭐     | Instantané      | Toujours fonctionne ✅ |
 
 ## 🎯 EXEMPLES RÉELS
 
@@ -274,11 +274,13 @@
 ## 🔧 CONFIGURATION ACTUELLE
 
 ### Logo.dev API Token
+
 ```typescript
-const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
+const LOGO_DEV_TOKEN = "pk_acOeajbNRKGsSDnJvJrcfw";
 ```
 
 ### Mappings Prioritaires (SERVICE_DOMAINS)
+
 ```typescript
 {
   'wa': 'whatsapp.com',    // WhatsApp
@@ -297,6 +299,7 @@ const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
 ```
 
 ### Emojis de Fallback (iconMap)
+
 ```typescript
 {
   'wa': '💬',   // WhatsApp
@@ -313,41 +316,53 @@ const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
 
 ## 📈 PERFORMANCE
 
-| Métrique | Valeur | Notes |
-|----------|--------|-------|
-| **Taille moyenne logo** | 5KB | PNG optimisé par Logo.dev |
-| **Temps de chargement** | <100ms | Cached par le navigateur |
-| **Taux de succès Logo.dev** | >95% | La plupart des services connus |
-| **Taille SVG fallback** | 2KB | Data URI inline, pas de requête |
-| **Taille emoji** | <1KB | Unicode natif, aucun téléchargement |
-| **Total requêtes** | 1 par service | Logo.dev ou inline (SVG/emoji) |
+| Métrique                    | Valeur        | Notes                               |
+| --------------------------- | ------------- | ----------------------------------- |
+| **Taille moyenne logo**     | 5KB           | PNG optimisé par Logo.dev           |
+| **Temps de chargement**     | <100ms        | Cached par le navigateur            |
+| **Taux de succès Logo.dev** | >95%          | La plupart des services connus      |
+| **Taille SVG fallback**     | 2KB           | Data URI inline, pas de requête     |
+| **Taille emoji**            | <1KB          | Unicode natif, aucun téléchargement |
+| **Total requêtes**          | 1 par service | Logo.dev ou inline (SVG/emoji)      |
 
 ## 🎨 STYLES CSS
 
 ### Conteneur du logo
+
 ```css
 .w-11.h-11          /* 44x44px - taille conteneur */
+/* 44x44px - taille conteneur */
+/* 44x44px - taille conteneur */
+/* 44x44px - taille conteneur */
 .bg-white           /* Fond blanc */
 .border             /* Bordure grise */
 .rounded-lg         /* Coins arrondis */
 .flex               /* Flexbox */
 .items-center       /* Centré verticalement */
 .justify-center     /* Centré horizontalement */
-.overflow-hidden    /* Cache débordement */
+.overflow-hidden; /* Cache débordement */
 ```
 
 ### Image du logo
+
 ```css
 .w-8.h-8           /* 32x32px - taille image */
-.object-contain    /* Préserve ratio */
+/* 32x32px - taille image */
+/* 32x32px - taille image */
+/* 32x32px - taille image */
+.object-contain; /* Préserve ratio */
 ```
 
 ### Emoji de fallback
+
 ```css
 .text-xl           /* 20px - taille emoji */
+/* 20px - taille emoji */
+/* 20px - taille emoji */
+/* 20px - taille emoji */
 .hidden            /* Caché par défaut */
 .items-center      /* Centré (si affiché) */
-.justify-center    /* Centré (si affiché) */
+.justify-center; /* Centré (si affiché) */
 ```
 
 ---

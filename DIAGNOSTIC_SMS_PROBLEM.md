@@ -3,6 +3,7 @@
 ## 📱 CAS SPÉCIFIQUE: Numéro +44 7429215087
 
 ### Symptôme
+
 - SMS reçu sur 5sim ✅
 - SMS **N'apparaît PAS** sur votre plateforme ❌
 - Statut reste "Waiting for SMS" ⏳
@@ -14,6 +15,7 @@
 ### 1. **Système de Polling défaillant** (Probabilité: 80%)
 
 **Vérification:**
+
 ```bash
 # Ouvrir la console du navigateur (F12)
 # Chercher les logs:
@@ -26,6 +28,7 @@
 **Si présent mais pas de "SMS reçu"** → L'Edge Function échoue
 
 **Causes possibles:**
+
 - ✅ Code du polling existe (`src/hooks/useSmsPolling.ts`)
 - ❌ Polling ne se déclenche pas après achat
 - ❌ Edge Function `check-5sim-sms` échoue
@@ -35,6 +38,7 @@
 ### 2. **Edge Function check-5sim-sms défaillante** (Probabilité: 60%)
 
 **Vérification:**
+
 ```bash
 # Voir les logs Supabase
 https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions/check-5sim-sms/logs
@@ -46,6 +50,7 @@ https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions/check-5sim
 ```
 
 **Causes possibles:**
+
 - ❌ `FIVE_SIM_API_KEY` non configuré → Erreur 401/403
 - ❌ Order ID invalide
 - ❌ Activation non trouvée en DB
@@ -56,8 +61,9 @@ https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions/check-5sim
 ### 3. **Problème de statut en base de données** (Probabilité: 40%)
 
 **Vérification:**
+
 ```sql
-SELECT 
+SELECT
   id,
   order_id,
   phone_number,
@@ -73,6 +79,7 @@ ORDER BY created_at DESC;
 ```
 
 **États possibles:**
+
 - `status = 'pending'` → En attente, normal
 - `status = 'received'` + `sms_code = NULL` → Bug mise à jour partielle
 - `status = 'timeout'` → Expiré (mauvais)
@@ -83,6 +90,7 @@ ORDER BY created_at DESC;
 ### 4. **Webhook non configuré** (Probabilité: 30%)
 
 **Vérification:**
+
 ```bash
 # Dashboard 5sim.net → Settings → API → Webhooks
 # Vérifier si configuré:
@@ -100,24 +108,30 @@ Webhook URL: https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/sms-webhook
 **Fichier:** `src/hooks/useSmsPolling.ts`
 
 **Vérifications:**
+
 1. Hook est-il appelé dans `DashboardPage.tsx` ?
 2. `activeNumbers` contient-il le numéro acheté ?
 3. Le statut est-il bien `'waiting'` ?
 4. L'intervalle se déclenche-t-il ?
 
 **Test manuel:**
+
 ```typescript
 // Dans Console du navigateur (F12)
 // Après achat d'un numéro:
-console.log('Active numbers:', window.__activeNumbers);
+console.log("Active numbers:", window.__activeNumbers);
 ```
 
 **Correction si polling ne démarre pas:**
+
 ```typescript
 // DashboardPage.tsx - Ligne ~158
 useEffect(() => {
-  console.log('🔍 [DEBUG] Active numbers changed:', activeNumbers.length);
-  console.log('🔍 [DEBUG] Waiting numbers:', activeNumbers.filter(n => n.status === 'waiting').length);
+  console.log("🔍 [DEBUG] Active numbers changed:", activeNumbers.length);
+  console.log(
+    "🔍 [DEBUG] Waiting numbers:",
+    activeNumbers.filter((n) => n.status === "waiting").length
+  );
 }, [activeNumbers]);
 ```
 
@@ -126,10 +140,12 @@ useEffect(() => {
 ### Solution 2: Configurer FIVE_SIM_API_KEY (PRIORITÉ HAUTE)
 
 **1. Récupérer votre clé API:**
+
 - Aller sur https://5sim.net/settings/api
 - Copier "API Key"
 
 **2. Ajouter dans Supabase:**
+
 ```bash
 # Via Dashboard:
 https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/settings/functions
@@ -140,6 +156,7 @@ Value: [votre clé]
 ```
 
 **3. Redéployer les fonctions:**
+
 ```bash
 cd "/Users/mac/Desktop/ONE SMS V1"
 supabase functions deploy check-5sim-sms --project-ref htfqmamvmhdoixqcbbbw
@@ -154,15 +171,15 @@ supabase functions deploy buy-5sim-number --project-ref htfqmamvmhdoixqcbbbw
 
 ```sql
 -- 1. Trouver l'activation
-SELECT id, order_id, status, sms_code 
-FROM activations 
-WHERE phone_number LIKE '%7429215087%' 
-ORDER BY created_at DESC 
+SELECT id, order_id, status, sms_code
+FROM activations
+WHERE phone_number LIKE '%7429215087%'
+ORDER BY created_at DESC
 LIMIT 1;
 
 -- 2. Mettre à jour avec le SMS reçu (remplacer les valeurs)
 UPDATE activations
-SET 
+SET
   status = 'received',
   sms_code = '123456',  -- Code reçu sur 5sim
   sms_text = 'Your verification code is 123456',
@@ -171,7 +188,7 @@ WHERE id = [ID_DE_L_ACTIVATION];
 
 -- 3. Facturer l'utilisateur (mettre à jour transaction)
 UPDATE transactions
-SET 
+SET
   status = 'completed',
   completed_at = NOW()
 WHERE metadata->>'activation_id' = '[ID_DE_L_ACTIVATION]'
@@ -185,6 +202,7 @@ AND status = 'pending';
 **Configuration:**
 
 1. **Sur 5sim.net:**
+
    - Aller dans Settings → API → Webhooks
    - Ajouter:
      ```
@@ -194,6 +212,7 @@ AND status = 'pending';
      ```
 
 2. **Vérifier l'Edge Function:**
+
    ```bash
    # Voir les logs:
    https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions/sms-webhook/logs
@@ -223,12 +242,14 @@ AND status = 'pending';
 **Créé:** `test_5sim_api.mjs`
 
 **Usage:**
+
 ```bash
 export FIVE_SIM_API_KEY=votre_cle_5sim
 node test_5sim_api.mjs
 ```
 
 **Ce qu'il fait:**
+
 1. ✅ Vérifie la connexion à l'API 5sim
 2. ✅ Récupère l'historique des commandes
 3. ✅ Cherche le numéro +44 7429215087
@@ -240,26 +261,31 @@ node test_5sim_api.mjs
 ## 📊 CHECKLIST DE DIAGNOSTIC
 
 ### Étape 1: Vérifier 5sim
+
 - [ ] SMS bien reçu sur 5sim.net ? (vérifier dans Orders)
 - [ ] Clé API 5sim valide ?
 - [ ] Balance suffisante ?
 
 ### Étape 2: Vérifier Supabase
+
 - [ ] `FIVE_SIM_API_KEY` configuré ?
 - [ ] Edge Functions déployées ?
 - [ ] Logs des Edge Functions (erreurs ?) ?
 
 ### Étape 3: Vérifier Base de données
+
 - [ ] Activation existe en DB ?
 - [ ] Statut de l'activation ?
 - [ ] SMS code présent en DB ?
 
 ### Étape 4: Vérifier Frontend
+
 - [ ] Console browser: logs de polling ?
 - [ ] Hook `useSmsPolling` s'exécute ?
 - [ ] Numéro bien dans `activeNumbers` ?
 
 ### Étape 5: Vérifier Webhook (optionnel)
+
 - [ ] Webhook configuré sur 5sim ?
 - [ ] Logs webhook dans Supabase ?
 
@@ -268,6 +294,7 @@ node test_5sim_api.mjs
 ## 🚨 ACTIONS IMMÉDIATES
 
 ### 1. Exécuter le script de diagnostic
+
 ```bash
 cd "/Users/mac/Desktop/ONE SMS V1"
 export FIVE_SIM_API_KEY=votre_cle_5sim
@@ -275,17 +302,20 @@ node test_5sim_api.mjs
 ```
 
 ### 2. Vérifier les logs Supabase
+
 ```
 https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions/check-5sim-sms/logs
 ```
 
 ### 3. Vérifier la console navigateur
+
 - Ouvrir http://localhost:3000
 - F12 → Console
 - Acheter un numéro test
 - Regarder les logs `[POLLING]` et `[CHECK]`
 
 ### 4. Si le problème persiste
+
 - Envoyez-moi:
   1. Output du script `test_5sim_api.mjs`
   2. Logs Supabase Edge Functions
@@ -305,13 +335,13 @@ https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions/check-5sim
 
 ```sql
 -- Trouver l'activation
-SELECT id, order_id, status FROM activations 
-WHERE phone_number LIKE '%7429215087%' 
+SELECT id, order_id, status FROM activations
+WHERE phone_number LIKE '%7429215087%'
 ORDER BY created_at DESC LIMIT 1;
 
 -- Mettre à jour (remplacer ID et CODE)
 UPDATE activations
-SET 
+SET
   status = 'received',
   sms_code = 'VOTRE_CODE_ICI',
   sms_text = 'Le texte complet du SMS ici',

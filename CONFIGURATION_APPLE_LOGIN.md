@@ -8,6 +8,7 @@
 ## ⚠️ IMPORTANT
 
 L'authentification Apple est **plus complexe** que Google et nécessite :
+
 - ✅ Un compte Apple Developer (99$/an)
 - ✅ Configuration dans Apple Developer Portal
 - ✅ Création d'un Service ID
@@ -31,6 +32,7 @@ L'authentification Apple est **plus complexe** que Google et nécessite :
 ## 📋 CONFIGURATION COMPLÈTE (Apple Developer)
 
 ### Prérequis
+
 - Compte Apple Developer actif (https://developer.apple.com/)
 - Coût : **99$/an**
 
@@ -43,6 +45,7 @@ L'authentification Apple est **plus complexe** que Google et nécessite :
 3. Section **Identifiers** → Cliquez **"+"**
 
 **Configuration:**
+
 ```
 Type: App IDs
 Description: ONE SMS V1
@@ -64,6 +67,7 @@ Bundle ID: com.onesms.v1
 3. Cliquez **"Continue"**
 
 **Configuration:**
+
 ```
 Description: ONE SMS V1 Web
 Identifier: com.onesms.v1.web
@@ -73,11 +77,13 @@ Identifier: com.onesms.v1.web
 5. Cliquez **"Configure"** :
 
 **Primary App ID:**
+
 ```
 Select: com.onesms.v1 (celui créé à l'étape 1)
 ```
 
 **Website URLs:**
+
 ```
 Domains and Subdomains:
 - gqvxrvxmfvlnhukbpdjb.supabase.co
@@ -103,10 +109,7 @@ Return URLs:
 6. Cliquez **"Save"**
 7. Cliquez **"Continue"** → **"Register"**
 
-**⚠️ IMPORTANT :**
-8. **Téléchargez la clé** immédiatement (fichier `.p8`)
-9. **Notez le Key ID** (ex: `ABC123DEF4`)
-10. **Cette clé ne peut être téléchargée qu'une seule fois !**
+**⚠️ IMPORTANT :** 8. **Téléchargez la clé** immédiatement (fichier `.p8`) 9. **Notez le Key ID** (ex: `ABC123DEF4`) 10. **Cette clé ne peut être téléchargée qu'une seule fois !**
 
 ---
 
@@ -126,29 +129,37 @@ Retournez dans **Supabase Dashboard** → **Authentication** → **Sign In / Pro
 ### Remplissez les champs :
 
 **1. Enable Sign in with Apple:**
+
 ```
 ✅ Activé
 ```
 
 **2. Client ID (Bundle ID):**
+
 ```
 com.onesms.v1.web
 ```
+
 (Le Service ID créé à l'étape 2)
 
 **3. Team ID:**
+
 ```
 XYZ789ABC1
 ```
+
 (Récupéré à l'étape 4)
 
 **4. Key ID:**
+
 ```
 ABC123DEF4
 ```
+
 (Noté lors du téléchargement de la clé)
 
 **5. Secret Key:**
+
 ```
 -----BEGIN PRIVATE KEY-----
 [Contenu du fichier .p8 téléchargé]
@@ -162,11 +173,13 @@ ABC123DEF4
 ## 🧪 TESTER
 
 ### 1. Lancer l'application
+
 ```bash
 npm run dev
 ```
 
 ### 2. Tester le login
+
 1. Ouvrez : http://localhost:5173/login
 2. Cliquez sur le bouton **"Apple"**
 3. Authentifiez-vous avec votre Apple ID
@@ -180,6 +193,7 @@ npm run dev
 ### Dans Supabase
 
 **Authentication → Users:**
+
 ```
 ✅ Utilisateur créé
 ✅ Provider = "apple"
@@ -187,11 +201,13 @@ npm run dev
 ```
 
 **Table users:**
+
 ```sql
 SELECT * FROM users WHERE email LIKE '%appleid.com';
 ```
 
 Si l'utilisateur masque son email, Apple crée un email relay :
+
 ```
 abc123def456@privaterelay.appleid.com
 ```
@@ -205,6 +221,7 @@ abc123def456@privaterelay.appleid.com
 **Cause:** Client ID, Team ID ou Key ID incorrect
 
 **Solution:**
+
 1. Vérifiez les 3 identifiants dans Supabase
 2. Comparez avec Apple Developer Portal
 
@@ -215,6 +232,7 @@ abc123def456@privaterelay.appleid.com
 **Cause:** Clé privée (.p8) incorrecte ou mal formatée
 
 **Solution:**
+
 1. Ouvrez le fichier .p8 dans un éditeur de texte
 2. Copiez TOUT le contenu (y compris BEGIN et END)
 3. Collez dans Supabase exactement tel quel
@@ -226,6 +244,7 @@ abc123def456@privaterelay.appleid.com
 **Cause:** URL de callback mal configurée
 
 **Solution:**
+
 1. Apple Developer → Service ID → Configure
 2. Vérifiez que le Return URL est exactement :
    ```
@@ -239,6 +258,7 @@ abc123def456@privaterelay.appleid.com
 **Cause:** L'utilisateur a choisi "Hide My Email"
 
 **Solution:**
+
 - C'est normal ! Apple protège la vie privée
 - Email relay utilisé : `xxx@privaterelay.appleid.com`
 - Toujours fonctionnel pour l'authentification
@@ -255,10 +275,12 @@ abc123def456@privaterelay.appleid.com
 // LoginPage.tsx et RegisterPage.tsx
 // Commentez ou supprimez le bouton Apple
 
-{/* <Button variant="outline" onClick={handleAppleLogin}>
+{
+  /* <Button variant="outline" onClick={handleAppleLogin}>
   <svg>...</svg>
   Apple
-</Button> */}
+</Button> */
+}
 ```
 
 **Option 2: Utiliser uniquement Google**
@@ -269,13 +291,13 @@ Gardez seulement le bouton Google qui fonctionne déjà ! 🎉
 
 ## 📊 COMPARAISON Google vs Apple
 
-| Critère | Google | Apple |
-|---------|--------|-------|
-| **Coût** | Gratuit | 99$/an |
-| **Difficulté** | ⭐⭐ Facile | ⭐⭐⭐⭐ Difficile |
-| **Configuration** | 5 min | 20 min |
-| **Email** | Toujours visible | Peut être masqué |
-| **Recommandation** | ✅ Oui | ⚠️ Si nécessaire |
+| Critère            | Google           | Apple              |
+| ------------------ | ---------------- | ------------------ |
+| **Coût**           | Gratuit          | 99$/an             |
+| **Difficulté**     | ⭐⭐ Facile      | ⭐⭐⭐⭐ Difficile |
+| **Configuration**  | 5 min            | 20 min             |
+| **Email**          | Toujours visible | Peut être masqué   |
+| **Recommandation** | ✅ Oui           | ⚠️ Si nécessaire   |
 
 ---
 
@@ -294,6 +316,7 @@ Apple peut être ajouté plus tard quand vous aurez des revenus ! 💰
 ## 📝 RÉSUMÉ
 
 **Pour activer Apple Login :**
+
 - ✅ Compte Apple Developer (99$/an)
 - ✅ Créer App ID avec "Sign in with Apple"
 - ✅ Créer Service ID avec callback URL
@@ -302,12 +325,13 @@ Apple peut être ajouté plus tard quand vous aurez des revenus ! 💰
 - ✅ Tester l'authentification
 
 **OU simplement :**
+
 - ✅ Utiliser seulement Google pour l'instant ! 🚀
 
 ---
 
 ## 🎉 CONCLUSION
 
-Apple Login est **plus complexe et coûteux** que Google. 
+Apple Login est **plus complexe et coûteux** que Google.
 
 **Mon conseil :** Commence avec Google uniquement, c'est amplement suffisant ! Tu pourras toujours ajouter Apple plus tard si besoin. 😊

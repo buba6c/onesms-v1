@@ -1,0 +1,292 @@
+{
+  "timestamp": "2025-12-08T22:03:38.231Z",
+  "auth": {
+    "cloud": {
+      "total": 64,
+      "with_email": 64,
+      "with_phone": 0,
+      "admins": 1,
+      "active": 64,
+      "with_balance": 19,
+      "total_balance": 11405,
+      "emails": [
+        "mamourdiengg@gmail.com",
+        "admin@onesms.com",
+        "papecheikhdieye481@gmail.com",
+        "fallousamadndiaye@gmail.com",
+        "azizgoumbala4@gmail.com",
+        "sessenetvthiernondiaye@gmail.com",
+        "dixwork0@gmail.com",
+        "massdj2022@gmail.com",
+        "metaabou5@gmail.com",
+        "boubacar@evocom-sn.com",
+        "amadoufinances@gmail.com",
+        "abdoulazizbah203@gmail.com",
+        "woloftuto219@gmail.com",
+        "bocarnhamadjo350@gmail.com",
+        "diamankaseydou77@gmail.com",
+        "joe55mbaye@gmail.com",
+        "theoghost8@gmail.com",
+        "falloundiour04@gmail.com",
+        "pbara455@gmail.com",
+        "bassniang050@gmail.com",
+        "ndourndour.com@gmail.com",
+        "fallmamemor555@gmail.com",
+        "daodadieng3@gmail.com",
+        "deguenembodje@gmail.com",
+        "mentediallo006@gmail.com",
+        "cheikhounaly26@gmail.com",
+        "amadoufalldev@gmail.com",
+        "bailogaucher@gmail.com",
+        "sakhocheikhou800@gmail.com",
+        "sakhoibrahima800@gmail.com",
+        "fallbaye004fall@gmail.com",
+        "adokpo9@gmail.com",
+        "infosportmedia7@gmail.com",
+        "diallothiernoamadou441@gmail.com",
+        "alassaneguebre77@gmail.com",
+        "coachprofait14@gmail.com",
+        "touremaman39@gmail.com",
+        "ronaljotadiogo@gmail.com",
+        "ouzefall0000@gmail.com",
+        "kenzondoye56@gmail.com",
+        "fayekhadim383@gmail.com",
+        "sohibouofficiel@gmail.com",
+        "bachiroud321@gmail.com",
+        "tawthiaw@gmail.com",
+        "mendygermaine607@gmail.com",
+        "smassambambacke7@gmail.com",
+        "sadiodiakhate723@gmail.com",
+        "www.boulangaming@gmail.com",
+        "contact@walyecom.com",
+        "falloumbengue96@gmail.com",
+        "velosenegal608@gmail.com",
+        "fallabdou5544@gmail.com",
+        "momodanen@gmail.com",
+        "kawdpc@gmail.com",
+        "babacarjr222mk@gmail.com",
+        "wizdabo543@gmail.com",
+        "leyemouhamed552@gmail.com",
+        "bmdboudarou@gmail.com",
+        "buba6c@gmail.com",
+        "diagnesam256@gmail.com",
+        "mortallawade467@gmail.com",
+        "momobendo222@gmail.com",
+        "amadou@evocom-sn.com",
+        "gelefentreprise1@gmail.com"
+      ]
+    },
+    "coolify": {
+      "total": 65,
+      "with_email": 65,
+      "with_phone": 0,
+      "admins": 2,
+      "active": 65,
+      "with_balance": 20,
+      "total_balance": 21405
+    },
+    "missing": 0,
+    "status": "OK"
+  },
+  "email": {
+    "campaigns": {
+      "cloud": 1,
+      "coolify": 1
+    },
+    "contact_settings": {
+      "cloud": 1,
+      "coolify": 1
+    },
+    "status": "OK"
+  },
+  "storage": {
+    "cloud_buckets": 1,
+    "coolify_buckets": 0,
+    "status": "CRITICAL"
+  },
+  "database": {
+    "sql_functions": 45,
+    "sql_triggers": 8
+  },
+  "security": {
+    "rls_policies": {
+      "users": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "services": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "activations": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "balance_operations": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "rental_logs": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "transactions": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "payment_providers": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "system_settings": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "promo_codes": {
+        "has_data": false,
+        "rls_active": false
+      },
+      "email_campaigns": {
+        "has_data": false,
+        "rls_active": false
+      }
+    },
+    "status": "CHECK_MANUALLY"
+  },
+  "external": {
+    "systems": {
+      "PayDunya": {
+        "configured": false,
+        "missing_vars": [
+          "PAYDUNYA_MASTER_KEY",
+          "PAYDUNYA_PRIVATE_KEY",
+          "PAYDUNYA_TOKEN"
+        ]
+      },
+      "MoneyFusion": {
+        "configured": false,
+        "missing_vars": [
+          "MONEYFUSION_API_URL",
+          "MONEYFUSION_API_KEY"
+        ]
+      },
+      "Moneroo": {
+        "configured": false,
+        "missing_vars": [
+          "MONEROO_API_KEY"
+        ]
+      },
+      "PayTech": {
+        "configured": false,
+        "missing_vars": [
+          "PAYTECH_API_KEY",
+          "PAYTECH_API_SECRET"
+        ]
+      },
+      "SMS Activate": {
+        "configured": false,
+        "missing_vars": [
+          "SMS_ACTIVATE_API_KEY"
+        ]
+      },
+      "5SIM": {
+        "configured": false,
+        "missing_vars": [
+          "FIVESIM_API_KEY"
+        ]
+      }
+    },
+    "webhooks_to_update": [
+      "PayDunya → http://supabasekong...sslip.io/functions/v1/paydunya-webhook",
+      "MoneyFusion → http://supabasekong...sslip.io/functions/v1/moneyfusion-webhook",
+      "Moneroo → http://supabasekong...sslip.io/functions/v1/moneroo-webhook",
+      "PayTech → http://supabasekong...sslip.io/functions/v1/paytech-ipn",
+      "SMS Activate → http://supabasekong...sslip.io/functions/v1/webhook-sms-activate"
+    ]
+  },
+  "critical_missing": [
+    {
+      "type": "storage_bucket",
+      "bucket": "public-assets",
+      "files": 1,
+      "size_mb": "0.00"
+    }
+  ],
+  "warnings": [
+    "AUTH.USERS table must be migrated via pg_dump",
+    "PayDunya configuration incomplete",
+    "MoneyFusion configuration incomplete",
+    "Moneroo configuration incomplete",
+    "PayTech configuration incomplete",
+    "SMS Activate configuration incomplete",
+    "5SIM configuration incomplete"
+  ],
+  "actions": [
+    {
+      "priority": "CRITICAL",
+      "action": "Export auth.users via pg_dump --schema=auth",
+      "command": "pg_dump -h ... -U postgres --schema=auth --table=users"
+    },
+    {
+      "priority": "HIGH",
+      "action": "Migrate storage bucket: public-assets",
+      "command": "supabase storage download-all --bucket public-assets"
+    },
+    {
+      "priority": "HIGH",
+      "action": "Verify RLS policies on Coolify",
+      "command": "SELECT * FROM pg_policies;"
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Configure PayDunya secrets in Coolify",
+      "vars": [
+        "PAYDUNYA_MASTER_KEY",
+        "PAYDUNYA_PRIVATE_KEY",
+        "PAYDUNYA_TOKEN"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Configure MoneyFusion secrets in Coolify",
+      "vars": [
+        "MONEYFUSION_API_URL",
+        "MONEYFUSION_API_KEY"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Configure Moneroo secrets in Coolify",
+      "vars": [
+        "MONEROO_API_KEY"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Configure PayTech secrets in Coolify",
+      "vars": [
+        "PAYTECH_API_KEY",
+        "PAYTECH_API_SECRET"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Configure SMS Activate secrets in Coolify",
+      "vars": [
+        "SMS_ACTIVATE_API_KEY"
+      ]
+    },
+    {
+      "priority": "CRITICAL",
+      "action": "Configure 5SIM secrets in Coolify",
+      "vars": [
+        "FIVESIM_API_KEY"
+      ]
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Verify SQL functions on Coolify",
+      "command": "SELECT proname FROM pg_proc WHERE pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');"
+    }
+  ]
+}

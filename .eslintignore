@@ -1,0 +1,31 @@
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Backups and temporary files
+*_backup*.tsx
+*_backup*.ts
+*_dec*.tsx
+*_dec*.ts
+*_d2ced9b*.tsx
+BuyNumberModal_dec1.tsx
+DashboardPage_dec3.tsx
+DashboardPage_backup_current.tsx
+
+# Scripts
+scripts/
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Config files
+*.config.js
+*.config.ts

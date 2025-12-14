@@ -5,11 +5,13 @@ Système d'automatisation complète qui génère automatiquement les icônes lor
 ## 📁 Fichiers créés
 
 1. **`supabase/functions/generate-service-icon/index.ts`**
+
    - Edge Function Supabase qui génère les icônes
    - Support simple-icons, Clearbit, et fallback
    - Upload automatique vers S3 ou data URL
 
 2. **`supabase/migrations/030_auto_generate_service_icons.sql`**
+
    - Trigger de base de données
    - S'active automatiquement sur INSERT dans `services`
    - Appelle l'Edge Function via HTTP
@@ -90,7 +92,7 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/generate-ser
 
 ```sql
 -- Insérer un service test - l'icône devrait être générée automatiquement
-INSERT INTO services (code, name, display_name) 
+INSERT INTO services (code, name, display_name)
 VALUES ('test-auto', 'Test Auto', 'Test Automatique');
 
 -- Vérifier que l'icône a été générée (après 1-2 secondes)
@@ -127,11 +129,13 @@ graph TD
 ## 🎯 Sources d'icônes
 
 1. **Simple Icons** (priorité 1)
+
    - 3000+ logos de marques populaires
    - Format SVG optimisé
    - Gratuit et open source
 
 2. **Clearbit Logo API** (priorité 2)
+
    - Logos d'entreprises mondiales
    - Format PNG (converti en SVG si possible)
    - Gratuit
@@ -191,8 +195,8 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/generate-ser
 
 ```sql
 -- Lister les services sans icône
-SELECT id, code, name, icon_url 
-FROM services 
+SELECT id, code, name, icon_url
+FROM services
 WHERE icon_url IS NULL;
 
 -- Les régénérer via le script Node.js
@@ -215,6 +219,7 @@ DROP TRIGGER IF EXISTS auto_generate_service_icon ON services;
 ## 📈 Statistiques
 
 Après l'import initial:
+
 - ✅ **1300+ services** avec icônes
 - ⚡ **~60%** depuis simple-icons
 - 🌐 **~25%** depuis Clearbit
@@ -256,11 +261,11 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/generate-ser
 
 ```typescript
 // Vérifier dans votre composant React
-console.log(service.icon_url)
+console.log(service.icon_url);
 
 // S'assurer que l'URL est valide
 if (service.icon_url) {
-  return <img src={service.icon_url} alt={service.name} />
+  return <img src={service.icon_url} alt={service.name} />;
 }
 ```
 

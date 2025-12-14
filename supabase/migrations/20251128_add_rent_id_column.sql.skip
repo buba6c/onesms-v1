@@ -1,0 +1,56 @@
+-- ===================================================================
+-- MIGRATION: Add rent_id column for SMS-Activate compatibility
+-- ===================================================================
+-- The rentals table was created with order_id (for 5sim) but SMS-Activate
+-- uses rent_id. This adds the rent_id column for compatibility.
+-- ===================================================================
+
+-- Add rent_id column if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'rentals' 
+    AND column_name = 'rent_id'
+  ) THEN
+    ALTER TABLE public.rentals ADD COLUMN rent_id TEXT;
+    
+    -- Create index for rent_id
+    CREATE INDEX IF NOT EXISTS idx_rentals_rent_id ON public.rentals(rent_id);
+    
+    -- Copy existing order_id values to rent_id (as text)
+    UPDATE public.rentals SET rent_id = order_id::TEXT WHERE rent_id IS NULL AND order_id IS NOT NULL;
+    
+    RAISE NOTICE 'Added rent_id column to rentals table';
+  ELSE
+    RAISE NOTICE 'rent_id column already exists';
+  END IF;
+END $$;
+
+-- Also add rental_id for additional compatibility
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'rentals' 
+    AND column_name = 'rental_id'
+  ) THEN
+    ALTER TABLE public.rentals ADD COLUMN rental_id TEXT;
+    
+    -- Create index for rental_id
+    CREATE INDEX IF NOT EXISTS idx_rentals_rental_id ON public.rentals(rental_id);
+    
+    RAISE NOTICE 'Added rental_id column to rentals table';
+  ELSE
+    RAISE NOTICE 'rental_id column already exists';
+  END IF;
+END $$;
+
+-- Ensure all ID columns are synced
+UPDATE public.rentals 
+SET 
+  rent_id = COALESCE(rent_id, rental_id, order_id::TEXT),
+  rental_id = COALESCE(rental_id, rent_id, order_id::TEXT)
+WHERE rent_id IS NULL OR rental_id IS NULL;

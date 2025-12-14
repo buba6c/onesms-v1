@@ -170,6 +170,11 @@ export default function AdminRentals() {
   // Cancel/Refund rental (Model A)
   const refundMutation = useMutation({
     mutationFn: async (rental: Rental) => {
+      // Bloquer les doublons/états déjà traités
+      if (!rental || ['refunded', 'completed', 'cancelled'].includes(rental.status)) {
+        throw new Error('Location déjà traitée ou remboursée');
+      }
+
       // Model A: Utiliser atomic_refund qui gère tout atomiquement
       const { data: refundResult, error: refundError } = await (supabase as any).rpc('atomic_refund', {
         p_user_id: rental.user_id,

@@ -1,6 +1,7 @@
 # 🔧 Forcer la Vérification du SMS Manuellement
 
 ## Situation
+
 - **Numéro:** 6283187992496
 - **Status:** pending (en attente)
 - **SMS visible sur SMS-Activate:** OUI
@@ -15,6 +16,7 @@ SELECT id, order_id FROM activations WHERE phone = '6283187992496';
 ```
 
 **Résultat attendu:**
+
 ```
 id: 123abc... (UUID)
 order_id: 987654321 (numéro SMS-Activate)
@@ -44,6 +46,7 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/check-sms-ac
 ```
 
 **Vous devriez obtenir:**
+
 ```json
 {
   "success": true,
@@ -58,7 +61,7 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/check-sms-ac
 ### Étape 3: Vérifier le résultat dans la DB
 
 ```sql
-SELECT 
+SELECT
   phone,
   status,
   sms_code,
@@ -69,6 +72,7 @@ WHERE phone = '6283187992496';
 ```
 
 **Si ça a marché:**
+
 - status = 'received'
 - sms_code = le code
 - sms_text = le texte complet
@@ -86,6 +90,7 @@ curl "https://api.sms-activate.ae/stubs/handler_api.php?api_key=YOUR_API_KEY&act
 **Réponses possibles:**
 
 1. **SMS reçu (succès):**
+
 ```json
 {
   "sms": {
@@ -97,11 +102,13 @@ curl "https://api.sms-activate.ae/stubs/handler_api.php?api_key=YOUR_API_KEY&act
 ```
 
 2. **Encore en attente:**
+
 ```
 STATUS_WAIT_CODE
 ```
 
 3. **Annulé:**
+
 ```
 STATUS_CANCEL
 ```
@@ -109,14 +116,17 @@ STATUS_CANCEL
 ### Problèmes courants
 
 #### Problème 1: STATUS_WAIT_CODE
+
 **Cause:** Le SMS n'est pas encore disponible via l'API
 **Solution:** Attendre 30 secondes et réessayer
 
 #### Problème 2: NO_ACTIVATION
+
 **Cause:** L'order_id est invalide ou l'activation est expirée
 **Solution:** Vérifier l'order_id dans la DB
 
 #### Problème 3: BAD_KEY
+
 **Cause:** Clé API invalide ou expirée
 **Solution:** Vérifier la variable d'environnement `SMS_ACTIVATE_API_KEY` dans Supabase
 
@@ -130,14 +140,17 @@ STATUS_CANCEL
 
 ```javascript
 // Forcer la vérification
-const { data, error } = await supabase.functions.invoke('check-sms-activate-status', {
-  body: {
-    activationId: 'YOUR_ACTIVATION_ID', // Remplacer par l'ID
-    userId: 'YOUR_USER_ID' // Remplacer par votre user ID
+const { data, error } = await supabase.functions.invoke(
+  "check-sms-activate-status",
+  {
+    body: {
+      activationId: "YOUR_ACTIVATION_ID", // Remplacer par l'ID
+      userId: "YOUR_USER_ID", // Remplacer par votre user ID
+    },
   }
-});
+);
 
-console.log('Résultat:', data, error);
+console.log("Résultat:", data, error);
 ```
 
 4. **Regardez le résultat dans la console**
@@ -149,14 +162,17 @@ Si `data.data.status === 'received'` → ✅ SMS récupéré !
 Causes possibles:
 
 1. **Dashboard pas ouvert**
+
    - Le hook `useSmsPolling` ne démarre que si la page est ouverte
    - Solution: Ouvrir la page Dashboard
 
 2. **Polling désactivé temporairement**
+
    - Si l'utilisateur change de page, le polling s'arrête
    - Solution: Rester sur la page Dashboard
 
 3. **Erreur JavaScript silencieuse**
+
    - Vérifier la console navigateur (F12)
    - Solution: Corriger les erreurs JS
 

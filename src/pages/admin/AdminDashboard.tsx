@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { 
   Users, DollarSign, Phone, MessageSquare, TrendingUp, TrendingDown, RefreshCw, Loader2,
   CreditCard, Wallet, Snowflake, Activity, AlertTriangle, CheckCircle, Clock, XCircle,
-  ArrowUpRight, ArrowDownRight, Zap, Eye, Settings, BarChart3, ShieldCheck, Timer
+  ArrowUpRight, ArrowDownRight, Zap, Eye, Settings, BarChart3, ShieldCheck, Timer, Gift
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -55,6 +55,28 @@ const defaultStats: DashboardStats = {
   smsReceived: 0, smsToday: 0
 }
 
+interface ReferralStats {
+  total: number
+  pending: number
+  qualified: number
+  rewarded: number
+  rejected: number
+  expired: number
+  bonusCount: number
+  bonusAmount: number
+}
+
+const defaultReferralStats: ReferralStats = {
+  total: 0,
+  pending: 0,
+  qualified: 0,
+  rewarded: 0,
+  rejected: 0,
+  expired: 0,
+  bonusCount: 0,
+  bonusAmount: 0
+}
+
 export default function AdminDashboard() {
   const { t } = useTranslation();
   
@@ -83,6 +105,12 @@ export default function AdminDashboard() {
     refetchInterval: 60000
   })
 
+  const { data: referralStats = defaultReferralStats, isLoading: referralLoading, refetch: refetchReferrals } = useQuery({
+    queryKey: ['admin-referral-stats'],
+    queryFn: fetchReferralStats,
+    refetchInterval: 60000
+  })
+
   const { data: recentActivations = [] } = useQuery({
     queryKey: ['admin-recent-activations'],
     queryFn: fetchRecentActivations,
@@ -94,31 +122,46 @@ export default function AdminDashboard() {
   }
 
   async function fetchRecentTransactions() {
-    const { data } = await supabase
-      .from('transactions')
-      .select('*, user:users(email, name)')
-      .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit'])
-      .order('created_at', { ascending: false })
-      .limit(5)
-    return data || []
+    try {
+      const { data } = await supabase
+        .from('transactions')
+        .select('*, user:users(email, name)')
+        .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit'])
+        .order('created_at', { ascending: false })
+        .limit(5)
+      return data || []
+    } catch (error) {
+      console.error('[AdminDashboard] recent transactions error:', error)
+      return []
+    }
   }
 
   async function fetchRecentUsers() {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(5)
-    return data || []
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      return data || []
+    } catch (error) {
+      console.error('[AdminDashboard] recent users error:', error)
+      return []
+    }
   }
 
   async function fetchRecentActivations() {
-    const { data } = await supabase
-      .from('activations')
-      .select('*, user:users(email)')
-      .order('created_at', { ascending: false })
-      .limit(5)
-    return data || []
+    try {
+      const { data } = await supabase
+        .from('activations')
+        .select('*, user:users(email)')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      return data || []
+    } catch (error) {
+      console.error('[AdminDashboard] recent activations error:', error)
+      return []
+    }
   }
 
   async function fetchSystemHealth() {
@@ -179,6 +222,67 @@ export default function AdminDashboard() {
     }
 
     return { status, issues }
+  }
+
+  async function fetchReferralStats(): Promise<ReferralStats> {
+    // Utilise une fonction RPC en SECURITY DEFINER pour bypasser le RLS sur referrals/transactions
+    const { data: adminReferralStats, error: adminReferralError } = await supabase.rpc('admin_referral_stats')
+    if (!adminReferralError && adminReferralStats?.length) {
+      const row = adminReferralStats[0] as Partial<ReferralStats>
+      return {
+        total: Number(row.total ?? 0),
+        pending: Number(row.pending ?? 0),
+        qualified: Number(row.qualified ?? 0),
+        rewarded: Number(row.rewarded ?? 0),
+        rejected: Number(row.rejected ?? 0),
+        expired: Number(row.expired ?? 0),
+        bonusCount: Number(row.bonusCount ?? row.bonus_count ?? 0),
+        bonusAmount: Number(row.bonusAmount ?? row.bonus_amount ?? 0)
+      }
+    }
+    if (adminReferralError) {
+      console.warn('[AdminDashboard] admin_referral_stats RPC error fallback to RLS path:', adminReferralError.message)
+    }
+
+    const countByStatus = async (status: string) => {
+      const { count } = await supabase
+        .from('referrals')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', status)
+      return count || 0
+    }
+
+    const [pending, qualified, rewarded, rejected, expired] = await Promise.all([
+      countByStatus('pending'),
+      countByStatus('qualified'),
+      countByStatus('rewarded'),
+      countByStatus('rejected'),
+      countByStatus('expired')
+    ])
+
+    const { count: total } = await supabase
+      .from('referrals')
+      .select('*', { count: 'exact', head: true })
+
+    const { data: bonusTx } = await supabase
+      .from('transactions')
+      .select('amount, metadata')
+      .eq('type', 'referral_bonus')
+      .eq('status', 'completed')
+
+    const getAmountFCFA = (tx: any) => tx.metadata?.amount_xof || (tx.amount * 100) || 0
+    const bonusAmount = bonusTx?.reduce((sum, tx) => sum + getAmountFCFA(tx), 0) || 0
+
+    return {
+      total: total || 0,
+      pending,
+      qualified,
+      rewarded,
+      rejected,
+      expired,
+      bonusCount: bonusTx?.length || 0,
+      bonusAmount
+    }
   }
 
   const fetchDashboardData = async (): Promise<DashboardStats> => {
@@ -522,6 +626,47 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">Locations Actives</p>
                 <p className="text-xl font-bold">{stats.activeRentals} / {stats.totalRentals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Referrals & Bonus */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-l-4 border-l-indigo-500">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Parrainages</p>
+                <h3 className="text-2xl font-bold">{referralStats.total}</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  🎯 {referralStats.qualified} qualifiés • 🏅 {referralStats.rewarded} récompensés
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  ⏳ {referralStats.pending} en attente • ❌ {referralStats.rejected} refusés • ⌛ {referralStats.expired} expirés
+                </p>
+              </div>
+              <div className="bg-indigo-500 p-3 rounded-lg">
+                <Gift className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Bonus Parrainage</p>
+                <p className="text-xl font-bold">{formatNumber(referralStats.bonusAmount)} FCFA</p>
+                <p className="text-xs text-muted-foreground mt-1">{referralStats.bonusCount} transaction(s) validées</p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={referralLoading} onClick={() => refetchReferrals()}>
+                  {referralLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                  Maj
+                </Button>
               </div>
             </div>
           </CardContent>

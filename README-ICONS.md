@@ -5,6 +5,7 @@ Script Node.js complet pour importer automatiquement des icônes de haute qualit
 ## 🎯 Fonctionnalités
 
 - **Sources multiples** : 5 sources d'icônes avec fallback automatique
+
   1. `simple-icons` - 3000+ logos avec fuzzy matching
   2. Brandfetch API - Logos officiels de marques
   3. Clearbit Logo API - Base de données massive
@@ -12,16 +13,19 @@ Script Node.js complet pour importer automatiquement des icônes de haute qualit
   5. Fallback SVG - Génération automatique (initiales + couleur)
 
 - **Optimisation complète** :
+
   - SVG optimisés avec SVGO (taille réduite ~40%)
   - PNG vectorisés avec Potrace
   - 5 tailles PNG générées : 32, 64, 128, 256, 512px
 
 - **Upload S3 automatique** :
+
   - Upload SVG + tous les PNG
   - Headers de cache optimisés (1 an)
   - URLs publiques retournées
 
 - **Performance** :
+
   - Traitement batch avec `p-limit`
   - Concurrency configurable (défaut: 10)
   - Logging en temps réel (NDJSON)
@@ -84,6 +88,7 @@ aws s3api put-bucket-policy --bucket onesms-icons --policy '{
 ```
 
 **Option B - Utiliser un bucket existant** :
+
 - S'assurer que le bucket autorise les uploads publics
 - Configurer les variables `S3_BUCKET` et `S3_BASE_URL`
 
@@ -112,6 +117,7 @@ node import-icons.js
 ```
 
 Le script va :
+
 1. ✅ Récupérer tous les services depuis Supabase
 2. 🔍 Chercher la meilleure icône pour chaque service
 3. 🎨 Générer SVG optimisé + 5 PNG
@@ -126,10 +132,10 @@ Pour tester avant de lancer l'import complet, modifier temporairement le script 
 ```javascript
 // Limiter à 10 services pour test
 const { data: services, error } = await supabase
-  .from('services')
-  .select('id, code, name, display_name')
-  .order('popularity_score', { ascending: false })
-  .limit(10)  // ← Ajouter cette ligne
+  .from("services")
+  .select("id, code, name, display_name")
+  .order("popularity_score", { ascending: false })
+  .limit(10); // ← Ajouter cette ligne
 ```
 
 ## 📁 Structure de sortie
@@ -216,17 +222,14 @@ s3://onesms-icons/
 ### Erreur: "S3 upload failed: AccessDenied"
 
 → Vérifier les permissions IAM de l'utilisateur AWS :
+
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:PutObjectAcl",
-        "s3:GetObject"
-      ],
+      "Action": ["s3:PutObject", "s3:PutObjectAcl", "s3:GetObject"],
       "Resource": "arn:aws:s3:::onesms-icons/*"
     }
   ]
@@ -240,8 +243,9 @@ s3://onesms-icons/
 ### Performances lentes
 
 → Augmenter la concurrence dans le script (ligne 26) :
+
 ```javascript
-const CONCURRENCY_LIMIT = 20  // Au lieu de 10
+const CONCURRENCY_LIMIT = 20; // Au lieu de 10
 ```
 
 ### Icônes de mauvaise qualité
@@ -251,6 +255,7 @@ const CONCURRENCY_LIMIT = 20  // Au lieu de 10
 ## 📈 Statistiques typiques
 
 Pour ~1300 services :
+
 - ⏱️ **Durée** : 10-15 minutes (avec concurrence 10)
 - 🎯 **Taux de succès** : 85-95%
 - 📦 **Sources** :
@@ -285,23 +290,26 @@ CREATE INDEX IF NOT EXISTS idx_services_icon_url ON services(icon_url);
 ### Modifier les tailles PNG
 
 Ligne 25 du script :
+
 ```javascript
-const PNG_SIZES = [32, 64, 128, 256, 512]  // Ajouter/supprimer des tailles
+const PNG_SIZES = [32, 64, 128, 256, 512]; // Ajouter/supprimer des tailles
 ```
 
 ### Changer la couleur du fallback
 
 Ligne 169 du script (fonction `hashColor`) :
+
 ```javascript
-const sat = 70  // Saturation (0-100)
-const light = 50  // Luminosité (0-100)
+const sat = 70; // Saturation (0-100)
+const light = 50; // Luminosité (0-100)
 ```
 
 ### Modifier la priorité des sources
 
 Ligne 435 du script (fonction `processService`) :
+
 ```javascript
-let iconData = 
+let iconData =
   await tryBrandfetch(displayName, code) ||    // Brandfetch en premier
   await trySimpleIcons(displayName, code) ||   // Simple-icons en second
   // ...
@@ -310,6 +318,7 @@ let iconData =
 ## 📞 Support
 
 En cas de problème :
+
 1. Vérifier les logs dans la console
 2. Consulter `import-results.ndjson` pour les erreurs
 3. Vérifier les permissions AWS/Supabase

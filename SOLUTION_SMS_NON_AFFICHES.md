@@ -5,13 +5,16 @@
 **Numéro concerné** : 6289518249636 (Order ID: 4450977982)
 
 ### Symptômes
+
 - Activation créée avec status `pending`
 - SMS reçu par SMS-Activate (code: 358042)
 - SMS **NON** stocké dans la base de données
 - SMS **NON** affiché sur la plateforme
 
 ### Cause Root
+
 1. **API V2 (`getStatusV2`) ne fonctionne pas** pour certains ordres
+
    - Retourne : `WRONG_ACTIVATION_ID`
    - Alors que V1 retourne : `STATUS_OK:358042` ✅
 
@@ -23,9 +26,11 @@
 ## ✅ SOLUTION MISE EN PLACE
 
 ### 1. Fonction Cron Côté Serveur
+
 **Fichier** : `/supabase/functions/cron-check-pending-sms/index.ts`
 
 **Fonctionnalités** :
+
 - ✅ Vérifie toutes les activations `pending` ou `waiting`
 - ✅ Utilise API V1 (plus fiable) : `getStatus`
 - ✅ Met à jour automatiquement la base de données
@@ -34,11 +39,13 @@
 - ✅ Indépendant du frontend
 
 **Déploiement** :
+
 ```bash
 supabase functions deploy cron-check-pending-sms
 ```
 
 **Test manuel** :
+
 ```bash
 curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/cron-check-pending-sms' \
   -H 'Authorization: Bearer YOUR_ANON_KEY'
@@ -47,6 +54,7 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/cron-check-p
 ### 2. Configuration du Cron Job
 
 #### Option A : Supabase Dashboard (Recommandé)
+
 1. Aller sur : https://supabase.com/dashboard/project/htfqmamvmhdoixqcbbbw/functions
 2. Sélectionner `cron-check-pending-sms`
 3. Onglet "Settings" → "Schedules"
@@ -56,7 +64,9 @@ curl -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/cron-check-p
    - **Headers** : Aucun (service role automatique)
 
 #### Option B : pg_cron (SQL)
+
 Exécuter dans SQL Editor :
+
 ```sql
 -- Enable pg_cron extension
 CREATE EXTENSION IF NOT EXISTS pg_cron;
@@ -78,23 +88,29 @@ SELECT cron.schedule(
 ```
 
 #### Option C : Cron Job externe (EasyCron, cron-job.org)
+
 URL à appeler :
+
 ```
 POST https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/cron-check-pending-sms
 Header: Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
 Fréquence : Toutes les 30 secondes
 
 ### 3. Fonctions Debug Créées
 
 #### `debug-sms-activation`
+
 Diagnostic complet d'une activation par numéro de téléphone :
+
 ```bash
 curl -X POST '.../debug-sms-activation' \
   -d '{"phone": "6289518249636"}'
 ```
 
 Retourne :
+
 - État de l'activation dans la DB
 - Test des 3 APIs (V2, V1, History)
 - Diagnostics (expired, polling status, etc.)
@@ -102,6 +118,7 @@ Retourne :
 ## 📊 RÉSULTATS DES TESTS
 
 ### Test du numéro 6289518249636
+
 ```json
 {
   "success": true,
@@ -119,6 +136,7 @@ Retourne :
 ✅ **SMS récupéré avec succès !**
 
 ### Test de la fonction cron
+
 ```json
 {
   "success": true,
@@ -136,16 +154,19 @@ Retourne :
 ## 🚀 AMÉLIORATIONS FUTURES
 
 ### 1. Optimisation API
+
 - [ ] Détecter automatiquement si V2 ne fonctionne pas
 - [ ] Utiliser V1 par défaut pour certains pays/services
 - [ ] Cache des statuts API par ordre
 
 ### 2. Monitoring
+
 - [ ] Logger tous les échecs de polling
 - [ ] Alertes email pour SMS non récupérés après 5 min
 - [ ] Dashboard admin pour voir les activations bloquées
 
 ### 3. Frontend
+
 - [ ] Bouton "Forcer la vérification" pour l'utilisateur
 - [ ] Indicateur visuel du dernier check
 - [ ] Notification push quand SMS reçu
@@ -165,21 +186,25 @@ Retourne :
 ### API SMS-Activate - Différences V1/V2
 
 **getStatusV2** (JSON) :
+
 - ✅ Retourne texte complet du SMS
 - ❌ Parfois retourne `WRONG_ACTIVATION_ID` même quand le SMS existe
 - ❌ Moins fiable pour les anciens ordres
 
 **getStatus** (Text) :
+
 - ✅ Plus fiable, fonctionne toujours
 - ✅ Format simple : `STATUS_OK:code`
 - ❌ Ne retourne que le code, pas le texte
 
 **getFullSms** (History) :
+
 - ✅ Récupère les SMS des 30 derniers jours
 - ✅ Utile pour les SMS ratés
 - ❌ Plus lent, à utiliser en dernier recours
 
 ### Stratégie de Récupération (Ordre)
+
 1. **Frontend polling** (temps réel, 3-30s)
 2. **Cron serveur** (backup, toutes les 30s)
 3. **Vérification manuelle** (utilisateur ou admin)

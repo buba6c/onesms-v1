@@ -21,7 +21,8 @@
     "contacts": "Contacts",
     "services": "Services",
     "features": "Features",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "referral": "Referral"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -63,6 +64,7 @@
     "noStock": "Out of stock",
     "available": "Available",
     "universalService": "Universal service",
+    "fullRent": "Full Rent",
     "receiveFromAny": "Receive SMS from any service",
     "loadingRates": "Loading live rates...",
     "countrySuccessRate": "Country, success rate",
@@ -148,7 +150,7 @@
     "forgotPasswordDescription": "Enter your email address and we'll send you a link to reset your password.",
     "sendResetLink": "Send Reset Link",
     "emailSent": "Email Sent!",
-    "resetEmailSentDescription": "A reset link has been sent to your email address. Check your inbox.",
+    "resetEmailSentDescription": "If this email address is associated with a One SMS account, a reset link has been sent. Check your inbox and spam folder.",
     "checkSpam": "Also check your spam folder if you can't find the email.",
     "backToLogin": "Back to Login",
     "resetPasswordTitle": "New Password",
@@ -386,6 +388,20 @@
     },
     "popularServices": "Popular Services",
     "testimonials": "What Our Users Say",
+    "referralBanner": {
+      "badge": "💰 Referral Program",
+      "title": "Refer Your Friends,",
+      "titleHighlight": "Earn Bonuses",
+      "description": "Invite your friends to join One SMS! When your friend tops up, you get 5Ⓐ and they get 5Ⓐ too. Everyone wins!",
+      "cta": "Sign Up with a Referral Code",
+      "ctaLearnMore": "Learn More",
+      "benefit1": "Bonus on every friend's top-up",
+      "benefit2": "Unlimited referrals",
+      "benefit3": "Instant credit",
+      "haveCode": "Have a referral code?",
+      "enterCode": "Enter your code during signup",
+      "codeExample": "Sample referral code"
+    },
     "cta": {
       "title": "Ready to Get Started?",
       "description": "Join thousands of users worldwide",
@@ -428,6 +444,8 @@
     "support": "Support",
     "helpCenter": "Help Center",
     "contact": "Contact Us",
+    "contactUs": "Contact Us",
+    "referral": "Referral Program",
     "faq": "FAQ",
     "apiDocs": "API Documentation",
     "legal": "Legal",
@@ -519,6 +537,20 @@
       "buyNow": "Buy Now",
       "customPackage": "Need a custom package?",
       "contactUs": "Contact Us"
+    },
+    "referralBanner": {
+      "badge": "💰 Referral Program",
+      "title": "Refer Your Friends,",
+      "titleHighlight": "Earn Bonuses",
+      "description": "Invite your friends to join One SMS! When your friend tops up, you get 5Ⓐ and they get 5Ⓐ too. Everyone wins!",
+      "cta": "Sign Up with a Referral Code",
+      "ctaLearnMore": "Learn More",
+      "benefit1": "Bonus on every friend's top-up",
+      "benefit2": "Unlimited referrals",
+      "benefit3": "Instant credit",
+      "haveCode": "Have a referral code?",
+      "enterCode": "Enter your code during signup",
+      "codeExample": "Sample referral code"
     },
     "cta": {
       "title": "Ready to Get Started?",
@@ -822,6 +854,9 @@
   "toasts": {
     "paymentSuccess": "Payment successful! 🎉",
     "paymentSuccessDesc": "Your activations have been added to your account. You can now purchase numbers.",
+    "referralBonusReceived": "Referral bonus received! 🎁",
+    "referralBonusReceivedDesc": "You received {{amount}}Ⓐ bonus! Refer friends to earn more.",
+    "referralBonusCta": "Refer friends",
     "paymentFailed": "Payment failed",
     "paymentFailedDesc": "The payment was cancelled or failed. Please try again.",
     "loadingError": "Loading error",
@@ -964,4 +999,39 @@
       "serviceUpdated": "Service updated successfully"
     }
   }
+    ,
+    "referral": {
+      "badge": "Referral",
+      "title": "Invite and earn",
+      "subtitle": "Share your code and get rewards on first recharge",
+      "bonusHighlight": "You get 5Ⓐ + Your friend gets 5Ⓐ",
+      "bonusHighlightDesc": "When your friend makes their first top-up, you both receive 5 bonus credits!",
+      "hint": "Works on the first top-up of each friend only.",
+      "yourCode": "Your code",
+      "notAvailable": "Unavailable",
+      "shareCta": "Share my link",
+      "copiedCode": "Referral code copied",
+      "copyFallback": "Unable to copy. Please copy manually.",
+      "shareTitle": "Join me on One SMS",
+      "shareText": "Use my referral code on One SMS and get your bonus.",
+      "linkCopied": "Referral link copied",
+      "copyCodeCta": "Copy code",
+      "pageTitle": "Boost your rewards",
+      "pageSubtitle": "Invite friends, they recharge, everyone wins.",
+      "benefitsTitle": "Why share it?",
+      "benefitsSubtitle": "Fair, capped, first top-up only",
+      "benefitEarn": "You receive the referrer bonus on each friend's first recharge.",
+      "benefitReferee": "Your friend also gets their welcome bonus on that first recharge.",
+      "benefitSafe": "Anti-fraud controls and monthly caps to prevent abuse.",
+      "stepsTitle": "How it works",
+      "stepsSubtitle": "Simple and transparent",
+      "step1Title": "Share your link or code",
+      "step1Desc": "Send your unique code to your friends or share the link.",
+      "step2Title": "They sign up and top up",
+      "step2Desc": "On their first recharge, the program checks eligibility.",
+      "step3Title": "Bonus credited",
+      "step3Desc": "The bonus is credited once the first recharge is confirmed.",
+      "shareSectionTitle": "Share your referral link",
+      "shareSectionSubtitle": "Copy or share in one tap"
+    }
 }

@@ -8,6 +8,7 @@
 Quand un SMS arrivait, le status devenait `received` et l'activation disparaissait.
 
 **Correction :**
+
 ```typescript
 // AVANT
 .in('status', ['pending', 'waiting'])
@@ -22,6 +23,7 @@ Quand un SMS arrivait, le status devenait `received` et l'activation disparaissa
 Quand la DB retournait un tableau vide, le state local conservait les anciennes valeurs.
 
 **Correction :**
+
 ```typescript
 // AVANT
 useEffect(() => {
@@ -63,8 +65,8 @@ useEffect(() => {
 
 ### Prochaine étape :
 
-Pour que les numéros avec SMS reçu ne restent pas indéfiniment sur le dashboard, 
-on peut ajouter une option "Supprimer" ou faire qu'ils disparaissent automatiquement 
+Pour que les numéros avec SMS reçu ne restent pas indéfiniment sur le dashboard,
+on peut ajouter une option "Supprimer" ou faire qu'ils disparaissent automatiquement
 après un certain temps (ex: 1 heure après réception).
 
 Voulez-vous que j'ajoute cette fonctionnalité ?

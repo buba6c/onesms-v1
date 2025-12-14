@@ -401,6 +401,97 @@ export interface Database {
           created_at?: string
         }
       }
+      contact_messages: {
+        Row: {
+          id: string
+          name: string
+          email: string
+          subject: string
+          message: string
+          status: 'new' | 'read' | 'replied' | 'archived'
+          user_id: string | null
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+          updated_at: string
+          replied_at: string | null
+          replied_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          email: string
+          subject: string
+          message: string
+          status?: 'new' | 'read' | 'replied' | 'archived'
+          user_id?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+          updated_at?: string
+          replied_at?: string | null
+          replied_by?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          email?: string
+          subject?: string
+          message?: string
+          status?: 'new' | 'read' | 'replied' | 'archived'
+          user_id?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+          updated_at?: string
+          replied_at?: string | null
+          replied_by?: string | null
+        }
+      }
+      wave_payment_proofs: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          activations: number
+          proof_url: string
+          status: 'pending' | 'approved' | 'rejected'
+          metadata: Json | null
+          admin_notes: string | null
+          verified_by: string | null
+          verified_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          activations: number
+          proof_url: string
+          status?: 'pending' | 'approved' | 'rejected'
+          metadata?: Json | null
+          admin_notes?: string | null
+          verified_by?: string | null
+          verified_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          activations?: number
+          proof_url?: string
+          status?: 'pending' | 'approved' | 'rejected'
+          metadata?: Json | null
+          admin_notes?: string | null
+          verified_by?: string | null
+          verified_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparaison des Modals BuyNumber</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .modal-preview {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-content {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .code-section {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+        }
+        .version-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        .v-dec1 { background: #dbeafe; color: #1e40af; }
+        .v-dec3 { background: #dcfce7; color: #15803d; }
+        .v-current { background: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">🔍 Comparaison des Modals "En attente de SMS"</h1>
+            <p class="text-gray-600 text-lg">Visualisation des 3 versions du BuyNumberModal</p>
+        </div>
+
+        <!-- Timeline -->
+        <div class="flex items-center justify-center mb-12 gap-4">
+            <div class="text-center">
+                <div class="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                    <span class="text-4xl">📅</span>
+                </div>
+                <span class="version-badge v-dec1">1er Décembre</span>
+                <p class="text-sm text-gray-600 mt-1">Version originale</p>
+            </div>
+            <div class="text-gray-400 text-2xl">→</div>
+            <div class="text-center">
+                <div class="w-32 h-32 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                    <span class="text-4xl">✨</span>
+                </div>
+                <span class="version-badge v-dec3">3 Décembre</span>
+                <p class="text-sm text-gray-600 mt-1">Netlify (prod)</p>
+            </div>
+            <div class="text-gray-400 text-2xl">→</div>
+            <div class="text-center">
+                <div class="w-32 h-32 rounded-full bg-yellow-100 flex items-center justify-center mb-2">
+                    <span class="text-4xl">🚀</span>
+                </div>
+                <span class="version-badge v-current">Actuelle</span>
+                <p class="text-sm text-gray-600 mt-1">Version locale</p>
+            </div>
+        </div>
+
+        <!-- Comparaison visuelle -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <!-- Version 1er Décembre -->
+            <div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">Version 1</h3>
+                        <span class="version-badge v-dec1">1er Déc</span>
+                    </div>
+                    
+                    <div class="modal-preview mb-4">
+                        <div class="modal-content">
+                            <!-- Header avec gradient coloré -->
+                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-4 text-white mb-4">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-full flex items-center justify-center">
+                                        <span class="text-2xl">📨</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold">En attente du SMS...</h4>
+                                        <p class="text-xs text-white/80">Le code apparaîtra automatiquement</p>
+                                    </div>
+                                </div>
+                                <!-- Timer avec barre -->
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-sm">
+                                        <span>Temps restant</span>
+                                        <span class="font-mono font-bold">8:45</span>
+                                    </div>
+                                    <div class="w-full bg-white/20 rounded-full h-2">
+                                        <div class="bg-green-400 h-2 rounded-full" style="width: 87%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Numéro -->
+                            <div class="mb-4">
+                                <label class="text-xs text-gray-500 mb-1 block">Votre Numéro</label>
+                                <div class="flex gap-2">
+                                    <div class="flex-1 border-2 rounded-lg p-2 bg-gray-50">
+                                        <span class="font-mono font-bold text-lg">+33 6 12 34 56 78</span>
+                                    </div>
+                                    <button class="border-2 rounded-lg p-2 hover:bg-gray-50">
+                                        📋
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Zone SMS -->
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                                <div class="mb-3">
+                                    <span class="text-4xl">📨</span>
+                                </div>
+                                <p class="text-sm font-semibold mb-1">En attente du SMS...</p>
+                                <p class="text-xs text-gray-500">Le code s'affichera ici</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <h4 class="font-bold text-gray-900">✨ Caractéristiques:</h4>
+                        <ul class="space-y-1 text-gray-600">
+                            <li>• Header coloré avec gradient</li>
+                            <li>• Barre de progression visible</li>
+                            <li>• Affichage du temps gelé</li>
+                            <li>• Design riche et animé</li>
+                            <li>• Polling toutes les 3 secondes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version 3 Décembre (Netlify) -->
+            <div>
+                <div class="bg-white rounded-lg shadow-lg p-6 ring-4 ring-green-500">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">Version 2</h3>
+                        <div>
+                            <span class="version-badge v-dec3">3 Déc</span>
+                            <span class="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded">PROD</span>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-preview mb-4">
+                        <div class="modal-content">
+                            <!-- Badge status épuré -->
+                            <div class="flex justify-center mb-4">
+                                <div class="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                    <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                    En attente
+                                </div>
+                            </div>
+                            
+                            <!-- Numéro dans une carte épurée -->
+                            <div class="bg-gray-50 rounded-2xl p-4 mb-4">
+                                <div class="flex justify-between mb-2">
+                                    <span class="text-xs font-medium text-gray-500 uppercase">Numéro</span>
+                                    <span class="text-xs text-gray-400">🇫🇷 WhatsApp</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="flex-1 text-2xl font-mono font-bold text-center">+33612345678</span>
+                                    <button class="w-11 h-11 rounded-xl border bg-white flex items-center justify-center hover:bg-gray-50">
+                                        📋
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Timer minimaliste -->
+                            <div class="flex items-center justify-center gap-3 mb-4">
+                                <span class="text-gray-400">⏱</span>
+                                <span class="text-2xl font-mono font-bold">8:45</span>
+                                <div class="w-24 h-1.5 bg-gray-200 rounded-full">
+                                    <div class="bg-green-500 h-1.5 rounded-full" style="width: 87%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Zone SMS épurée -->
+                            <div class="text-center py-6">
+                                <div class="mb-3">
+                                    <span class="text-4xl">💬</span>
+                                </div>
+                                <p class="font-medium text-gray-900 mb-1">En attente du SMS</p>
+                                <p class="text-sm text-gray-500">Utilisez ce numéro sur WhatsApp</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <h4 class="font-bold text-gray-900">✨ Caractéristiques:</h4>
+                        <ul class="space-y-1 text-gray-600">
+                            <li>• Design épuré et moderne</li>
+                            <li>• Moins de couleurs vives</li>
+                            <li>• Barre de progression discrète</li>
+                            <li>• Focus sur le numéro</li>
+                            <li>• Meilleure lisibilité</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version Actuelle -->
+            <div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">Version 3</h3>
+                        <span class="version-badge v-current">Actuelle</span>
+                    </div>
+                    
+                    <div class="modal-preview mb-4">
+                        <div class="modal-content">
+                            <div class="text-center">
+                                <div class="text-6xl mb-4">🤷‍♂️</div>
+                                <p class="font-bold text-xl text-gray-900 mb-2">Identique à V2</p>
+                                <p class="text-sm text-gray-600">Aucune différence détectée</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <h4 class="font-bold text-gray-900">📌 Statut:</h4>
+                        <ul class="space-y-1 text-gray-600">
+                            <li>• Fichier local = Netlify</li>
+                            <li>• Pas de modifications</li>
+                            <li>• Sync parfait</li>
+                            <li>• Prêt pour déploiement</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Différences clés -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-12">
+            <h2 class="text-2xl font-bold mb-6">📊 Tableau des différences</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b-2 border-gray-200">
+                            <th class="text-left p-4 font-bold">Fonctionnalité</th>
+                            <th class="text-center p-4"><span class="version-badge v-dec1">1er Déc</span></th>
+                            <th class="text-center p-4"><span class="version-badge v-dec3">3 Déc</span></th>
+                            <th class="text-center p-4"><span class="version-badge v-current">Actuelle</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr>
+                            <td class="p-4 font-medium">Header gradient coloré</td>
+                            <td class="text-center p-4">✅</td>
+                            <td class="text-center p-4">❌</td>
+                            <td class="text-center p-4">❌</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="p-4 font-medium">Badge status épuré</td>
+                            <td class="text-center p-4">❌</td>
+                            <td class="text-center p-4">✅</td>
+                            <td class="text-center p-4">✅</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 font-medium">Barre de progression visible</td>
+                            <td class="text-center p-4">✅ Grande</td>
+                            <td class="text-center p-4">✅ Petite</td>
+                            <td class="text-center p-4">✅ Petite</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="p-4 font-medium">Affichage frozen balance</td>
+                            <td class="text-center p-4">✅</td>
+                            <td class="text-center p-4">❌</td>
+                            <td class="text-center p-4">❌</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 font-medium">Polling status visible</td>
+                            <td class="text-center p-4">✅</td>
+                            <td class="text-center p-4">❌</td>
+                            <td class="text-center p-4">❌</td>
+                        </tr>
+                        <tr class="bg-gray-50">
+                            <td class="p-4 font-medium">Design épuré</td>
+                            <td class="text-center p-4">❌</td>
+                            <td class="text-center p-4">✅✅</td>
+                            <td class="text-center p-4">✅✅</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 font-medium">Support balance/credits</td>
+                            <td class="text-center p-4">❌</td>
+                            <td class="text-center p-4">✅</td>
+                            <td class="text-center p-4">✅</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Conclusion -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white text-center">
+            <h2 class="text-3xl font-bold mb-4">🎯 Conclusion</h2>
+            <p class="text-xl mb-6">La version actuelle (locale) est <strong>identique</strong> à celle déployée sur Netlify (3 déc)</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+                <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                    <div class="text-3xl mb-2">✅</div>
+                    <p class="font-semibold">Modal existe bien</p>
+                    <p class="text-sm text-white/80">Dans BuyNumberModal.tsx</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                    <div class="text-3xl mb-2">❌</div>
+                    <p class="font-semibold">Pas cliquable</p>
+                    <p class="text-sm text-white/80">Depuis le Dashboard</p>
+                </div>
+            </div>
+            <p class="mt-6 text-lg">
+                💡 <strong>Solution:</strong> Rendre le badge "En attente de SMS" cliquable dans DashboardPage
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-12 text-gray-500 text-sm">
+            <p>Généré le 5 décembre 2025 • ONE SMS V1</p>
+        </div>
+    </div>
+</body>
+</html>

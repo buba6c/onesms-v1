@@ -7,6 +7,7 @@
 **Localisation:** `supabase/functions/get-top-countries-by-service/index.ts`
 
 **Fonctionnement:**
+
 1. Appelle `getTopCountriesByServiceRank` de SMS-Activate (considère le rang de l'utilisateur)
 2. Appelle `getListOfTopCountriesByService` pour obtenir les stats de performance
 3. Récupère tous les noms de pays depuis `getCountries`
@@ -14,15 +15,17 @@
 5. Trie les pays par score décroissant
 
 **Score Composite:**
+
 ```typescript
-compositeScore = 
-  (successRate * 0.4) +          // 40% poids sur succès (0-40 points)
-  (popularityShare * 0.3) +      // 30% poids sur popularité (0-30 points)
-  availabilityBonus +            // 0-20 points selon stock (>1000=20, >100=10, >0=5)
-  (rankingBonus * 0.2)           // 10% poids sur position API (0-10 points)
+compositeScore =
+  successRate * 0.4 + // 40% poids sur succès (0-40 points)
+  popularityShare * 0.3 + // 30% poids sur popularité (0-30 points)
+  availabilityBonus + // 0-20 points selon stock (>1000=20, >100=10, >0=5)
+  rankingBonus * 0.2; // 10% poids sur position API (0-10 points)
 ```
 
 **Exemple de réponse:**
+
 ```json
 {
   "success": true,
@@ -55,6 +58,7 @@ compositeScore =
 **Localisation:** `supabase/migrations/032_country_service_stats.sql`
 
 **Structure:**
+
 ```sql
 CREATE TABLE country_service_stats (
   id UUID PRIMARY KEY,
@@ -68,12 +72,13 @@ CREATE TABLE country_service_stats (
   retail_price DECIMAL DEFAULT 0,
   composite_score DECIMAL DEFAULT 0,
   last_synced TIMESTAMP DEFAULT NOW(),
-  
+
   UNIQUE(country_code, service_code)
 );
 ```
 
 **Usage futur:**
+
 - Cron job quotidien pour synchroniser les stats
 - Cache local pour éviter trop d'appels API
 - Historique des performances par pays
@@ -81,19 +86,24 @@ CREATE TABLE country_service_stats (
 ### 3. Frontend Modifié: `DashboardPage.tsx`
 
 **Changement ligne ~290:**
+
 ```typescript
 // AVANT
-const { data } = await supabase.functions.invoke('get-country-availability', {
-  body: { service: apiServiceCode }
+const { data } = await supabase.functions.invoke("get-country-availability", {
+  body: { service: apiServiceCode },
 });
 
 // APRÈS
-const { data } = await supabase.functions.invoke('get-top-countries-by-service', {
-  body: { service: apiServiceCode }
-});
+const { data } = await supabase.functions.invoke(
+  "get-top-countries-by-service",
+  {
+    body: { service: apiServiceCode },
+  }
+);
 ```
 
 **Mapping enrichi ligne ~313:**
+
 ```typescript
 const mapped = countries
   .filter((c: any) => c.count > 0)
@@ -105,9 +115,9 @@ const mapped = countries
     successRate: c.successRate || 95,
     count: c.count,
     price: c.price,
-    compositeScore: c.compositeScore,  // ✅ NOUVEAU
-    rank: c.rank,                      // ✅ NOUVEAU
-    share: c.share                     // ✅ NOUVEAU
+    compositeScore: c.compositeScore, // ✅ NOUVEAU
+    rank: c.rank, // ✅ NOUVEAU
+    share: c.share, // ✅ NOUVEAU
   }));
 ```
 
@@ -116,6 +126,7 @@ const mapped = countries
 ## 📊 COMPARAISON AVANT/APRÈS
 
 ### AVANT: Tri par Quantité Uniquement
+
 ```
 1. Indonesia (95% - 66960 nums - $1.2)
 2. United States (95% - 111179 nums - $1.5)
@@ -125,11 +136,13 @@ const mapped = countries
 ```
 
 **Problème:** USA et Canada en tête juste parce qu'ils ont beaucoup de numéros, mais:
+
 - Prix plus élevés
 - Pas forcément les meilleurs taux de succès
 - Pas les plus populaires
 
 ### APRÈS: Tri Intelligent (Score Composite)
+
 ```
 1. Colombia (95% - 25507 nums - $0.84 - Score: 67.8) ✅
 2. Brazil (95% - 28919 nums - $1.20 - Score: 67.6) ✅
@@ -139,6 +152,7 @@ const mapped = countries
 ```
 
 **Avantages:**
+
 - ✅ Pays avec meilleur rapport qualité/prix en premier
 - ✅ Considère le taux de succès réel (stats SMS-Activate)
 - ✅ Privilégie les pays populaires (share)
@@ -158,12 +172,13 @@ const mapped = countries
 ```
 
 **Logs attendus:**
+
 ```
 🌐 [LIVE] Chargement pays avec quantités réelles...
 📝 [LIVE] Service: whatsapp → API code: wa
 📡 [LIVE] Response: {success: true, service: 'wa', countries: Array(193), stats: {…}}
-🏆 [LIVE] Top 5 pays (tri intelligent): 
-  ['Colombia (95% - 25507 nums - $0.84 - Score: 67.8)', 
+🏆 [LIVE] Top 5 pays (tri intelligent):
+  ['Colombia (95% - 25507 nums - $0.84 - Score: 67.8)',
    'Brazil (95% - 28919 nums - $1.20 - Score: 67.6)', ...]
 ```
 
@@ -186,6 +201,7 @@ curl -s -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-top-c
 ### 3. Vérifier le Tri dans l'UI
 
 **Points à vérifier:**
+
 - ✅ Les pays sont bien ordonnés par score (pas juste par quantité)
 - ✅ Les pays avec prix bas apparaissent plus haut
 - ✅ Les pays avec bon success rate sont privilégiés
@@ -196,21 +212,25 @@ curl -s -X POST 'https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-top-c
 ## 🎯 PROCHAINES ÉTAPES
 
 ### Phase 1: Cron Job pour Cache des Stats (RECOMMANDÉ) ✅
+
 **Fichier à créer:** `supabase/functions/sync-country-stats/index.ts`
 
 ```typescript
 // Exécution: Tous les jours à 3h du matin
 // Durée: ~10 minutes pour tous les services
 
-const TOP_SERVICES = ['wa', 'tg', 'fb', 'ig', 'go', 'tw', 'dr']
+const TOP_SERVICES = ["wa", "tg", "fb", "ig", "go", "tw", "dr"];
 
 for (const service of TOP_SERVICES) {
-  const { data } = await supabase.functions.invoke('get-top-countries-by-service', {
-    body: { service }
-  })
-  
+  const { data } = await supabase.functions.invoke(
+    "get-top-countries-by-service",
+    {
+      body: { service },
+    }
+  );
+
   for (const country of data.countries) {
-    await supabase.from('country_service_stats').upsert({
+    await supabase.from("country_service_stats").upsert({
       country_code: country.countryCode,
       service_code: service,
       success_rate: country.successRate,
@@ -220,18 +240,20 @@ for (const service of TOP_SERVICES) {
       price: country.price,
       retail_price: country.retailPrice,
       composite_score: country.compositeScore,
-      last_synced: new Date()
-    })
+      last_synced: new Date(),
+    });
   }
 }
 ```
 
 **Avantages:**
+
 - Réduit la charge API (1 appel/jour au lieu de 100/jour)
 - Améliore la vitesse de chargement
 - Permet de suivre l'évolution des stats dans le temps
 
 ### Phase 2: Filtres Avancés dans l'UI ✅
+
 **Ajouter dans DashboardPage:**
 
 ```typescript
@@ -244,6 +266,7 @@ for (const service of TOP_SERVICES) {
 ```
 
 ### Phase 3: Admin - Monitoring des Pays ✅
+
 **Ajouter dans AdminCountries:**
 
 ```typescript
@@ -270,16 +293,19 @@ for (const service of TOP_SERVICES) {
 ## 📈 MÉTRIQUES À SURVEILLER
 
 ### Frontend
+
 - **Temps de chargement des pays:** Devrait rester < 3 secondes
 - **Nombre de pays affichés:** Devrait être > 100 (vs 8-10 avant)
 - **Taux de conversion:** Les utilisateurs achètent-ils plus avec ce tri ?
 
 ### Backend
+
 - **Appels API SMS-Activate:** ~10-20/minute (accepté)
 - **Cache hit rate:** Si cron job actif, devrait être > 90%
 - **Temps de réponse Edge Function:** < 2 secondes
 
 ### Business
+
 - **Pays les plus achetés:** Correspondent-ils au top du classement ?
 - **Taux de succès moyen:** Devrait augmenter avec meilleurs pays
 - **Revenue par activation:** Devrait rester stable ou augmenter
@@ -289,16 +315,19 @@ for (const service of TOP_SERVICES) {
 ## ⚠️ LIMITATIONS ACTUELLES
 
 ### 1. Share = 0 pour tous les pays
+
 **Raison:** `getListOfTopCountriesByService` retourne souvent 0 pour `share`
 **Impact:** Le score composite donne moins de poids à la popularité
 **Solution:** Utiliser un algorithme alternatif (position dans le classement)
 
 ### 2. Success Rate = 95 pour tous
+
 **Raison:** SMS-Activate ne fournit pas toujours les vraies stats
 **Impact:** Tous les pays sont considérés égaux pour ce critère
 **Solution:** Utiliser nos propres stats DB (à construire)
 
 ### 3. Pas de cache encore
+
 **Raison:** Cron job pas encore implémenté
 **Impact:** Appels API à chaque chargement de page
 **Solution:** Implémenter le cron job (Phase 1)
@@ -308,6 +337,7 @@ for (const service of TOP_SERVICES) {
 ## 🐛 DEBUGGING
 
 ### Si les pays n'apparaissent pas:
+
 ```typescript
 // 1. Vérifier la console
 console.log('📡 [LIVE] Response:', availabilityData)
@@ -321,14 +351,18 @@ curl https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/get-top-countries-by-
 ```
 
 ### Si le tri semble bizarre:
+
 ```typescript
 // Vérifier les scores dans la console
-mapped.slice(0, 10).forEach(c => {
-  console.log(`${c.name}: Score ${c.compositeScore} = Success ${c.successRate} + Share ${c.share} + Rank ${c.rank}`)
-})
+mapped.slice(0, 10).forEach((c) => {
+  console.log(
+    `${c.name}: Score ${c.compositeScore} = Success ${c.successRate} + Share ${c.share} + Rank ${c.rank}`
+  );
+});
 ```
 
 ### Si l'API est lente:
+
 ```typescript
 // Vérifier les logs Supabase
 // Dashboard > Functions > get-top-countries-by-service > Logs
