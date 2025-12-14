@@ -69,12 +69,12 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
     }
 
     // Accept multiple parameter names for compatibility
-    const serviceCode = req.body.serviceCode || req.body.product || req.body.service;
-    const countryCode = req.body.countryCode || req.body.country;
+    let serviceCode = req.body.serviceCode || req.body.product || req.body.service;
+    let countryCode = req.body.countryCode || req.body.country;
     const operator = req.body.operator || 'any';
     const expectedPrice = req.body.expectedPrice;
     
-    console.log('📥 Request:', { serviceCode, countryCode, operator, expectedPrice, userId: user.id });
+    console.log('📥 Request (raw):', { serviceCode, countryCode, operator, expectedPrice, userId: user.id });
 
     if (!serviceCode || !countryCode) {
       return res.status(400).json({ 
@@ -82,6 +82,46 @@ app.post('/functions/v1/buy-sms-activate-number', async (req, res) => {
         success: false 
       });
     }
+
+    // Map service code if needed (frontend sends names like 'alipay', API needs 'hw')
+    const SERVICE_CODE_MAPPING = {
+      'google': 'go', 'whatsapp': 'wa', 'telegram': 'tg', 'facebook': 'fb',
+      'instagram': 'ig', 'twitter': 'tw', 'discord': 'ds', 'microsoft': 'mm',
+      'yahoo': 'mb', 'amazon': 'am', 'netflix': 'nf', 'uber': 'ub',
+      'tiktok': 'tk', 'snapchat': 'sn', 'linkedin': 'ld', 'viber': 'vi',
+      'paypal': 'ts', 'steam': 'st', 'alipay': 'hw', 'alibaba': 'hw', 'huawei': 'hw',
+      'wechat': 'wb', 'line': 'la', 'kakao': 'kt', 'apple': 'wx', 'samsung': 'qi',
+      'shopee': 'jt', 'grab': 'hx', 'gojek': 'go', 'lazada': 'lz', 'tinder': 'oi',
+      'bumble': 'fr', 'badoo': 'qq', 'olx': 'qe', 'avito': 'av', 'didi': 'dd',
+      'bolt': 'bz', 'yandex': 'ya', 'mailru': 'ml', 'vk': 'vk', 'odnoklassniki': 'ok',
+      'weibo': 'wb', 'baidu': 'bd', 'jd': 'jd', 'taobao': 'tb', 'pinduoduo': 'pd'
+    };
+    
+    const originalServiceCode = serviceCode;
+    if (SERVICE_CODE_MAPPING[serviceCode.toLowerCase()]) {
+      serviceCode = SERVICE_CODE_MAPPING[serviceCode.toLowerCase()];
+      console.log(`📍 Mapped service code: ${originalServiceCode} -> ${serviceCode}`);
+    }
+
+    // Map country code if it's a name instead of ID
+    const COUNTRY_CODE_MAPPING = {
+      'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
+      'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'vietnam': 10, 'england': 12,
+      'india': 22, 'germany': 27, 'romania': 32, 'colombia': 33, 'canada': 36,
+      'mexico': 38, 'spain': 40, 'thailand': 52, 'brazil': 45, 'france': 78,
+      'usa': 187, 'australia': 175,
+      'ru': 0, 'ua': 1, 'kz': 2, 'cn': 3, 'ph': 4, 'id': 6, 'my': 7,
+      'vn': 10, 'gb': 12, 'uk': 12, 'in': 22, 'de': 27, 'ro': 32, 'co': 33,
+      'ca': 36, 'mx': 38, 'es': 40, 'th': 52, 'br': 45, 'fr': 78, 'us': 187, 'au': 175
+    };
+    
+    const originalCountryCode = countryCode;
+    if (typeof countryCode === 'string' && COUNTRY_CODE_MAPPING[countryCode.toLowerCase()] !== undefined) {
+      countryCode = COUNTRY_CODE_MAPPING[countryCode.toLowerCase()];
+      console.log(`📍 Mapped country code: ${originalCountryCode} -> ${countryCode}`);
+    }
+
+    console.log('📥 Request (mapped):', { serviceCode, countryCode, operator });
 
     // Get user balance
     const { data: userData, error: userError } = await supabase
@@ -1554,6 +1594,314 @@ async function cronCheckPendingSms() {
 app.post('/functions/v1/cron-check-pending-sms', async (req, res) => {
   const result = await cronCheckPendingSms();
   return res.json(result);
+});
+
+// ============================================================================
+// BUY SMS-ACTIVATE RENT (Location de numéro)
+// ============================================================================
+const SERVICE_CODE_MAP = {
+  'google': 'go',
+  'whatsapp': 'wa',
+  'telegram': 'tg',
+  'facebook': 'fb',
+  'instagram': 'ig',
+  'twitter': 'tw',
+  'discord': 'ds',
+  'microsoft': 'mm',
+  'yahoo': 'mb',
+  'amazon': 'am',
+  'netflix': 'nf',
+  'uber': 'ub',
+  'tiktok': 'tk',
+  'snapchat': 'sn',
+  'linkedin': 'ld',
+  'viber': 'vi',
+  'paypal': 'ts',
+  'steam': 'st',
+  'alipay': 'hw',
+  'alibaba': 'hw',
+  'huawei': 'hw'
+};
+
+const COUNTRY_CODE_MAP = {
+  'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
+  'myanmar': 5, 'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'tanzania': 9,
+  'vietnam': 10, 'kyrgyzstan': 11, 'england': 12, 'israel': 13, 'hongkong': 14,
+  'poland': 15, 'egypt': 16, 'nigeria': 17, 'morocco': 19, 'ghana': 20,
+  'argentina': 21, 'india': 22, 'uzbekistan': 23, 'cambodia': 24, 'germany': 27,
+  'romania': 32, 'colombia': 33, 'canada': 36, 'mexico': 38, 'spain': 40,
+  'thailand': 52, 'portugal': 56, 'italy': 58, 'brazil': 45, 'france': 78,
+  'australia': 175, 'usa': 187,
+  'ru': 0, 'ua': 1, 'kz': 2, 'cn': 3, 'ph': 4,
+  'mm': 5, 'id': 6, 'my': 7, 'ke': 8, 'tz': 9,
+  'vn': 10, 'kg': 11, 'gb': 12, 'uk': 12, 'il': 13, 'hk': 14,
+  'pl': 15, 'eg': 16, 'ng': 17, 'mo': 18, 'ma': 19,
+  'gh': 20, 'ar': 21, 'in': 22, 'uz': 23, 'kh': 24,
+  'cm': 25, 'td': 26, 'de': 27, 'lt': 28, 'hr': 29,
+  'se': 30, 'iq': 31, 'ro': 32, 'co': 33, 'at': 34,
+  'by': 35, 'ca': 36, 'sa': 37, 'mx': 38, 'za': 39,
+  'es': 40, 'ir': 41, 'dz': 42, 'nl': 43, 'bd': 44,
+  'br': 45, 'tr': 46, 'jp': 47, 'kr': 48, 'tw': 49,
+  'sg': 50, 'ae': 51, 'th': 52, 'pk': 53, 'np': 54,
+  'lk': 55, 'pt': 56, 'nz': 57, 'it': 58, 'be': 59,
+  'ch': 60, 'gr': 61, 'cz': 62, 'hu': 63, 'dk': 64,
+  'no': 65, 'fi': 66, 'ie': 67, 'sk': 68, 'bg': 69,
+  'rs': 70, 'si': 71, 'mk': 72, 'pe': 73, 'cl': 74,
+  'ec': 75, 've': 76, 'bo': 77, 'fr': 78, 'py': 79, 'uy': 80,
+  'cr': 81, 'pa': 82, 'do': 83, 'sv': 84, 'gt': 85,
+  'hn': 86, 'ni': 87, 'cu': 88, 'ht': 89, 'jm': 90,
+  'tt': 91, 'pr': 92, 'bb': 93, 'bs': 94,
+  'af': 108, 'la': 117, 'sd': 129, 'jo': 141, 'ps': 163,
+  'bh': 165, 'et': 172, 'au': 175, 'us': 187
+};
+
+const RENT_DURATIONS = {
+  '4hours': 4,
+  '1day': 24,
+  '1week': 168,
+  '1month': 720
+};
+
+const mapServiceCode = (code) => {
+  if (!code) return code;
+  return SERVICE_CODE_MAP[code.toLowerCase()] || code;
+};
+
+const mapCountryCode = (country) => {
+  if (typeof country === 'number') {
+    return Number.isFinite(country) ? country : 2;
+  }
+  const trimmed = (country || '').toString().trim().toLowerCase();
+  if (!trimmed) return 2;
+  const maybeNum = Number(trimmed);
+  if (!Number.isNaN(maybeNum)) return maybeNum;
+  return COUNTRY_CODE_MAP[trimmed] ?? 2;
+};
+
+const normalizeEndDate = (raw, rentTimeHours) => {
+  const now = Date.now();
+  const expectedMs = rentTimeHours * 3600 * 1000;
+  const fallback = () => new Date(now + expectedMs).toISOString();
+
+  const coerce = (val) => {
+    if (typeof val === 'number') {
+      const ts = val < 1e12 ? val * 1000 : val;
+      return Number.isFinite(ts) ? ts : null;
+    }
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      const isoish = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+      const parsedLocal = Date.parse(isoish);
+      if (!Number.isNaN(parsedLocal)) return parsedLocal;
+      const num = Number(trimmed);
+      if (!Number.isNaN(num)) {
+        const ts = num < 1e12 ? num * 1000 : num;
+        return Number.isFinite(ts) ? ts : null;
+      }
+    }
+    return null;
+  };
+
+  const parsed = coerce(raw);
+  if (parsed === null) return fallback();
+
+  const delta = parsed - now;
+  if (Math.abs(delta - expectedMs) > 45 * 60 * 1000) {
+    return fallback();
+  }
+
+  return new Date(parsed).toISOString();
+};
+
+app.post('/functions/v1/buy-sms-activate-rent', async (req, res) => {
+  console.log('🚀 [BUY-RENT] Function called');
+  
+  try {
+    const user = await getUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { country, product, userId, duration = '4hours', expectedPrice } = req.body;
+    console.log('📞 [BUY-RENT] Request:', { country, product, userId, duration, expectedPrice });
+
+    // Map service and country codes
+    const smsActivateService = product === 'full' ? product : mapServiceCode(product);
+    const smsActivateCountry = mapCountryCode(country);
+    const rentTime = RENT_DURATIONS[duration] || 4;
+
+    console.log('📞 [BUY-RENT] Mapped:', { smsActivateService, smsActivateCountry, rentTime });
+
+    // Get available rent services and find price
+    const servicesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&country=${smsActivateCountry}&rent_time=${rentTime}`;
+    const servicesData = await fetchSmsActivate(servicesUrl);
+    
+    let price = 0;
+    let actualService = smsActivateService;
+    
+    if (servicesData.services && servicesData.services[smsActivateService]) {
+      price = servicesData.services[smsActivateService].cost || 0;
+      console.log(`✅ [BUY-RENT] Service ${smsActivateService} found: ${price}`);
+    } else {
+      // Fallback to 'full' universal service
+      console.warn(`⚠️ [BUY-RENT] Service ${smsActivateService} not available, trying 'full'...`);
+      if (servicesData.services && servicesData.services['full']) {
+        price = servicesData.services['full'].cost || 0;
+        actualService = 'full';
+        console.log(`🔄 [BUY-RENT] Fallback to 'full' service: ${price}`);
+      }
+    }
+    
+    // Use expectedPrice from frontend if provided
+    if (expectedPrice && expectedPrice > 0) {
+      console.log(`💰 [BUY-RENT] Using expectedPrice: ${expectedPrice} (API was: ${price})`);
+      price = expectedPrice;
+    }
+    
+    if (!price || price <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Rent not available for ${product} in ${country} for ${duration}` 
+      });
+    }
+
+    console.log(`💰 [BUY-RENT] Final price: ${price} for ${rentTime} hours using service: ${actualService}`);
+
+    // Check user balance
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('balance, frozen_balance')
+      .eq('id', userId || user.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      return res.status(400).json({ success: false, error: 'User profile not found' });
+    }
+
+    if (userProfile.balance < price) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Insufficient balance. Required: ${price}Ⓐ, Available: ${userProfile.balance}Ⓐ` 
+      });
+    }
+
+    // Rent number from SMS-Activate
+    const rentUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentNumber&service=${actualService}&country=${smsActivateCountry}&rent_time=${rentTime}`;
+    console.log('🌐 [BUY-RENT] API Call:', rentUrl.replace(SMS_ACTIVATE_API_KEY, 'KEY_HIDDEN'));
+
+    const rentData = await fetchSmsActivate(rentUrl);
+    console.log('📥 [BUY-RENT] API Response:', rentData);
+
+    if (rentData.status !== 'success' || !rentData.phone) {
+      if (rentData.message === 'NO_BALANCE') {
+        return res.status(400).json({ success: false, error: 'Solde insuffisant sur SMS-Activate' });
+      } else if (rentData.message === 'NO_NUMBERS') {
+        return res.status(400).json({ success: false, error: `Aucun numéro disponible pour ${product} dans ce pays` });
+      }
+      return res.status(400).json({ success: false, error: rentData.message || 'Failed to rent number' });
+    }
+
+    const { id: rentId, number: phone, endDate } = rentData.phone;
+    const normalizedEndDate = normalizeEndDate(endDate, rentTime);
+
+    console.log('📞 [BUY-RENT] Number rented:', { rentId, phone, endDate, price });
+
+    // Create rental record
+    const { data: rental, error: rentalError } = await supabase
+      .from('rentals')
+      .insert({
+        user_id: userId || user.id,
+        rent_id: rentId.toString(),
+        rental_id: rentId.toString(),
+        phone: phone,
+        service_code: product,
+        country_code: country.toString(),
+        operator: 'auto',
+        total_cost: price,
+        hourly_rate: price / rentTime,
+        status: 'active',
+        end_date: normalizedEndDate,
+        expires_at: normalizedEndDate,
+        rent_hours: rentTime,
+        duration_hours: rentTime,
+        provider: 'sms-activate',
+        message_count: 0,
+        frozen_amount: price
+      })
+      .select()
+      .single();
+
+    if (rentalError) {
+      console.error('❌ [BUY-RENT] Failed to create rental:', rentalError);
+      // Try to cancel on SMS-Activate
+      try {
+        await fetchSmsActivate(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rentId}&status=2`);
+      } catch (e) {
+        console.error('Failed to cancel rent:', e);
+      }
+      return res.status(500).json({ success: false, error: `Failed to create rental: ${rentalError.message}` });
+    }
+
+    console.log('✅ [BUY-RENT] Rental created:', rental.id);
+
+    // Freeze balance using RPC
+    const { data: freezeResult, error: freezeError } = await supabase.rpc('secure_freeze_balance', {
+      p_user_id: userId || user.id,
+      p_amount: price,
+      p_rental_id: rental.id,
+      p_reason: `Freeze for rent ${product} ${country} (${duration})`
+    });
+
+    if (freezeError || !freezeResult?.success) {
+      console.error('❌ [BUY-RENT] Freeze failed:', freezeError);
+      // Fallback: direct balance update
+      await supabase
+        .from('users')
+        .update({
+          balance: userProfile.balance - price,
+          frozen_balance: (userProfile.frozen_balance || 0) + price
+        })
+        .eq('id', userId || user.id);
+    }
+
+    // Create transaction
+    await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId || user.id,
+        type: 'rental',
+        amount: -price,
+        description: `Rent ${product} in ${country} for ${duration}`,
+        status: 'pending',
+        related_rental_id: rental.id,
+        balance_before: userProfile.balance,
+        balance_after: userProfile.balance
+      });
+
+    console.log('✅ [BUY-RENT] Success:', { id: rental.id, phone, price });
+
+    return res.json({
+      success: true,
+      data: {
+        id: rental.id,
+        rental_id: rentId,
+        rent_id: rentId,
+        phone: phone,
+        service: product,
+        country: country,
+        price: price,
+        total_cost: price,
+        status: 'active',
+        expires: normalizedEndDate,
+        end_date: normalizedEndDate,
+        duration_hours: rentTime,
+        rent_hours: rentTime
+      }
+    });
+  } catch (error) {
+    console.error('❌ [BUY-RENT] Error:', error);
+    return res.status(400).json({ success: false, error: error.message });
+  }
 });
 
 // ============================================================================
