@@ -654,7 +654,7 @@ app.post('/functions/v1/link-referral', async (req, res) => {
 // INIT MONEYFUSION PAYMENT
 // ============================================================================
 app.post('/functions/v1/init-moneyfusion-payment', async (req, res) => {
-  console.log('💳 [INIT-MONEYFUSION] Function called');
+  console.log('💳 [INIT-MONEYFUSION] Function called', req.body);
   
   try {
     const user = await getUser(req.headers.authorization);
@@ -662,17 +662,134 @@ app.post('/functions/v1/init-moneyfusion-payment', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { amount, phoneNumber, provider } = req.body;
+    const { amount, currency, description, return_url, customer = {}, metadata = {} } = req.body;
     
-    // For now, return a placeholder - implement actual MoneyFusion integration
+    // Validate required fields
+    if (!amount) {
+      return res.status(400).json({ error: 'Missing required field: amount' });
+    }
+
+    // Get MoneyFusion URL from env
+    const MONEYFUSION_API_URL = process.env.MONEYFUSION_API_URL;
+    if (!MONEYFUSION_API_URL) {
+      console.error('❌ [MONEYFUSION] MONEYFUSION_API_URL not configured');
+      return res.status(500).json({ error: 'MoneyFusion non configuré' });
+    }
+
+    // Check if MoneyFusion is active
+    const { data: moneyfusionConfig, error: configError } = await supabase
+      .from('payment_providers')
+      .select('is_active')
+      .eq('provider_code', 'moneyfusion')
+      .single();
+
+    if (configError || !moneyfusionConfig) {
+      console.log('⚠️ [MONEYFUSION] Config not found, proceeding anyway');
+    } else if (!moneyfusionConfig.is_active) {
+      return res.status(403).json({ error: 'MoneyFusion est désactivé' });
+    }
+
+    // Extract customer info
+    const phone = customer.phone || '00000000';
+    const clientName = `${customer.first_name || 'Client'} ${customer.last_name || 'ONESMS'}`;
+
+    // Generate unique reference
+    const paymentRef = `ONESMS_${user.id.substring(0, 8)}_${Date.now()}`;
+
+    // Webhook URL
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/moneyfusion-webhook`;
+
+    // Prepare MoneyFusion payload
+    const moneyfusionPayload = {
+      totalPrice: Math.round(amount),
+      article: [{ "Rechargement ONE SMS": Math.round(amount) }],
+      numeroSend: phone.replace(/\s/g, ''),
+      nomclient: clientName || user.email?.split('@')[0] || 'Client',
+      personal_Info: [{
+        userId: user.id,
+        paymentRef: paymentRef,
+        activations: metadata.activations || 0,
+        type: 'recharge',
+        source: 'onesms'
+      }],
+      return_url: return_url || 'http://onesms.46.202.171.108.sslip.io/dashboard?payment=success',
+      webhook_url: webhookUrl
+    };
+
+    console.log('📤 [MONEYFUSION] Sending request to:', MONEYFUSION_API_URL);
+
+    // Call MoneyFusion API
+    const mfResponse = await fetch(MONEYFUSION_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(moneyfusionPayload)
+    });
+
+    const mfData = await mfResponse.json();
+
+    console.log('📥 [MONEYFUSION] Response:', {
+      statut: mfData.statut,
+      token: mfData.token,
+      message: mfData.message
+    });
+
+    if (!mfData.statut || !mfData.url) {
+      console.error('❌ [MONEYFUSION] API Error:', mfData);
+      return res.status(400).json({ 
+        error: mfData.message || 'Failed to initialize payment'
+      });
+    }
+
+    // Get current user balance
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('balance')
+      .eq('id', user.id)
+      .single();
+
+    const currentBalance = userProfile?.balance || 0;
+    const activationsToAdd = metadata.activations || 0;
+
+    // Create pending transaction
+    const { error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        type: 'deposit',
+        amount: activationsToAdd,
+        balance_before: currentBalance,
+        balance_after: currentBalance + activationsToAdd,
+        status: 'pending',
+        reference: paymentRef,
+        external_id: mfData.token,
+        description: description || `Rechargement via MoneyFusion`,
+        metadata: {
+          moneyfusion_token: mfData.token,
+          checkout_url: mfData.url,
+          phone: phone,
+          amount_xof: amount,
+          payment_provider: 'moneyfusion',
+          ...metadata
+        }
+      });
+
+    if (txError) {
+      console.error('❌ [MONEYFUSION] Failed to create transaction:', txError);
+    }
+
+    console.log('✅ [MONEYFUSION] Payment initialized:', mfData.token);
+
     return res.json({
       success: true,
-      message: 'MoneyFusion payment initialized',
-      paymentUrl: null,
-      instructions: 'Payment integration pending'
+      message: mfData.message,
+      data: {
+        token: mfData.token,
+        checkout_url: mfData.url,
+        payment_ref: paymentRef
+      }
     });
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('❌ [MONEYFUSION] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -871,6 +988,232 @@ app.post('/functions/v1/get-sms-activate-inbox', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// SYNC SMS-ACTIVATE (Countries + Services + Prices)
+// ============================================================================
+app.post('/functions/v1/sync-sms-activate', async (req, res) => {
+  console.log('🔄 [SYNC-SMS-ACTIVATE] Starting synchronization...');
+  
+  try {
+    const startTime = Date.now();
+    const results = { countries: 0, services: 0, prices: 0, errors: [] };
+
+    // 1. Get margin from system_settings
+    const { data: marginSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pricing_margin_percentage')
+      .single();
+    
+    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30;
+    console.log(`💰 System margin: ${marginPercentage}%`);
+
+    // 2. Fetch countries from SMS-Activate
+    console.log('🌍 Fetching countries...');
+    const countriesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getCountries`;
+    const countriesData = await fetchSmsActivate(countriesUrl);
+    
+    // Country ID to code mapping for SMS-Activate
+    const countryMapping = {
+      0: 'russia', 1: 'ukraine', 2: 'kazakhstan', 3: 'china', 4: 'philippines',
+      5: 'myanmar', 6: 'indonesia', 7: 'malaysia', 8: 'kenya', 9: 'tanzania',
+      10: 'vietnam', 11: 'kyrgyzstan', 12: 'england', 13: 'china', 14: 'israel',
+      15: 'poland', 16: 'hk', 17: 'morocco', 18: 'egypt', 19: 'nigeria',
+      20: 'macao', 21: 'india', 22: 'ireland', 32: 'romania', 33: 'colombia',
+      36: 'canada', 39: 'argentina', 43: 'germany', 52: 'thailand', 56: 'spain',
+      58: 'italy', 62: 'southafrica', 73: 'brazil', 78: 'france', 79: 'netherlands',
+      80: 'ghana', 82: 'mexico', 88: 'bangladesh', 90: 'pakistan', 94: 'turkey',
+      108: 'philippines', 109: 'nigeria', 115: 'egypt', 132: 'uae', 135: 'iraq',
+      168: 'chile', 174: 'singapore', 175: 'australia', 177: 'newzealand', 187: 'usa'
+    };
+
+    // 3. Fetch prices for top countries
+    const topCountryIds = [187, 0, 6, 21, 73, 82, 4, 3, 22, 12, 175, 78, 43];
+    let allPrices = {};
+    
+    for (const countryId of topCountryIds) {
+      try {
+        const pricesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&country=${countryId}`;
+        const priceData = await fetchSmsActivate(pricesUrl);
+        if (priceData && priceData[countryId]) {
+          allPrices[countryId] = priceData[countryId];
+          
+          // Update country available_numbers
+          const countryCode = countryMapping[countryId];
+          if (countryCode) {
+            let totalNumbers = 0;
+            for (const svc of Object.values(priceData[countryId])) {
+              totalNumbers += (svc.count || 0);
+            }
+            
+            await supabase
+              .from('countries')
+              .update({ available_numbers: totalNumbers, updated_at: new Date().toISOString() })
+              .eq('code', countryCode);
+            
+            results.countries++;
+          }
+        }
+      } catch (err) {
+        results.errors.push(`Country ${countryId}: ${err.message}`);
+      }
+    }
+    
+    console.log(`📊 Fetched prices for ${Object.keys(allPrices).length} countries`);
+
+    // 4. Update services with prices
+    const { data: services } = await supabase.from('services').select('id, code');
+    
+    for (const [countryId, servicesPrices] of Object.entries(allPrices)) {
+      for (const [serviceCode, priceInfo] of Object.entries(servicesPrices)) {
+        const service = services?.find(s => s.code === serviceCode);
+        if (service && priceInfo.cost) {
+          const basePrice = parseFloat(priceInfo.cost);
+          const ourPrice = Math.ceil(basePrice * (1 + marginPercentage / 100) * 100); // CFA
+          
+          // Update pricing_rules
+          await supabase
+            .from('pricing_rules')
+            .upsert({
+              service_id: service.id,
+              country_code: countryMapping[countryId] || `country_${countryId}`,
+              base_price: basePrice,
+              our_price: ourPrice,
+              margin_percentage: marginPercentage,
+              available_count: priceInfo.count || 0,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'service_id,country_code' });
+          
+          results.prices++;
+        }
+      }
+    }
+
+    // 5. Fetch service list
+    console.log('📋 Fetching service list...');
+    const servicesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getServicesList`;
+    const servicesData = await fetchSmsActivate(servicesUrl);
+    
+    if (servicesData?.status === 'success' && Array.isArray(servicesData.services)) {
+      for (const [index, svc] of servicesData.services.entries()) {
+        await supabase
+          .from('services')
+          .upsert({
+            code: svc.code,
+            name: svc.name,
+            popularity_score: 1000 - index,
+            is_active: true,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'code' });
+        
+        results.services++;
+      }
+    }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Sync complete in ${duration}s: ${results.countries} countries, ${results.services} services, ${results.prices} prices`);
+
+    // Log sync
+    await supabase.from('sync_logs').insert({
+      sync_type: 'full',
+      provider: 'sms-activate',
+      services_synced: results.services,
+      countries_synced: results.countries,
+      pricing_rules_synced: results.prices,
+      duration_seconds: parseFloat(duration),
+      status: 'success'
+    });
+
+    return res.json({
+      success: true,
+      results,
+      duration: `${duration}s`
+    });
+  } catch (error) {
+    console.error('❌ Sync error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// MONEYFUSION WEBHOOK
+// ============================================================================
+app.post('/functions/v1/moneyfusion-webhook', async (req, res) => {
+  console.log('📥 [MONEYFUSION-WEBHOOK] Received:', JSON.stringify(req.body).substring(0, 500));
+  
+  try {
+    const { event, tokenPay, personal_Info, Montant, statut, numeroTransaction } = req.body;
+    
+    if (!tokenPay) {
+      return res.status(400).json({ error: 'Missing tokenPay' });
+    }
+
+    // Find transaction by token
+    const { data: transaction, error: txError } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('external_id', tokenPay)
+      .single();
+
+    if (txError || !transaction) {
+      console.log('⚠️ Transaction not found for token:', tokenPay);
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Determine status based on event
+    let newStatus = transaction.status;
+    if (event === 'payin.session.completed' || statut === 'paid') {
+      newStatus = 'completed';
+    } else if (event === 'payin.session.cancelled' || statut === 'failure' || statut === 'no paid') {
+      newStatus = 'failed';
+    }
+
+    // Only process if status changed
+    if (newStatus !== transaction.status) {
+      console.log(`📊 Updating transaction ${transaction.id}: ${transaction.status} → ${newStatus}`);
+      
+      if (newStatus === 'completed' && transaction.status === 'pending') {
+        // Credit user balance
+        const activations = transaction.metadata?.activations || transaction.amount || 0;
+        
+        const { data: user } = await supabase
+          .from('users')
+          .select('balance')
+          .eq('id', transaction.user_id)
+          .single();
+
+        const newBalance = (user?.balance || 0) + activations;
+
+        await supabase
+          .from('users')
+          .update({ balance: newBalance })
+          .eq('id', transaction.user_id);
+
+        await supabase
+          .from('transactions')
+          .update({
+            status: 'completed',
+            balance_after: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', transaction.id);
+
+        console.log(`✅ User ${transaction.user_id} credited ${activations} activations`);
+      } else {
+        await supabase
+          .from('transactions')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', transaction.id);
+      }
+    }
+
+    return res.json({ success: true, status: newStatus });
+  } catch (error) {
+    console.error('❌ Webhook error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
