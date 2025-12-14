@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cron from 'node-cron';
 import { createClient } from '@supabase/supabase-js';
 
 // Load env
@@ -1219,10 +1220,287 @@ app.post('/functions/v1/moneyfusion-webhook', async (req, res) => {
 });
 
 // ============================================================================
+// CLEANUP EXPIRED ACTIVATIONS
+// ============================================================================
+async function cleanupExpiredActivations() {
+  console.log('🧹 [CLEANUP-ACTIVATIONS] Starting cleanup...');
+  
+  try {
+    // Find expired pending activations
+    const { data: expiredActivations, error: fetchError } = await supabase
+      .from('activations')
+      .select('*')
+      .eq('status', 'pending')
+      .lt('expires_at', new Date().toISOString());
+
+    if (fetchError) {
+      console.error('❌ [CLEANUP-ACTIVATIONS] Fetch error:', fetchError.message);
+      return { success: false, error: fetchError.message };
+    }
+
+    console.log(`📊 [CLEANUP-ACTIVATIONS] Found ${expiredActivations?.length || 0} expired activations`);
+
+    const results = [];
+    for (const activation of (expiredActivations || [])) {
+      try {
+        // Cancel on SMS-Activate
+        const cancelUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`;
+        let apiResult = 'N/A';
+        try {
+          const response = await fetch(cancelUrl);
+          apiResult = await response.text();
+        } catch (e) {
+          console.log('⚠️ SMS-Activate cancel error (continuing):', e.message);
+        }
+
+        // Update status
+        await supabase
+          .from('activations')
+          .update({ status: 'expired', updated_at: new Date().toISOString() })
+          .eq('id', activation.id);
+
+        // Call atomic_refund
+        const { data: refundResult, error: refundError } = await supabase
+          .rpc('atomic_refund', {
+            p_user_id: activation.user_id,
+            p_activation_id: activation.id,
+            p_reason: 'Cron cleanup expired'
+          });
+
+        if (refundError) {
+          console.error(`⚠️ Refund error for ${activation.id}:`, refundError.message);
+        } else {
+          console.log(`✅ Refunded ${refundResult?.refunded || activation.price}Ⓐ for ${activation.user_id}`);
+        }
+
+        results.push({ id: activation.id, status: 'cleaned', refunded: refundResult?.refunded || 0 });
+      } catch (err) {
+        results.push({ id: activation.id, status: 'error', error: err.message });
+      }
+    }
+
+    console.log(`✅ [CLEANUP-ACTIVATIONS] Completed: ${results.length} processed`);
+    return { success: true, processed: results.length, results };
+  } catch (error) {
+    console.error('❌ [CLEANUP-ACTIVATIONS] Error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+app.post('/functions/v1/cleanup-expired-activations', async (req, res) => {
+  const result = await cleanupExpiredActivations();
+  return res.json(result);
+});
+
+// ============================================================================
+// CLEANUP EXPIRED RENTALS
+// ============================================================================
+async function cleanupExpiredRentals() {
+  console.log('🧹 [CLEANUP-RENTALS] Starting cleanup...');
+  
+  try {
+    // Find expired active rentals
+    const { data: expiredRentals, error: fetchError } = await supabase
+      .from('rentals')
+      .select('*')
+      .eq('status', 'active')
+      .lt('end_date', new Date().toISOString());
+
+    if (fetchError) {
+      console.error('❌ [CLEANUP-RENTALS] Fetch error:', fetchError.message);
+      return { success: false, error: fetchError.message };
+    }
+
+    console.log(`📊 [CLEANUP-RENTALS] Found ${expiredRentals?.length || 0} expired rentals`);
+
+    const results = [];
+    for (const rental of (expiredRentals || [])) {
+      try {
+        // Finish on SMS-Activate
+        const finishUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rental.rent_id}&status=1`;
+        try {
+          await fetch(finishUrl);
+        } catch (e) {
+          console.log('⚠️ SMS-Activate finish error (continuing):', e.message);
+        }
+
+        // Unfreeze balance (consume, no refund for rentals)
+        if (rental.frozen_amount > 0) {
+          const { error: unfreezeError } = await supabase.rpc('secure_unfreeze_balance', {
+            p_user_id: rental.user_id,
+            p_rental_id: rental.id,
+            p_refund_to_balance: false,
+            p_refund_reason: 'Rental expired - consumed'
+          });
+          if (unfreezeError) {
+            console.error(`⚠️ Unfreeze error for ${rental.id}:`, unfreezeError.message);
+          }
+        }
+
+        // Update status
+        await supabase
+          .from('rentals')
+          .update({ status: 'expired', frozen_amount: 0, updated_at: new Date().toISOString() })
+          .eq('id', rental.id)
+          .eq('status', 'active');
+
+        results.push({ id: rental.id, status: 'cleaned' });
+      } catch (err) {
+        results.push({ id: rental.id, status: 'error', error: err.message });
+      }
+    }
+
+    console.log(`✅ [CLEANUP-RENTALS] Completed: ${results.length} processed`);
+    return { success: true, processed: results.length, results };
+  } catch (error) {
+    console.error('❌ [CLEANUP-RENTALS] Error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+app.post('/functions/v1/cleanup-expired-rentals', async (req, res) => {
+  const result = await cleanupExpiredRentals();
+  return res.json(result);
+});
+
+// ============================================================================
+// CRON CHECK PENDING SMS
+// ============================================================================
+async function cronCheckPendingSms() {
+  console.log('🔄 [CRON-CHECK-SMS] Starting periodic SMS check...');
+  
+  try {
+    // Find pending activations
+    const { data: activations, error } = await supabase
+      .from('activations')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(20);
+
+    if (error) {
+      console.error('❌ [CRON-CHECK-SMS] Fetch error:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`📊 [CRON-CHECK-SMS] Found ${activations?.length || 0} pending activations`);
+
+    const results = { checked: 0, sms_received: 0, expired: 0, cancelled: 0 };
+    
+    for (const activation of (activations || [])) {
+      results.checked++;
+      
+      // Check if expired
+      if (new Date(activation.expires_at) < new Date()) {
+        results.expired++;
+        continue; // Let cleanup handle it
+      }
+
+      // Check SMS status on SMS-Activate
+      const statusUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.order_id}`;
+      try {
+        const response = await fetch(statusUrl);
+        const v1Text = await response.text();
+        console.log(`📥 [CRON-CHECK-SMS] ${activation.order_id}: ${v1Text}`);
+
+        if (v1Text.startsWith('STATUS_OK:')) {
+          // SMS received!
+          const smsCode = v1Text.split(':')[1];
+          results.sms_received++;
+          
+          // Process via RPC
+          await supabase.rpc('process_sms_received', {
+            p_activation_id: activation.id,
+            p_sms_code: smsCode,
+            p_full_sms: smsCode,
+            p_source: 'cron'
+          });
+          
+          console.log(`✅ [CRON-CHECK-SMS] SMS received for ${activation.order_id}: ${smsCode}`);
+        } else if (v1Text === 'STATUS_CANCEL') {
+          results.cancelled++;
+          
+          // Refund
+          await supabase.rpc('atomic_refund', {
+            p_user_id: activation.user_id,
+            p_activation_id: activation.id,
+            p_reason: 'Cron cancelled (STATUS_CANCEL)'
+          });
+          
+          console.log(`⚠️ [CRON-CHECK-SMS] Cancelled ${activation.order_id}`);
+        }
+      } catch (err) {
+        console.error(`⚠️ [CRON-CHECK-SMS] Error checking ${activation.order_id}:`, err.message);
+      }
+    }
+
+    console.log(`✅ [CRON-CHECK-SMS] Completed:`, results);
+    return { success: true, ...results };
+  } catch (error) {
+    console.error('❌ [CRON-CHECK-SMS] Error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+app.post('/functions/v1/cron-check-pending-sms', async (req, res) => {
+  const result = await cronCheckPendingSms();
+  return res.json(result);
+});
+
+// ============================================================================
+// SETUP CRON JOBS
+// ============================================================================
+function setupCronJobs() {
+  console.log('⏰ Setting up cron jobs...');
+
+  // Cron 1: Cleanup expired activations - every 3 minutes
+  cron.schedule('*/3 * * * *', async () => {
+    console.log('⏰ [CRON] Running cleanup-expired-activations...');
+    await cleanupExpiredActivations();
+  });
+
+  // Cron 2: Cleanup expired rentals - every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('⏰ [CRON] Running cleanup-expired-rentals...');
+    await cleanupExpiredRentals();
+  });
+
+  // Cron 3: Check pending SMS - every 2 minutes
+  cron.schedule('*/2 * * * *', async () => {
+    console.log('⏰ [CRON] Running cron-check-pending-sms...');
+    await cronCheckPendingSms();
+  });
+
+  // Cron 4: Sync SMS-Activate data - every 30 minutes
+  cron.schedule('*/30 * * * *', async () => {
+    console.log('⏰ [CRON] Running sync-sms-activate...');
+    try {
+      // Call our own sync endpoint
+      const response = await fetch(`http://localhost:${PORT}/functions/v1/sync-sms-activate`, {
+        method: 'POST'
+      });
+      const result = await response.json();
+      console.log('✅ [CRON] Sync completed:', result);
+    } catch (err) {
+      console.error('❌ [CRON] Sync error:', err.message);
+    }
+  });
+
+  console.log('✅ Cron jobs configured:');
+  console.log('   - cleanup-expired-activations: */3 * * * *');
+  console.log('   - cleanup-expired-rentals: */5 * * * *');
+  console.log('   - cron-check-pending-sms: */2 * * * *');
+  console.log('   - sync-sms-activate: */30 * * * *');
+}
+
+// ============================================================================
 // START SERVER
 // ============================================================================
 app.listen(PORT, () => {
   console.log(`🚀 ONE SMS API Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 Supabase URL: ${SUPABASE_URL}`);
+  
+  // Start cron jobs
+  setupCronJobs();
 });
