@@ -485,10 +485,12 @@ app.post('/functions/v1/set-rent-status', async (req, res) => {
 // GET REAL-TIME PRICES
 // ============================================================================
 app.post('/functions/v1/get-real-time-prices', async (req, res) => {
-  console.log('💰 [GET-REAL-TIME-PRICES] Function called');
+  console.log('💰 [GET-REAL-TIME-PRICES] Function called', req.body);
   
   try {
-    const { serviceCode, countries = [] } = req.body;
+    // Accept both 'service' and 'serviceCode' for compatibility
+    const serviceCode = req.body.serviceCode || req.body.service;
+    const { countries = [] } = req.body;
     
     if (!serviceCode) {
       return res.status(400).json({ error: 'serviceCode is required' });
@@ -522,10 +524,11 @@ app.post('/functions/v1/get-real-time-prices', async (req, res) => {
 // GET TOP COUNTRIES BY SERVICE
 // ============================================================================
 app.post('/functions/v1/get-top-countries-by-service', async (req, res) => {
-  console.log('🌍 [GET-TOP-COUNTRIES] Function called');
+  console.log('🌍 [GET-TOP-COUNTRIES] Function called', req.body);
   
   try {
-    const { serviceCode } = req.body;
+    // Accept both 'service' and 'serviceCode' for compatibility
+    const serviceCode = req.body.serviceCode || req.body.service;
     
     if (!serviceCode) {
       return res.status(400).json({ error: 'serviceCode is required' });
