@@ -1,0 +1,12 @@
+# Force Coolify to use our Dockerfile instead of auto-detecting Deno
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npx serve -s dist -l 3000"
