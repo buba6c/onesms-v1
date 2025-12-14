@@ -535,10 +535,95 @@ app.post('/functions/v1/get-top-countries-by-service', async (req, res) => {
       return res.status(400).json({ error: 'serviceCode is required' });
     }
     
-    const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getTopCountriesByService&service=${serviceCode}`;
-    const data = await fetchSmsActivate(url);
-
-    return res.json({ success: true, countries: data });
+    // Get margin from system_settings
+    const { data: marginSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pricing_margin_percentage')
+      .single();
+    
+    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30;
+    console.log(`💰 [GET-TOP-COUNTRIES] Margin: ${marginPercentage}%`);
+    
+    // 1️⃣ Get ranked countries with prices from SMS-Activate
+    const rankUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getTopCountriesByServiceRank&service=${serviceCode}&freePrice=true`;
+    const rankData = await fetchSmsActivate(rankUrl);
+    
+    if (!rankData || Object.keys(rankData).length === 0) {
+      return res.json({ success: true, service: serviceCode, countries: [] });
+    }
+    
+    console.log(`✅ [GET-TOP-COUNTRIES] Found ${Object.keys(rankData).length} ranked countries`);
+    
+    // 2️⃣ Get country names mapping
+    const countriesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getCountries`;
+    const allCountriesData = await fetchSmsActivate(countriesUrl);
+    
+    const countryMap = {};
+    Object.entries(allCountriesData).forEach(([id, country]) => {
+      countryMap[parseInt(id)] = {
+        code: country.eng.toLowerCase().replace(/\s+/g, '_'),
+        name: country.eng
+      };
+    });
+    
+    // 3️⃣ Transform data with price conversion
+    const MIN_PRICE_COINS = 5;
+    const USD_TO_FCFA = 600;
+    const FCFA_TO_COINS = 100;
+    const marginMultiplier = 1 + marginPercentage / 100;
+    
+    const topCountries = [];
+    
+    Object.entries(rankData).forEach(([index, countryData]) => {
+      const countryId = countryData.country;
+      const countryInfo = countryMap[countryId];
+      
+      if (!countryInfo) return;
+      
+      const rank = parseInt(index) + 1;
+      const count = countryData.count || 0;
+      const priceUSD = countryData.price || 0;
+      
+      // Price conversion: USD → FCFA → Coins (Ⓐ)
+      const priceFCFA = priceUSD * USD_TO_FCFA;
+      const priceCoins = (priceFCFA / FCFA_TO_COINS) * marginMultiplier;
+      const price = Math.max(MIN_PRICE_COINS, Math.ceil(priceCoins));
+      
+      // Composite score calculation
+      const rankingScore = Math.max(0, 100 - rank);
+      const availabilityBonus = count > 1000 ? 20 : count > 100 ? 10 : count > 0 ? 5 : 0;
+      const priceBonus = price > 0 ? Math.max(0, 10 - (price * 2)) : 0;
+      const compositeScore = rankingScore + availabilityBonus + priceBonus;
+      
+      topCountries.push({
+        countryId,
+        countryCode: countryInfo.code,
+        countryName: countryInfo.name,
+        count,
+        price,
+        retailPrice: price,
+        share: 0,
+        successRate: null,
+        rank,
+        compositeScore
+      });
+    });
+    
+    // Sort by composite score
+    topCountries.sort((a, b) => b.compositeScore - a.compositeScore);
+    
+    console.log(`🏆 [GET-TOP-COUNTRIES] Returning ${topCountries.length} countries`);
+    
+    return res.json({ 
+      success: true, 
+      service: serviceCode,
+      countries: topCountries,
+      stats: {
+        totalCountries: topCountries.length,
+        totalAvailable: topCountries.reduce((sum, c) => sum + c.count, 0)
+      }
+    });
   } catch (error) {
     console.error('❌ Error:', error);
     return res.status(500).json({ error: error.message });
