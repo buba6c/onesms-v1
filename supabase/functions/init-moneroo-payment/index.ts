@@ -2,7 +2,7 @@
  * Edge Function: Initialize Moneroo Payment
  * 
  * Cette fonction initialise un paiement via l'API Moneroo.
- * Elle doit être appelée depuis le frontend via supabase.functions.invoke()
+ * Basée sur la structure de init-moneyfusion-payment pour cohérence.
  * 
  * Documentation Moneroo: https://docs.moneroo.io/payments/standard-integration
  */
@@ -33,7 +33,7 @@ serve(async (req) => {
     // Initialize Supabase admin client (bypasses RLS)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -43,7 +43,7 @@ serve(async (req) => {
     // Verify user authentication
     const authHeader = req.headers.get('Authorization')
     const token = authHeader?.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token!)
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token!)
 
     if (authError || !user) {
       console.error('❌ Auth error:', authError)
@@ -59,19 +59,28 @@ serve(async (req) => {
     // Parse request body
     const body = await req.json()
     const { 
-      amount, 
-      currency, 
-      description, 
-      customer, 
-      return_url, 
+      amount,        // Amount in XOF
+      currency = 'XOF',
+      description,
+      return_url,
+      customer = {},
       metadata = {},
-      methods 
+      methods
     } = body
 
+    // Convert activations to number (frontend sends as string)
+    const activationsCount = parseInt(metadata.activations, 10) || 0
+
+    // Extract customer info
+    const phone = customer.phone || ''
+    const email = customer.email || user.email
+    const firstName = customer.first_name || 'Client'
+    const lastName = customer.last_name || 'ONESMS'
+
     // Validate required fields
-    if (!amount || !currency || !customer?.email) {
+    if (!amount) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: amount, currency, customer.email' }),
+        JSON.stringify({ error: 'Missing required field: amount' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -79,34 +88,81 @@ serve(async (req) => {
       )
     }
 
+    // Check if Moneroo is active in payment_providers
+    const { data: monerooConfig, error: configError } = await supabaseAdmin
+      .from('payment_providers')
+      .select('is_active')
+      .eq('provider_code', 'moneroo')
+      .single()
+
+    if (configError || !monerooConfig) {
+      console.error('❌ [MONEROO] Configuration not found:', configError)
+      return new Response(
+        JSON.stringify({ error: 'Moneroo non configuré' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (!monerooConfig.is_active) {
+      console.log('⚠️ [MONEROO] Provider is disabled')
+      return new Response(
+        JSON.stringify({ error: 'Moneroo est désactivé' }),
+        { 
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
     console.log('💰 [MONEROO] Initializing payment:', { 
       amount, 
-      currency, 
+      currency,
       userId: user.id,
-      customer: customer.email 
+      email
     })
 
     // Generate unique reference
     const paymentRef = `ONESMS_${user.id.substring(0, 8)}_${Date.now()}`
 
-    // Prepare Moneroo API request - ensure all required fields have values
+    // Webhook URL for Moneroo callbacks
+    const webhookUrl = `${supabaseUrl}/functions/v1/moneroo-webhook`
+
+    // Build metadata object - Moneroo n'accepte pas les valeurs null
+    const monerooMetadata: Record<string, any> = {
+      userId: user.id,
+      paymentRef: paymentRef,
+      activations: activationsCount,
+      amount_xof: amount,
+      type: 'recharge',
+      source: 'onesms',
+      base_activations: metadata.base_activations || activationsCount,
+      bonus_activations: metadata.bonus_activations || 0
+    }
+    
+    // Ajouter promo_code seulement si défini
+    if (metadata.promo_code_id) {
+      monerooMetadata.promo_code_id = String(metadata.promo_code_id)
+    }
+    if (metadata.promo_code) {
+      monerooMetadata.promo_code = String(metadata.promo_code)
+    }
+
+    // Prepare Moneroo API request
     const monerooPayload: any = {
-      amount: Math.round(amount), // Moneroo expects integer for XOF
+      amount: Math.round(amount),
       currency: currency,
-      description: description || `Rechargement ONE SMS - ${amount} ${currency}`,
+      description: description || `Rechargement ONE SMS - ${activationsCount} activations`,
       customer: {
-        email: customer.email,
-        first_name: customer.first_name && customer.first_name.trim() !== '' ? customer.first_name : 'Client',
-        last_name: customer.last_name && customer.last_name.trim() !== '' ? customer.last_name : 'ONESMS',
-        ...(customer.phone && { phone: customer.phone })
+        email: email,
+        first_name: firstName,
+        last_name: lastName,
+        ...(phone && { phone: phone })
       },
-      return_url: return_url || `${Deno.env.get('APP_URL') || 'https://onesms-sn.com'}/dashboard?payment=success`,
-      metadata: {
-        ...metadata,
-        user_id: user.id,
-        payment_ref: paymentRef,
-        source: 'onesms'
-      }
+      return_url: return_url || 'https://onesms-sn.com/dashboard?payment=success',
+      metadata: monerooMetadata
     }
 
     // Add methods if specified
@@ -149,28 +205,40 @@ serve(async (req) => {
       )
     }
 
-    // Create pending transaction in database
-    // Colonnes disponibles: id, user_id, type, amount, balance_before, balance_after, 
-    // status, description, reference, payment_method, payment_data, virtual_number_id, 
-    // created_at, updated_at, metadata, related_rental_id
-    const { error: txError } = await supabase
+    // Get current user balance for transaction record
+    const { data: userProfile } = await supabaseAdmin
+      .from('users')
+      .select('balance')
+      .eq('id', user.id)
+      .single()
+
+    const currentBalance = userProfile?.balance || 0
+
+    // Create pending transaction in database (matching MoneyFusion structure)
+    const { error: txError } = await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: user.id,
         type: 'deposit',
-        amount: amount,
+        amount: amount, // Amount is the actual XOF amount
+        balance_before: currentBalance,
+        balance_after: currentBalance + activationsCount, // Will be updated in webhook
         status: 'pending',
         payment_method: 'moneroo',
         reference: paymentRef,
-        description: description || `Rechargement via Moneroo`,
-        payment_data: {
-          moneroo_id: monerooData.data.id,
-          checkout_url: monerooData.data.checkout_url,
-          currency: currency
-        },
+        external_id: monerooData.data.id, // Moneroo payment ID
+        description: description || `Rechargement ${activationsCount} activations ONE SMS`,
         metadata: {
           moneroo_id: monerooData.data.id,
-          currency: currency,
+          checkout_url: monerooData.data.checkout_url,
+          phone: phone,
+          amount_xof: amount,
+          activations: activationsCount,
+          payment_provider: 'moneroo',
+          promo_code_id: metadata.promo_code_id || null,
+          promo_code: metadata.promo_code || null,
+          base_activations: metadata.base_activations || activationsCount,
+          bonus_activations: metadata.bonus_activations || 0,
           ...metadata
         }
       })
@@ -180,14 +248,15 @@ serve(async (req) => {
       // Continue anyway - payment was initialized
     }
 
-    console.log('✅ [MONEROO] Payment initialized successfully:', monerooData.data.id)
+    console.log('✅ [MONEROO] Payment initialized:', monerooData.data.id)
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: monerooData.message,
+        message: monerooData.message || 'Payment initialized',
         data: {
           id: monerooData.data.id,
+          token: monerooData.data.id, // For compatibility
           checkout_url: monerooData.data.checkout_url,
           payment_ref: paymentRef
         }
@@ -202,8 +271,7 @@ serve(async (req) => {
     console.error('❌ [MONEROO] Error:', error)
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Internal server error',
-        details: error.stack 
+        error: error.message || 'Internal server error'
       }),
       { 
         status: 500,

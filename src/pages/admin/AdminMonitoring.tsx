@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Activity, TrendingUp, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
+import { Activity, TrendingUp, AlertCircle, CheckCircle, RefreshCw, Trophy, Globe } from 'lucide-react'
 
 interface DashboardStats {
   total_activations_24h: number
@@ -33,10 +33,20 @@ interface CountryHealth {
   health_status: string
 }
 
+interface ProviderPerformance {
+  provider: string
+  service_code: string
+  attempts: number
+  successes: number
+  score: number
+  updated_at: string
+}
+
 export default function AdminMonitoring() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [services, setServices] = useState<ServiceHealth[]>([])
   const [countries, setCountries] = useState<CountryHealth[]>([])
+  const [providerStats, setProviderStats] = useState<ProviderPerformance[]>([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
@@ -61,9 +71,17 @@ export default function AdminMonitoring() {
         .select('*')
         .order('total_activations_24h', { ascending: false })
 
+      // Fetch Provider Intelligence
+      const { data: providerData } = await supabase
+        .from('provider_performance')
+        .select('*')
+        .order('score', { ascending: false })
+        .limit(50) // Top 50
+
       setStats(statsData)
       setServices(servicesData || [])
       setCountries(countriesData || [])
+      setProviderStats((providerData as any) || [])
       setLastUpdate(new Date())
     } catch (error) {
       console.error('Error fetching monitoring data:', error)
@@ -205,13 +223,12 @@ export default function AdminMonitoring() {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
-                  className={`h-3 rounded-full transition-all ${
-                    stats.global_success_rate_pct >= 60
-                      ? 'bg-green-600'
-                      : stats.global_success_rate_pct >= 35
+                  className={`h-3 rounded-full transition-all ${stats.global_success_rate_pct >= 60
+                    ? 'bg-green-600'
+                    : stats.global_success_rate_pct >= 35
                       ? 'bg-orange-600'
                       : 'bg-red-600'
-                  }`}
+                    }`}
                   style={{ width: `${Math.min(stats.global_success_rate_pct, 100)}%` }}
                 />
               </div>
@@ -224,6 +241,62 @@ export default function AdminMonitoring() {
             </div>
           </Card>
         </>
+      )}
+
+      {/* Provider Intelligence Dashboard */}
+      {providerStats && providerStats.length > 0 && (
+        <Card className="p-6 bg-slate-50 border-slate-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="h-6 w-6 text-yellow-500" />
+            <h2 className="text-xl font-bold">Intelligence Artificielle (Top Providers)</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Le système priorise automatiquement ces fournisseurs pour ces services (basé sur l'historique global).
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4">Service</th>
+                  <th className="text-left py-3 px-4">Fournisseur Gagnant</th>
+                  <th className="text-right py-3 px-4">Score</th>
+                  <th className="text-right py-3 px-4">Fiabilité</th>
+                  <th className="text-right py-3 px-4">Volume (72h)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {providerStats.map((stat, idx) => (
+                  <tr key={idx} className="border-b border-gray-100 hover:bg-white transition-colors">
+                    <td className="py-2 px-4 font-medium uppercase text-xs tracking-wider text-slate-600">{stat.service_code}</td>
+                    <td className="py-2 px-4 font-bold text-slate-800 flex items-center gap-2">
+                      {idx < 3 && <Trophy className="h-3 w-3 text-yellow-500" />}
+                      {stat.provider}
+                    </td>
+                    <td className="text-right py-2 px-4">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${stat.score >= 80 ? 'bg-green-100 text-green-700' :
+                        stat.score >= 50 ? 'bg-blue-100 text-blue-700' :
+                          'bg-orange-100 text-orange-700'
+                        }`}>
+                        {Number(stat.score).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="text-right py-2 px-4">
+                      <div className="w-24 bg-gray-200 rounded-full h-1.5 ml-auto">
+                        <div
+                          className="bg-green-500 h-1.5 rounded-full"
+                          style={{ width: `${Math.min(stat.score, 100)}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="text-right py-2 px-4 text-xs text-gray-500">
+                      {stat.successes}/{stat.attempts}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {/* Services Health */}

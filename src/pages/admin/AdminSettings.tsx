@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Save, 
-  RefreshCw, 
+import {
+  Save,
+  RefreshCw,
   Key,
   Database,
   Globe,
@@ -22,8 +22,10 @@ import {
   Upload,
   Image,
   Trash2,
-  Eye
+  Eye,
+  ToggleLeft
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 
 interface SystemSetting {
@@ -58,6 +60,16 @@ const MODERN_SETTINGS = {
       { key: 'app_currency', label: 'Devise', secret: false, placeholder: 'FCFA' },
       { key: 'app_locale', label: 'Langue', secret: false, placeholder: 'fr' },
     ]
+  },
+  'api': {
+    icon: Key,
+    color: 'purple',
+    title: 'Intégrations API',
+    description: 'Clés API des fournisseurs SMS',
+    settings: [
+      { key: 'sms_activate_api_key', label: 'Clé API SMS-Activate', secret: true, placeholder: 'Votre clé API SMS-Activate' },
+      { key: '5sim_api_key', label: 'Clé API 5sim', secret: true, placeholder: 'Votre clé API 5sim' },
+    ]
   }
 };
 
@@ -66,7 +78,7 @@ export default function AdminSettings() {
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({});
   const [apiBalance, setApiBalance] = useState<number | null>(null);
-  
+
   // Logo upload states
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -99,11 +111,11 @@ export default function AdminSettings() {
         values[setting.key] = setting.value || '';
       });
       setEditedValues(values);
-      
+
       // Load current logo preview
       const logoUrl = values['app_logo_url'];
       if (logoUrl) setLogoPreview(logoUrl);
-      
+
       const faviconUrl = values['app_favicon_url'];
       if (faviconUrl) setFaviconPreview(faviconUrl);
     }
@@ -150,7 +162,7 @@ export default function AdminSettings() {
   // Upload logo to Supabase Storage
   const uploadLogo = async () => {
     if (!logoFile) return;
-    
+
     setUploadingLogo(true);
     try {
       const fileExt = logoFile.name.split('.').pop();
@@ -188,7 +200,7 @@ export default function AdminSettings() {
   // Upload favicon to Supabase Storage
   const uploadFavicon = async () => {
     if (!faviconFile) return;
-    
+
     setUploadingFavicon(true);
     try {
       const fileExt = faviconFile.name.split('.').pop();
@@ -269,8 +281,8 @@ export default function AdminSettings() {
         // Fallback: direct upsert
         const { error } = await (supabase as any)
           .from('system_settings')
-          .upsert({ 
-            key, 
+          .upsert({
+            key,
             value,
             category: key.split('_')[0] || 'general',
             description: key.replace(/_/g, ' ')
@@ -301,9 +313,9 @@ export default function AdminSettings() {
     try {
       // Call edge function to check balance
       const { data, error } = await cloudFunctions.invoke('get-providers-status');
-      
+
       if (error) throw error;
-      
+
       if (data?.smsActivate?.balance !== undefined) {
         setApiBalance(data.smsActivate.balance);
         toast({
@@ -474,15 +486,73 @@ export default function AdminSettings() {
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">Général</span>
           </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <div className="animate-pulse-slow">🔊</div>
+            <span className="hidden sm:inline">Sound</span>
+          </TabsTrigger>
           <TabsTrigger value="api" className="flex items-center gap-2">
             <Key className="h-4 w-4" />
             <span className="hidden sm:inline">API Info</span>
+          </TabsTrigger>
+
+          <TabsTrigger value="features" className="flex items-center gap-2">
+            <ToggleLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Fonctionnalités</span>
           </TabsTrigger>
           <TabsTrigger value="help" className="flex items-center gap-2">
             <Info className="h-4 w-4" />
             <span className="hidden sm:inline">Aide</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Features Tab */}
+        <TabsContent value="features">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ToggleLeft className="h-5 w-5 text-indigo-600" />
+                Gestion des Fonctionnalités
+              </CardTitle>
+              <CardDescription>
+                Activez ou désactivez les fonctionnalités globales de l'application
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-base">Location (Rentals)</span>
+                    {editedValues['rentals_enabled'] === 'true' ? (
+                      <Badge className="bg-green-600 hover:bg-green-700">Activé</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-gray-500 border-gray-300">Désactivé</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Permet aux utilisateurs de louer des numéros pour une longue durée.
+                    <br />
+                    <span className="text-xs text-orange-600 font-medium">Attention: Désactiver cette option cachera le menu pour tous les utilisateurs.</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={editedValues['rentals_enabled'] === 'true'}
+                    onCheckedChange={(checked) => {
+                      const newValue = checked ? 'true' : 'false';
+                      setEditedValues({ ...editedValues, rentals_enabled: newValue });
+                      // Auto-save logic
+                      updateSettingMutation.mutateAsync({
+                        key: 'rentals_enabled',
+                        value: newValue,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         {/* Appearance Tab */}
         <TabsContent value="appearance">
@@ -504,9 +574,9 @@ export default function AdminSettings() {
                   {logoPreview ? (
                     <div className="space-y-3">
                       <div className="flex justify-center">
-                        <img 
-                          src={logoPreview} 
-                          alt="Logo preview" 
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
                           className="max-h-16 max-w-full object-contain"
                         />
                       </div>
@@ -530,7 +600,7 @@ export default function AdminSettings() {
                   onChange={handleLogoSelect}
                   className="hidden"
                 />
-                
+
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -540,7 +610,7 @@ export default function AdminSettings() {
                     <Upload className="h-4 w-4 mr-2" />
                     Choisir une image
                   </Button>
-                  
+
                   {logoPreview && (
                     <Button
                       variant="outline"
@@ -588,9 +658,9 @@ export default function AdminSettings() {
                   {faviconPreview ? (
                     <div className="space-y-3">
                       <div className="flex justify-center">
-                        <img 
-                          src={faviconPreview} 
-                          alt="Favicon preview" 
+                        <img
+                          src={faviconPreview}
+                          alt="Favicon preview"
                           className="w-16 h-16 object-contain"
                         />
                       </div>
@@ -614,7 +684,7 @@ export default function AdminSettings() {
                   onChange={handleFaviconSelect}
                   className="hidden"
                 />
-                
+
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -624,7 +694,7 @@ export default function AdminSettings() {
                     <Upload className="h-4 w-4 mr-2" />
                     Choisir une image
                   </Button>
-                  
+
                   {faviconPreview && (
                     <Button
                       variant="outline"
@@ -685,7 +755,7 @@ export default function AdminSettings() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Couleur Secondaire</label>
                     <div className="flex gap-2">
@@ -703,7 +773,7 @@ export default function AdminSettings() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Couleur d'Accent</label>
                     <div className="flex gap-2">
@@ -795,6 +865,72 @@ export default function AdminSettings() {
           </Card>
         </TabsContent>
 
+        {/* Notifications Tab */}
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="animate-pulse-slow">🔊</div>
+                Configuration Audio
+              </CardTitle>
+              <CardDescription>
+                Définissez le son de notification pour tous les utilisateurs
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Son de réception SMS</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  {['coin', 'notification', 'success', 'arcade', 'none'].map((sound) => {
+                    const isSelected = (editedValues['app_notification_sound'] || 'coin') === sound;
+                    const labels: Record<string, string> = {
+                      'coin': '🪙 Coin',
+                      'notification': '🔔 Ping',
+                      'success': '✨ Success',
+                      'arcade': '👾 Arcade',
+                      'none': '🔕 Aucun'
+                    };
+
+                    return (
+                      <button
+                        key={sound}
+                        onClick={() => {
+                          setEditedValues({ ...editedValues, app_notification_sound: sound });
+                          import('@/lib/sound-manager').then(({ SoundManager }) => {
+                            if (sound !== 'none') SoundManager.play(sound as any);
+                          });
+                        }}
+                        className={`px-3 py-3 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center gap-2 ${isSelected
+                          ? 'bg-purple-50 border-purple-500 text-purple-700 shadow-sm scale-105'
+                          : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200 hover:bg-gray-50'
+                          }`}
+                      >
+                        <span className="text-xl">{labels[sound].split(' ')[0]}</span>
+                        <span>{labels[sound].split(' ')[1]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Button
+                onClick={async () => {
+                  await updateSettingMutation.mutateAsync({
+                    key: 'app_notification_sound',
+                    value: editedValues['app_notification_sound'] || 'coin'
+                  });
+                  toast({ title: '✅ Son enregistré', description: 'Ce son sera utilisé pour tous les clients' });
+                }}
+                disabled={updateSettingMutation.isPending}
+                className="w-full bg-purple-600 hover:bg-purple-700"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Enregistrer le son
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* General Tab */}
         <TabsContent value="general">
           <Card>
@@ -826,7 +962,7 @@ export default function AdminSettings() {
                 className="w-full mt-4"
               >
                 <Save className="h-4 w-4 mr-2" />
-                Enregistrer
+                Enregistrer les paramètres généraux
               </Button>
             </CardContent>
           </Card>

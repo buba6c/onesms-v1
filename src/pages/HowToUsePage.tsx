@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { 
-  UserPlus, 
-  Wallet, 
-  Search, 
-  Globe, 
-  MessageSquare, 
-  Copy, 
-  CheckCircle, 
+import {
+  UserPlus,
+  Wallet,
+  Search,
+  Globe,
+  MessageSquare,
+  Copy,
+  CheckCircle,
   ArrowRight,
   Smartphone,
   Shield,
@@ -29,9 +29,11 @@ export default function HowToUsePage() {
       icon: UserPlus,
       title: t('howToUse.step1.title'),
       description: t('howToUse.step1.description'),
-      color: 'from-blue-500 to-blue-600',
+      gradient: 'from-blue-500 to-blue-600',
       bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200',
+      tipBorder: 'border-blue-100',
+      tipIconColor: 'text-blue-500',
+      tipTextColor: 'text-blue-700',
       tips: [
         t('howToUse.step1.tip1'),
         t('howToUse.step1.tip2'),
@@ -42,9 +44,11 @@ export default function HowToUsePage() {
       icon: Wallet,
       title: t('howToUse.step2.title'),
       description: t('howToUse.step2.description'),
-      color: 'from-green-500 to-emerald-600',
+      gradient: 'from-green-500 to-emerald-600',
       bgColor: 'bg-green-50',
-      borderColor: 'border-green-200',
+      tipBorder: 'border-green-100',
+      tipIconColor: 'text-green-500',
+      tipTextColor: 'text-green-700',
       tips: [
         t('howToUse.step2.tip1'),
         t('howToUse.step2.tip2'),
@@ -55,9 +59,11 @@ export default function HowToUsePage() {
       icon: Search,
       title: t('howToUse.step3.title'),
       description: t('howToUse.step3.description'),
-      color: 'from-purple-500 to-purple-600',
+      gradient: 'from-purple-500 to-purple-600',
       bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-200',
+      tipBorder: 'border-purple-100',
+      tipIconColor: 'text-purple-500',
+      tipTextColor: 'text-purple-700',
       tips: [
         t('howToUse.step3.tip1'),
         t('howToUse.step3.tip2'),
@@ -68,9 +74,11 @@ export default function HowToUsePage() {
       icon: Globe,
       title: t('howToUse.step4.title'),
       description: t('howToUse.step4.description'),
-      color: 'from-orange-500 to-amber-600',
+      gradient: 'from-orange-500 to-amber-600',
       bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200',
+      tipBorder: 'border-orange-100',
+      tipIconColor: 'text-orange-500',
+      tipTextColor: 'text-orange-700',
       tips: [
         t('howToUse.step4.tip1'),
         t('howToUse.step4.tip2'),
@@ -81,9 +89,11 @@ export default function HowToUsePage() {
       icon: MessageSquare,
       title: t('howToUse.step5.title'),
       description: t('howToUse.step5.description'),
-      color: 'from-cyan-500 to-teal-600',
+      gradient: 'from-cyan-500 to-teal-600',
       bgColor: 'bg-cyan-50',
-      borderColor: 'border-cyan-200',
+      tipBorder: 'border-cyan-100',
+      tipIconColor: 'text-cyan-500',
+      tipTextColor: 'text-cyan-700',
       tips: [
         t('howToUse.step5.tip1'),
         t('howToUse.step5.tip2'),
@@ -94,9 +104,11 @@ export default function HowToUsePage() {
       icon: Copy,
       title: t('howToUse.step6.title'),
       description: t('howToUse.step6.description'),
-      color: 'from-pink-500 to-rose-600',
+      gradient: 'from-pink-500 to-rose-600',
       bgColor: 'bg-pink-50',
-      borderColor: 'border-pink-200',
+      tipBorder: 'border-pink-100',
+      tipIconColor: 'text-pink-500',
+      tipTextColor: 'text-pink-700',
       tips: [
         t('howToUse.step6.tip1'),
         t('howToUse.step6.tip2'),
@@ -142,21 +154,21 @@ export default function HowToUsePage() {
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5"></div>
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl"></div>
-        
+
         <div className="container mx-auto px-4 relative">
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Smartphone className="w-4 h-4" />
               {t('howToUse.badge')}
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
               {t('howToUse.title')}
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mt-2">
                 {t('howToUse.subtitle')}
               </span>
             </h1>
-            
+
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
               {t('howToUse.description')}
             </p>
@@ -189,11 +201,11 @@ export default function HowToUsePage() {
         </div>
       </section>
 
-      {/* Steps Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
+      {/* Steps Section - Timeline Design */}
+      <section className="py-16 md:py-24">
+        <div className="container mx-auto px-4 max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
               {t('howToUse.stepsTitle')}
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -201,49 +213,61 @@ export default function HowToUsePage() {
             </p>
           </div>
 
-          <div className="grid gap-8 max-w-5xl mx-auto">
-            {steps.map((step, index) => (
-              <div 
-                key={index}
-                className={`relative bg-white rounded-3xl p-8 shadow-xl shadow-gray-200/50 border-2 ${step.borderColor} hover:shadow-2xl transition-all duration-300 group`}
-              >
-                {/* Connector Line */}
-                {index < steps.length - 1 && (
-                  <div className="absolute left-12 bottom-0 transform translate-y-full w-0.5 h-8 bg-gradient-to-b from-gray-300 to-transparent hidden md:block"></div>
-                )}
+          <div className="relative">
+            {/* Vertical Line (Mobile & Desktop Central) */}
+            <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-1 bg-gray-100 transform md:-translate-x-1/2 rounded-full"></div>
 
-                <div className="flex flex-col md:flex-row gap-6 items-start">
-                  {/* Step Number & Icon */}
-                  <div className="flex-shrink-0">
-                    <div className={`relative w-24 h-24 bg-gradient-to-br ${step.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                      <step.icon className="w-10 h-10 text-white" />
-                      <div className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg border-2 border-gray-100">
-                        <span className="text-sm font-bold text-gray-900">{step.number}</span>
+            <div className="space-y-12 md:space-y-24">
+              {steps.map((step, index) => (
+                <div key={index} className={`relative flex flex-col md:flex-row items-center ${index % 2 === 0 ? 'md:flex-row-reverse' : ''}`}>
+
+                  {/* Step Number Badge (Center Line) */}
+                  <div className="absolute left-8 md:left-1/2 transform -translate-x-1/2 w-16 h-16 rounded-full border-4 border-white shadow-xl z-20 flex items-center justify-center bg-gradient-to-br from-white to-gray-50">
+                    <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${step.gradient} flex items-center justify-center text-white font-bold text-xl`}>
+                      {step.number}
+                    </div>
+                  </div>
+
+                  {/* Content Card Side */}
+                  <div className="w-full md:w-1/2 pl-24 md:pl-0 md:px-12">
+                    <div className={`group relative bg-white rounded-3xl p-6 md:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 overflow-hidden ${index % 2 === 0 ? 'md:text-left' : 'md:text-left'}`}>
+                      {/* Decorative Gradient Blob */}
+                      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${step.gradient} opacity-5 rounded-bl-full group-hover:scale-150 transition-transform duration-500`}></div>
+
+                      <div className="relative z-10">
+                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${step.gradient} flex items-center justify-center mb-6 shadow-md shadow-gray-200`}>
+                          <step.icon className="w-7 h-7 text-white" />
+                        </div>
+
+                        <h3 className="text-2xl font-bold text-gray-900 mb-3">{step.title}</h3>
+                        <p className="text-gray-600 mb-6 leading-relaxed">{step.description}</p>
+
+                        {/* Tips Box - Modernized */}
+                        <div className={`${step.bgColor} rounded-xl p-4 border ${step.tipBorder}`}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="p-1 bg-white rounded-full shadow-sm">
+                              <Zap className={`w-3 h-3 ${step.tipIconColor}`} />
+                            </div>
+                            <span className={`text-xs font-bold uppercase tracking-wider ${step.tipTextColor}`}>{t('howToUse.tips')}</span>
+                          </div>
+                          <ul className="space-y-2">
+                            {step.tips.map((tip, tipIndex) => (
+                              <li key={tipIndex} className="flex items-start gap-3 text-sm text-gray-700">
+                                <CheckCircle className={`w-4 h-4 ${step.tipIconColor} flex-shrink-0 mt-0.5`} />
+                                <span>{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">{step.title}</h3>
-                    <p className="text-gray-600 text-lg mb-4">{step.description}</p>
-                    
-                    {/* Tips */}
-                    <div className={`${step.bgColor} rounded-xl p-4`}>
-                      <p className="text-sm font-semibold text-gray-700 mb-2">💡 {t('howToUse.tips')}</p>
-                      <ul className="space-y-2">
-                        {step.tips.map((tip, tipIndex) => (
-                          <li key={tipIndex} className="flex items-start gap-2 text-sm text-gray-600">
-                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                            <span>{tip}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                  {/* Empty Side for Desktop Balance */}
+                  <div className="hidden md:block w-1/2"></div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -262,7 +286,7 @@ export default function HowToUsePage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {features.map((feature, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-white border-2 border-gray-100 rounded-2xl p-6 hover:border-blue-200 hover:shadow-xl transition-all duration-300 group"
               >

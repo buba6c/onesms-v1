@@ -39,16 +39,14 @@ serve(async (req) => {
       throw new Error('userId requis')
     }
 
-    // Récupérer la config PayDunya depuis payment_providers
-    const { data: paydunyaConfig, error: configError } = await supabase
-      .from('payment_providers')
-      .select('config, is_active')
-      .eq('provider_code', 'paydunya')
-      .eq('is_active', true)
-      .single()
-
-    if (configError || !paydunyaConfig) {
-      throw new Error('PayDunya non configuré ou inactif')
+    // Configuration PayDunya avec clés valides (temporaire - sera dans DB plus tard)
+    const paydunyaConfig = {
+      config: {
+        master_key: "NRimGfVs-w3HH-U396-4KyR-AXNV5vmF0uEW",
+        private_key: "live_private_MptaDaAADwpfmUi5rIhi2tP5wFc",
+        token: "igh8jsikXdOst2oY85NT",
+        mode: "live"
+      }
     }
 
     const { master_key, private_key, token, mode } = paydunyaConfig.config
@@ -128,8 +126,8 @@ serve(async (req) => {
         user_id: userId
       },
       actions: {
-        cancel_url: `${Deno.env.get('APP_URL')}/payment/cancel?txid=${transaction.id}`,
-        return_url: `${Deno.env.get('APP_URL')}/payment/success?txid=${transaction.id}`,
+        cancel_url: "https://onesms-sn.com",
+        return_url: "https://onesms-sn.com",
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/paydunya-webhook`
       }
     }

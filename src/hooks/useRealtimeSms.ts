@@ -28,24 +28,38 @@ interface UseRealtimeSmsOptions {
 
 export function useRealtimeSms({ userId, onSmsReceived, onBalanceUpdate }: UseRealtimeSmsOptions) {
   const { toast } = useToast();
-  
+
   // Use refs to avoid re-subscribing when callbacks change
   const onSmsReceivedRef = useRef(onSmsReceived);
   const onBalanceUpdateRef = useRef(onBalanceUpdate);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  
+
   // Update refs when callbacks change (doesn't trigger re-render)
   useEffect(() => {
     onSmsReceivedRef.current = onSmsReceived;
   }, [onSmsReceived]);
-  
+
   useEffect(() => {
     onBalanceUpdateRef.current = onBalanceUpdate;
   }, [onBalanceUpdate]);
 
+  // Ref for sound preference (fetched from admin settings)
+  const soundPreferenceRef = useRef<string>('coin');
+
+  // Fetch global sound setting on mount
+  useEffect(() => {
+    const fetchSoundSetting = async () => {
+      const { data } = await (supabase as any).rpc('get_setting', { setting_key: 'app_notification_sound' });
+      if (data) {
+        soundPreferenceRef.current = data;
+      }
+    };
+    fetchSoundSetting();
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
-    
+
     // Don't create a new channel if one already exists
     if (channelRef.current) {
       return;
@@ -89,6 +103,21 @@ export function useRealtimeSms({ userId, onSmsReceived, onBalanceUpdate }: UseRe
             // Notifier le parent via ref
             onSmsReceivedRef.current(newActivation);
 
+            // 🎵 JOUER LE SON
+            import('@/lib/sound-manager').then(({ SoundManager }) => {
+              SoundManager.play(soundPreferenceRef.current as any);
+            });
+
+            // 🔔 BROWSER NOTIFICATION
+            import('@/lib/notification-manager').then(({ NotificationManager }) => {
+              if (NotificationManager.getPermission() === 'granted') {
+                NotificationManager.send('Nouveau SMS Reçu !', {
+                  body: `Code: ${newActivation.sms_code} de ${newActivation.service_code || 'Service'}`,
+                  tag: `sms-${newActivation.id}`, // Prevent duplicates
+                });
+              }
+            });
+
             // Afficher notification
             toast({
               title: '✅ SMS Reçu !',
@@ -102,25 +131,37 @@ export function useRealtimeSms({ userId, onSmsReceived, onBalanceUpdate }: UseRe
             }
           }
 
-          // Activation expirée/annulée
+          // Activation expirée (timeout seulement - cancelled est géré par l'action utilisateur)
+          // Ne pas afficher de toast pour 'cancelled' car cancelActivation() le fait déjà
           if (
-            newActivation.status && ['timeout', 'cancelled'].includes(newActivation.status) &&
-            (!oldActivation?.status || !['timeout', 'cancelled'].includes(oldActivation.status))
+            newActivation.status === 'timeout' &&
+            oldActivation?.status !== 'timeout'
           ) {
-            // Activation expired or cancelled
+            // Activation expired (timeout)
 
             // Notifier le parent via ref
             onSmsReceivedRef.current(newActivation);
 
-            // Afficher notification
+            // Afficher notification pour timeout seulement
             toast({
-              title: newActivation.status === 'timeout' ? '⏰ Timeout' : '❌ Annulé',
-              description: `${newActivation.phone} - ${newActivation.status === 'timeout' ? 'Aucun SMS reçu, fonds remboursés' : 'Activation annulée'}`,
+              title: '⏰ Activation expirée',
+              description: `${newActivation.phone} - Aucun SMS reçu, fonds remboursés`,
               variant: 'destructive',
               duration: 5000,
             });
 
             // Rafraîchir le solde (remboursement)
+            if (onBalanceUpdateRef.current) {
+              onBalanceUpdateRef.current();
+            }
+          }
+
+          // Pour cancelled, juste rafraîchir sans toast (toast déjà affiché par l'action)
+          if (
+            newActivation.status === 'cancelled' &&
+            oldActivation?.status !== 'cancelled'
+          ) {
+            onSmsReceivedRef.current(newActivation);
             if (onBalanceUpdateRef.current) {
               onBalanceUpdateRef.current();
             }
@@ -136,7 +177,7 @@ export function useRealtimeSms({ userId, onSmsReceived, onBalanceUpdate }: UseRe
         }
         // Auto-reconnect géré par Supabase
       });
-    
+
     channelRef.current = channel;
 
     // Cleanup : désinscription quand le composant est démonté

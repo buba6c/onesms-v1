@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -7,8 +8,8 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('🚀 [CRON-ATOMIC] 100% Reliable Timeout & SMS Processing...')
-  
+  console.log('🚀 [CRON-ATOMIC] Multi-Provider Reliable Check...')
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -22,13 +23,15 @@ serve(async (req) => {
     // =========================================================================
     // PARTIE 1: TRAITEMENT ATOMIQUE DES TIMEOUTS 
     // =========================================================================
-    
+
     console.log('\n🔄 [CRON-ATOMIC] Phase 1: Atomic timeout processing...')
-    
+
+    // Calls the atomic-timeout-processor function which handles expirations based on expires_at
+    // This is provider-agnostic as it relies on DB timestamps
     const { data: atomicResult, error: atomicError } = await supabaseClient.functions.invoke('atomic-timeout-processor')
-    
+
     let timeoutResults = { processed: 0, refunded_total: 0, errors: 0 }
-    
+
     if (atomicError) {
       console.error('⚠️ [CRON-ATOMIC] Atomic processor error:', atomicError)
     } else if (atomicResult?.success) {
@@ -41,89 +44,81 @@ serve(async (req) => {
     }
 
     // =========================================================================
-    // PARTIE 2: VÉRIFICATION SMS (SANS REFUND - SMS SEULEMENT)
+    // PARTIE 2: VÉRIFICATION SMS MULTI-PROVIDER
     // =========================================================================
-    
-    console.log('\n📱 [CRON-ATOMIC] Phase 2: SMS checking (timeout handled separately)...')
-    
-    // Récupérer SEULEMENT les activations pending/waiting NON expirées
+
+    console.log('\n📱 [CRON-ATOMIC] Phase 2: Multi-Provider SMS Checking...')
+
+    // Récupérer les activations pending/waiting NON expirées
+    // IMPORTANT: fetch 'provider' column to route correctly
     const { data: activations, error: fetchError } = await supabaseClient
       .from('activations')
-      .select('*')
+      .select('id, user_id, order_id, phone, provider, status, expires_at')
       .in('status', ['pending', 'waiting'])
-      .gt('expires_at', new Date().toISOString())  // NON expirées
+      .gt('expires_at', new Date().toISOString())  // Pas encore expiré
       .order('created_at', { ascending: true })
-      .limit(30)
+      .limit(50) // Limit batch size to avoid timeout
 
     if (fetchError) {
       throw new Error(`Failed to fetch activations: ${fetchError.message}`)
     }
 
-    console.log(`📊 [CRON-ATOMIC] Found ${activations?.length || 0} active (non-expired) activations`)
+    console.log(`📊 [CRON-ATOMIC] Found ${activations?.length || 0} active (non-expired) activations to check`)
 
     const smsResults = {
       checked: 0,
-      found: 0,
+      invocations: [] as string[],
       errors: [] as string[]
     }
 
-    const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-    const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
-
-    // Vérifier les SMS SEULEMENT (pas de gestion timeout ici)
+    // Dispatch loops
     for (const activation of activations || []) {
       try {
-        console.log(`\n🔍 [CRON-ATOMIC] Checking SMS: ${activation.phone} (${activation.order_id})...`)
+        const provider = activation.provider || 'sms-activate'; // Default to sms-activate if older record
+        let checkerFunction = 'check-sms-activate-status';
+
+        // Route to correct checker
+        if (provider === '5sim') checkerFunction = 'check-5sim-status';
+        else if (provider === 'smspva') checkerFunction = 'check-smspva-status';
+        else if (provider === 'onlinesim') checkerFunction = 'check-onlinesim-status';
+        else if (provider === 'herosms') checkerFunction = 'check-sms-activate-status'; // Alias
+
+        console.log(`\n🔍 [CRON-ATOMIC] Checking ${activation.phone} (${provider}) -> ${checkerFunction}`)
         smsResults.checked++
 
-        // Check V1 API pour SMS
-        const v1Url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.order_id}`
-        const v1Response = await fetch(v1Url)
-        const v1Text = await v1Response.text()
+        // Invoke the specific checker function
+        // We do NOT wait for full execution to optimize speed? No, we should wait to avoid overloading Supabase functions concurrently?
+        // Sequential is safer for reliability.
+        const { data: checkData, error: checkError } = await supabaseClient.functions.invoke(checkerFunction, {
+          body: {
+            activationId: activation.id,
+            userId: activation.user_id
+          }
+        })
 
-        console.log(`📥 [CRON-ATOMIC] API Response: ${v1Text}`)
-
-        if (v1Text.startsWith('STATUS_OK:')) {
-          // SMS reçu!
-          const code = v1Text.split(':')[1]
-          const smsText = `Votre code de validation est ${code}`
-
-          console.log(`✅ [CRON-ATOMIC] SMS Found: ${code}`)
-
-          // Mettre à jour avec le SMS (PAS de refund ici)
-          await supabaseClient
-            .from('activations')
-            .update({ 
-              status: 'received',
-              sms_code: code,
-              sms_text: smsText,
-              sms_received_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', activation.id)
-
-          smsResults.found++
-
-        } else if (v1Text === 'STATUS_CANCEL') {
-          console.log(`❌ [CRON-ATOMIC] API Cancelled: ${activation.order_id}`)
-          
-          // Marquer comme cancelled, le timeout atomique s'en occupera
-          await supabaseClient
-            .from('activations')
-            .update({ 
-              status: 'cancelled',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', activation.id)
+        if (checkError) {
+          console.error(`❌ [CRON-ATOMIC] Checker failed for ${activation.id}:`, checkError)
+          smsResults.errors.push(`${activation.id} (${provider}): Invocation failed`)
+        } else {
+          // Check success logic ? The checker updates the DB itself.
+          // checking return data for logs
+          if (checkData?.success) {
+            const status = checkData.data?.status;
+            smsResults.invocations.push(`${activation.id}: ${status}`);
+            console.log(`✅ [CRON-ATOMIC] Result: ${status}`);
+          } else {
+            smsResults.errors.push(`${activation.id} (${provider}): ${checkData?.error || 'Unknown error'}`);
+            console.error(`⚠️ [CRON-ATOMIC] Logic error: ${checkData?.error}`);
+          }
         }
 
-        // Délai anti rate-limit
-        await new Promise(resolve => setTimeout(resolve, 500))
-
       } catch (error: any) {
-        console.error(`❌ [CRON-ATOMIC] SMS Check error for ${activation.order_id}:`, error.message)
-        smsResults.errors.push(`${activation.order_id}: ${error.message}`)
+        console.error(`❌ [CRON-ATOMIC] Loop error for ${activation.id}:`, error.message)
+        smsResults.errors.push(`${activation.id}: ${error.message}`)
       }
+
+      // Small delay to be nice to the platform
+      await new Promise(resolve => setTimeout(resolve, 200))
     }
 
     // =========================================================================
@@ -133,30 +128,26 @@ serve(async (req) => {
     const totalResults = {
       success: true,
       timestamp: new Date().toISOString(),
-      
+
       // Phase 1: Timeouts atomiques
-      timeout_processing: {
-        processed: timeoutResults.processed,
-        refunded_total: timeoutResults.refunded_total,
-        errors: timeoutResults.errors
-      },
-      
+      timeout_processing: timeoutResults,
+
       // Phase 2: SMS checking
       sms_checking: {
         checked: smsResults.checked,
-        found: smsResults.found,
-        errors: smsResults.errors.length
+        errors: smsResults.errors.length,
+        details: smsResults.invocations
       }
     }
 
     console.log('\n🎯 [CRON-ATOMIC] SUMMARY:')
-    console.log(`   Timeouts processed: ${timeoutResults.processed} (${timeoutResults.refunded_total}Ⓐ refunded)`)
-    console.log(`   SMS checked: ${smsResults.checked} (${smsResults.found} found)`)
-    console.log(`   Total errors: ${timeoutResults.errors + smsResults.errors.length}`)
+    console.log(`   Timeouts: ${timeoutResults.processed}`)
+    console.log(`   SMS Checked: ${smsResults.checked}`)
+    console.log(`   Errors: ${timeoutResults.errors + smsResults.errors.length}`)
 
     return new Response(
       JSON.stringify(totalResults),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
@@ -170,7 +161,7 @@ serve(async (req) => {
         error: error.message,
         timestamp: new Date().toISOString()
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

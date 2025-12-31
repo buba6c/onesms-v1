@@ -47,7 +47,7 @@ serve(async (req) => {
 
     // Get SMS from V1 API
     console.log('🌐 [UPDATE-SMS] Checking SMS-Activate V1 API...')
-    const v1Url = `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${orderId}`
+    const v1Url = `https://hero-sms.com/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${orderId}`
     const v1Response = await fetch(v1Url)
     const v1Text = await v1Response.text()
 

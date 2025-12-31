@@ -115,14 +115,30 @@ serve(async (req) => {
         
         const { data: userProfile } = await supabase
           .from('users')
-          .select('balance')
+          .select('balance, frozen_balance')
           .eq('id', user.id)
           .single()
 
         if (userProfile) {
+          const newBalance = (userProfile.balance || 0) + activations
+          
+          // Create ledger entry FIRST (required by trigger)
+          await supabase
+            .from('balance_operations')
+            .insert({
+              user_id: user.id,
+              operation_type: 'credit',
+              amount: activations,
+              balance_before: userProfile.balance || 0,
+              balance_after: newBalance,
+              frozen_before: userProfile.frozen_balance || 0,
+              frozen_after: userProfile.frozen_balance || 0,
+              reason: `Moneroo payment verified - ${activations} credits`
+            })
+          
           await supabase
             .from('users')
-            .update({ balance: (userProfile.balance || 0) + activations })
+            .update({ balance: newBalance })
             .eq('id', user.id)
         }
       }

@@ -1,13 +1,13 @@
 /**
  * SMS-Activate.io API Client
  * Documentation: https://sms-activate.io/api2
- * Base URL: https://api.sms-activate.ae/stubs/handler_api.php
+ * Base URL: https://hero-sms.com/stubs/handler_api.php
  */
 
 import axios from 'axios'
 
 const API_KEY = import.meta.env.VITE_SMS_ACTIVATE_API_KEY
-const BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 const apiSmsActivate = axios.create({
   baseURL: BASE_URL,

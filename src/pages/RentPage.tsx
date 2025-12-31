@@ -7,13 +7,15 @@ import { supabase, cloudFunctions } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Search, Copy, RefreshCw, Plus, ChevronDown, ChevronUp, Mail, Loader2 } from 'lucide-react'
+import { Search, Copy, RefreshCw, Plus, ChevronDown, ChevronUp, Mail, Loader2, Clock, Timer } from 'lucide-react'
 import { getServiceLogo, getCountryFlag, getFlagEmoji } from '@/lib/logo-service'
 
 interface Service { code: string; name: string; display_name?: string; available: number; total?: number; cost?: number; sellingPrice?: number }
 interface Country { id: number; code: string; name: string; available: boolean }
-interface Rental { id: string; rental_id: string; phone: string; service_code: string; country_code: string; price: number; rent_hours: number; status: string; end_date: string; created_at: string }
+interface Rental { id: string; rental_id: string; phone: string; service_code: string; country_code: string; price: number; rent_hours: number; status: string; end_date: string; created_at: string; provider?: string }
 interface Message { text: string; code: string | null; service: string; date: string }
 interface RentDuration { hours: number; label: string; description: string; price: number; loading?: boolean; available?: number }
 
@@ -37,6 +39,16 @@ const RentPage = () => {
   const [searchCountry, setSearchCountry] = useState('')
   const [isRenting, setIsRenting] = useState(false)
   const [expandedRental, setExpandedRental] = useState<string | null>(null)
+
+  // Extension dialog states
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false)
+  const [extendingRental, setExtendingRental] = useState<Rental | null>(null)
+  const [extensionHours, setExtensionHours] = useState<string>('4')
+  const [isExtending, setIsExtending] = useState(false)
+  const [extensionPrice, setExtensionPrice] = useState<number | null>(null)
+  const [extensionPriceLoading, setExtensionPriceLoading] = useState(false)
+  const [extensionError, setExtensionError] = useState<string | null>(null)
+  const [userCanAfford, setUserCanAfford] = useState(true)
 
   // =========================================================================
   // 1. Récupérer les PAYS RENT disponibles directement depuis l'API
@@ -90,19 +102,19 @@ const RentPage = () => {
     queryKey: ['rent-prices', selectedService?.code, selectedCountry?.id],
     queryFn: async () => {
       if (!selectedService?.code || !selectedCountry?.id) return null
-      
+
       const prices: Record<number, { price: number; available: number }> = {}
-      
+
       // Récupérer les prix pour toutes les durées en parallèle
       await Promise.all(BASE_RENT_DURATIONS.map(async (duration) => {
         try {
           const { data } = await cloudFunctions.invoke('get-rent-services', {
-            body: { 
+            body: {
               rentTime: duration.hours.toString(),
               country: selectedCountry.id.toString()
             }
           })
-          
+
           if (data?.services) {
             const serviceData = data.services[selectedService.code]
             if (serviceData) {
@@ -116,7 +128,7 @@ const RentPage = () => {
           console.warn(`Erreur récupération prix ${duration.hours}h:`, e)
         }
       }))
-      
+
       return prices
     },
     enabled: !!selectedService?.code && !!selectedCountry?.id && currentStep === 'duration',
@@ -135,14 +147,25 @@ const RentPage = () => {
 
   // Services filtrés (depuis l'API)
   const services = servicesData?.availableServices || []
-  const filteredServices = services.filter(s => 
+  const filteredServices = services.filter(s =>
     s.code.toLowerCase().includes(searchService.toLowerCase()) ||
     (s.name && s.name.toLowerCase().includes(searchService.toLowerCase()))
   )
 
   const fetchRentalInbox = async (rentalId: string) => {
     try {
-      const { data, error } = await cloudFunctions.invoke('get-sms-activate-inbox', { body: { rentalId, userId: user?.id } })
+      const rental = rentals.find(r => r.id === rentalId)
+      if (!rental) return []
+
+      // Route to appropriate provider
+      const functionName = rental.provider === 'onlinesim'
+        ? 'get-onlinesim-rent-inbox'
+        : 'get-sms-activate-inbox'
+
+      const { data, error } = await cloudFunctions.invoke(functionName, {
+        body: { rentalId, userId: user?.id }
+      })
+
       if (error || !data?.success) throw new Error(data?.error || 'Failed to fetch inbox')
       return data.data.messages as Message[]
     } catch (error: any) {
@@ -174,14 +197,64 @@ const RentPage = () => {
     }
   }
 
-  const handleExtendRental = async (rentalId: string) => {
+  // Fetch extension price
+  const fetchExtensionPrice = async (rentalId: string, hours: number) => {
+    setExtensionPriceLoading(true)
+    setExtensionError(null)
+    setExtensionPrice(null)
     try {
-      const { data, error } = await cloudFunctions.invoke('continue-sms-activate-rent', { body: { rentalId, userId: user?.id } })
+      const { data, error } = await cloudFunctions.invoke('get-rent-extension-price', {
+        body: { rentalId, userId: user?.id, hours }
+      })
+      if (error || !data?.success) throw new Error(data?.error || 'Impossible d\'obtenir le prix')
+      setExtensionPrice(data.data.price)
+      setUserCanAfford(data.data.canAfford)
+    } catch (err: any) {
+      setExtensionError(err.message)
+    } finally {
+      setExtensionPriceLoading(false)
+    }
+  }
+
+  // Open extension dialog
+  const handleExtendRental = (rentalId: string) => {
+    const rental = rentals.find(r => r.id === rentalId)
+    if (!rental) return
+    setExtendingRental(rental)
+    const defaultHours = rental.rent_hours || 4
+    setExtensionHours(String(defaultHours))
+    setExtensionPrice(null)
+    setExtensionError(null)
+    setExtendDialogOpen(true)
+    fetchExtensionPrice(rental.id, defaultHours)
+  }
+
+  // Handle hours change
+  const handleExtensionHoursChange = (hours: string) => {
+    setExtensionHours(hours)
+    if (extendingRental) fetchExtensionPrice(extendingRental.id, parseInt(hours))
+  }
+
+  // Perform extension with selected duration
+  const performExtension = async () => {
+    if (!extendingRental || isExtending || !extensionPrice) return
+    setIsExtending(true)
+    try {
+      const { data, error } = await cloudFunctions.invoke('continue-sms-activate-rent', {
+        body: { rentalId: extendingRental.id, userId: user?.id, hours: parseInt(extensionHours) }
+      })
       if (error || !data?.success) throw new Error(data?.error || 'Extension failed')
-      toast.success('Rental extended!', { description: `New end: ${new Date(data.data.end_date).toLocaleString()}` })
+      toast.success(t('rent.rentalExtended'), {
+        description: `+${data.data.hours}h • ${data.data.price}Ⓐ • ${t('rent.newEnd')}: ${new Date(data.data.end_date).toLocaleString()}`
+      })
+      setExtendDialogOpen(false)
+      setExtendingRental(null)
+      setExtensionPrice(null)
       refetchRentals()
     } catch (error: any) {
       toast.error(t('rent.extensionFailed'), { description: error.message })
+    } finally {
+      setIsExtending(false)
     }
   }
 
@@ -197,7 +270,7 @@ const RentPage = () => {
     const hours = Math.floor(totalSeconds / 3600)
     const mins = Math.floor((totalSeconds % 3600) / 60)
     const secs = totalSeconds % 60
-    if (hours > 24) return `${Math.floor(hours/24)}j ${hours%24}h`
+    if (hours > 24) return `${Math.floor(hours / 24)}j ${hours % 24}h`
     if (hours > 0) return `${hours}h ${mins}m`
     if (mins > 0) return `${mins}m ${secs}s`
     return `${secs}s`
@@ -207,16 +280,16 @@ const RentPage = () => {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">{t('rent.title')}</h1>
-        <Button onClick={() => refetchRentals()} variant="outline" size="sm"><RefreshCw className="w-4 h-4 mr-2"/>{t('rent.refresh')}</Button>
+        <Button onClick={() => refetchRentals()} variant="outline" size="sm"><RefreshCw className="w-4 h-4 mr-2" />{t('rent.refresh')}</Button>
       </div>
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">{t('rent.activeRentals')}</h2>
         {rentalsLoading ? <Card className="p-4">{t('rent.loading')}</Card> : rentals.length === 0 ? (
-          <Card className="p-8 text-center"><Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground"/><p>{t('rent.noActiveRentals')}</p></Card>
+          <Card className="p-8 text-center"><Mail className="w-12 h-12 mx-auto mb-4 text-muted-foreground" /><p>{t('rent.noActiveRentals')}</p></Card>
         ) : (
           <div className="grid gap-4">
-            {rentals.map(r => <RentalCard key={r.id} rental={r} expanded={expandedRental===r.id} onToggle={()=>setExpandedRental(expandedRental===r.id?null:r.id)} onCopy={copyToClipboard} onExtend={handleExtendRental} onFetchInbox={fetchRentalInbox} getRemainingTime={getRemainingTime} t={t}/>)}
+            {rentals.map(r => <RentalCard key={r.id} rental={r} expanded={expandedRental === r.id} onToggle={() => setExpandedRental(expandedRental === r.id ? null : r.id)} onCopy={copyToClipboard} onExtend={handleExtendRental} onFetchInbox={fetchRentalInbox} getRemainingTime={getRemainingTime} t={t} />)}
           </div>
         )}
       </div>
@@ -224,58 +297,58 @@ const RentPage = () => {
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4">{t('rent.rentNewNumber')}</h2>
         <div className="flex justify-center mb-6 gap-2">
-          <StepIndicator step={1} label={t('rent.steps.country')} active={currentStep==='country'}/>
-          <div className="w-12 h-px bg-border my-auto"/>
-          <StepIndicator step={2} label={t('rent.steps.service')} active={currentStep==='service'}/>
-          <div className="w-12 h-px bg-border my-auto"/>
-          <StepIndicator step={3} label={t('rent.steps.duration')} active={currentStep==='duration'}/>
-          <div className="w-12 h-px bg-border my-auto"/>
-          <StepIndicator step={4} label={t('rent.steps.confirm')} active={currentStep==='confirm'}/>
+          <StepIndicator step={1} label={t('rent.steps.country')} active={currentStep === 'country'} />
+          <div className="w-12 h-px bg-border my-auto" />
+          <StepIndicator step={2} label={t('rent.steps.service')} active={currentStep === 'service'} />
+          <div className="w-12 h-px bg-border my-auto" />
+          <StepIndicator step={3} label={t('rent.steps.duration')} active={currentStep === 'duration'} />
+          <div className="w-12 h-px bg-border my-auto" />
+          <StepIndicator step={4} label={t('rent.steps.confirm')} active={currentStep === 'confirm'} />
         </div>
 
-        {currentStep==='country' && (
+        {currentStep === 'country' && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground mb-2">{t('rent.countrySelectHint', { count: countries.length })}</p>
-            <Input placeholder={t('rent.searchCountry')} value={searchCountry} onChange={(e)=>setSearchCountry(e.target.value)}/>
+            <Input placeholder={t('rent.searchCountry')} value={searchCountry} onChange={(e) => setSearchCountry(e.target.value)} />
             {countriesLoading ? (
-              <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin mr-2"/>{t('rent.loadingCountries')}</div>
+              <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin mr-2" />{t('rent.loadingCountries')}</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                {filteredCountries.map(c=><Button key={c.id} variant={selectedCountry?.id===c.id?'default':'outline'} className="justify-start" onClick={()=>{setSelectedCountry(c);setSelectedService(null);setCurrentStep('service')}}><span className="mr-2">{getFlagEmoji(c.code)}</span>{c.name}</Button>)}
+                {filteredCountries.map(c => <Button key={c.id} variant={selectedCountry?.id === c.id ? 'default' : 'outline'} className="justify-start" onClick={() => { setSelectedCountry(c); setSelectedService(null); setCurrentStep('service') }}><span className="mr-2">{getFlagEmoji(c.code)}</span>{c.name}</Button>)}
               </div>
             )}
           </div>
         )}
 
-        {currentStep==='service' && (
+        {currentStep === 'service' && (
           <div className="space-y-4">
-            <div className="flex gap-2 mb-4"><Button variant="outline" size="sm" onClick={()=>{setCurrentStep('country');setSelectedCountry(null)}}>{t('rent.back')}</Button><span className="text-sm text-muted-foreground">{getFlagEmoji(selectedCountry?.code || '')} {selectedCountry?.name}</span></div>
-            <Input placeholder={t('rent.searchService')} value={searchService} onChange={(e)=>setSearchService(e.target.value)}/>
+            <div className="flex gap-2 mb-4"><Button variant="outline" size="sm" onClick={() => { setCurrentStep('country'); setSelectedCountry(null) }}>{t('rent.back')}</Button><span className="text-sm text-muted-foreground">{getFlagEmoji(selectedCountry?.code || '')} {selectedCountry?.name}</span></div>
+            <Input placeholder={t('rent.searchService')} value={searchService} onChange={(e) => setSearchService(e.target.value)} />
             {servicesLoading ? (
-              <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin mr-2"/>{t('rent.loadingServices')}</div>
+              <div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 animate-spin mr-2" />{t('rent.loadingServices')}</div>
             ) : filteredServices.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">{t('rent.noServices')}</div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
-                {filteredServices.map(s=><Button key={s.code} variant={selectedService?.code===s.code?'default':'outline'} className="h-auto py-4 flex flex-col gap-2 relative" onClick={()=>{setSelectedService(s);setCurrentStep('duration')}}><img src={getServiceLogo(s.code)} alt={`Logo ${s.name || s.code}`} className="w-8 h-8" onError={(e)=>(e.target as HTMLImageElement).src='/placeholder-service.png'}/><span className="text-sm font-medium">{s.code.toUpperCase()}</span><span className="text-xs text-muted-foreground">{s.available} {t('rent.available')}</span></Button>)}
+                {filteredServices.map(s => <Button key={s.code} variant={selectedService?.code === s.code ? 'default' : 'outline'} className="h-auto py-4 flex flex-col gap-2 relative" onClick={() => { setSelectedService(s); setCurrentStep('duration') }}><img src={getServiceLogo(s.code)} alt={`Logo ${s.name || s.code}`} className="w-8 h-8" onError={(e) => (e.target as HTMLImageElement).src = '/placeholder-service.png'} /><span className="text-sm font-medium">{s.code.toUpperCase()}</span><span className="text-xs text-muted-foreground">{s.available} {t('rent.available')}</span></Button>)}
               </div>
             )}
           </div>
         )}
 
-        {currentStep==='duration' && (
+        {currentStep === 'duration' && (
           <div className="space-y-4">
-            <div className="flex gap-2 mb-4"><Button variant="outline" size="sm" onClick={()=>setCurrentStep('service')}>{t('rent.back')}</Button><span className="text-sm text-muted-foreground">{getFlagEmoji(selectedCountry?.code || '')} {selectedCountry?.name} • {selectedService?.code.toUpperCase()}</span></div>
+            <div className="flex gap-2 mb-4"><Button variant="outline" size="sm" onClick={() => setCurrentStep('service')}>{t('rent.back')}</Button><span className="text-sm text-muted-foreground">{getFlagEmoji(selectedCountry?.code || '')} {selectedCountry?.name} • {selectedService?.code.toUpperCase()}</span></div>
             <div className="grid gap-3">
-              {rentDurations.map(d=><Button key={d.hours} variant={selectedDuration?.hours===d.hours?'default':'outline'} className="h-auto py-4 justify-between" onClick={()=>{setSelectedDuration(d);setCurrentStep('confirm')}} disabled={d.loading || d.price === 0 || d.available === 0}><div className="text-left"><div className="font-medium">{t(`rent.durations.${d.label}`)}</div><div className="text-sm text-muted-foreground">{t(`rent.durations.${d.description}`)} {d.available > 0 && `• ${d.available} ${t('rent.available')}`}</div></div>{d.loading ? <Loader2 className="w-4 h-4 animate-spin"/> : <div className="text-lg font-bold">{d.price > 0 ? `$${d.price.toFixed(2)}` : t('rent.notAvailable')}</div>}</Button>)}
+              {rentDurations.map(d => <Button key={d.hours} variant={selectedDuration?.hours === d.hours ? 'default' : 'outline'} className="h-auto py-4 justify-between" onClick={() => { setSelectedDuration(d); setCurrentStep('confirm') }} disabled={d.loading || d.price === 0 || d.available === 0}><div className="text-left"><div className="font-medium">{t(`rent.durations.${d.label}`)}</div><div className="text-sm text-muted-foreground">{t(`rent.durations.${d.description}`)} {d.available > 0 && `• ${d.available} ${t('rent.available')}`}</div></div>{d.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <div className="text-lg font-bold">{d.price > 0 ? `$${d.price.toFixed(2)}` : t('rent.notAvailable')}</div>}</Button>)}
             </div>
             {pricesLoading && <p className="text-sm text-muted-foreground text-center">{t('rent.loadingPrices')}</p>}
           </div>
         )}
 
-        {currentStep==='confirm' && (
+        {currentStep === 'confirm' && (
           <div className="space-y-4">
-            <Button variant="outline" size="sm" onClick={()=>setCurrentStep('duration')}>{t('rent.back')}</Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentStep('duration')}>{t('rent.back')}</Button>
             <Card className="p-4 space-y-2">
               <div className="flex justify-between"><span className="text-muted-foreground">{t('rent.country')}:</span><span className="font-medium">{getFlagEmoji(selectedCountry?.code || '')} {selectedCountry?.name}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">{t('rent.service')}:</span><span className="font-medium">{selectedService?.code.toUpperCase()}</span></div>
@@ -283,29 +356,102 @@ const RentPage = () => {
               <div className="flex justify-between"><span className="text-muted-foreground">{t('rent.available')}:</span><span className="font-medium">{selectedDuration?.available} {t('rent.numbers')}</span></div>
               <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2"><span>{t('rent.total')}:</span><span>${selectedDuration?.price.toFixed(2)}</span></div>
             </Card>
-            <Button onClick={handleRent} disabled={isRenting} className="w-full" size="lg">{isRenting?<><Loader2 className="w-4 h-4 animate-spin mr-2"/>{t('rent.renting')}</>:t('rent.confirmRental')}</Button>
+            <Button onClick={handleRent} disabled={isRenting} className="w-full" size="lg">{isRenting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />{t('rent.renting')}</> : t('rent.confirmRental')}</Button>
           </div>
         )}
       </Card>
+
+      {/* Extension Dialog */}
+      <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Timer className="w-5 h-5" />
+              {t('rent.extendRental')}
+            </DialogTitle>
+            <DialogDescription>
+              {extendingRental && (
+                <span>{extendingRental.phone} • {extendingRental.service_code}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t('rent.extensionDuration')}</label>
+              <Select value={extensionHours} onValueChange={handleExtensionHoursChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('rent.selectDuration')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4">4 {t('rent.hours')}</SelectItem>
+                  <SelectItem value="8">8 {t('rent.hours')}</SelectItem>
+                  <SelectItem value="12">12 {t('rent.hours')}</SelectItem>
+                  <SelectItem value="24">24 {t('rent.hours')} (1 {t('rent.day')})</SelectItem>
+                  <SelectItem value="48">48 {t('rent.hours')} (2 {t('rent.days')})</SelectItem>
+                  <SelectItem value="72">72 {t('rent.hours')} (3 {t('rent.days')})</SelectItem>
+                  <SelectItem value="168">168 {t('rent.hours')} (1 {t('rent.week')})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Price display */}
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">{t('rent.extensionPrice')}:</span>
+                {extensionPriceLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : extensionError ? (
+                  <span className="text-sm text-destructive">{t('common.error')}</span>
+                ) : extensionPrice !== null ? (
+                  <span className="text-lg font-bold text-primary">{extensionPrice} Ⓐ</span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">--</span>
+                )}
+              </div>
+              {extensionError && (
+                <p className="text-xs text-destructive">{extensionError}</p>
+              )}
+              {!userCanAfford && extensionPrice !== null && (
+                <p className="text-xs text-destructive">{t('rent.insufficientBalance')}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtendDialogOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={performExtension}
+              disabled={isExtending || extensionPriceLoading || !extensionPrice || !userCanAfford || !!extensionError}
+            >
+              {isExtending ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />{t('rent.extending')}</>
+              ) : (
+                <><Plus className="w-4 h-4 mr-2" />{t('rent.extend')} {extensionPrice ? `(${extensionPrice}Ⓐ)` : ''}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
-const StepIndicator=({step,label,active}:{step:number;label:string;active:boolean})=>(
-  <div className="flex flex-col items-center"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${active?'bg-primary text-primary-foreground':'bg-muted text-muted-foreground'}`}>{step}</div><span className={`text-xs mt-1 ${active?'text-primary font-medium':'text-muted-foreground'}`}>{label}</span></div>
+const StepIndicator = ({ step, label, active }: { step: number; label: string; active: boolean }) => (
+  <div className="flex flex-col items-center"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{step}</div><span className={`text-xs mt-1 ${active ? 'text-primary font-medium' : 'text-muted-foreground'}`}>{label}</span></div>
 )
 
-const RentalCard=({rental,expanded,onToggle,onCopy,onExtend,onFetchInbox,getRemainingTime,t}:{rental:Rental;expanded:boolean;onToggle:()=>void;onCopy:(t:string)=>void;onExtend:(id:string)=>void;onFetchInbox:(id:string)=>Promise<Message[]>;getRemainingTime:(d:string)=>string;t:(key:string)=>string})=>{
-  const [messages,setMessages]=useState<Message[]>([])
-  const [loading,setLoading]=useState(false)
-  const handleExpand=async()=>{if(!expanded){setLoading(true);setMessages(await onFetchInbox(rental.id));setLoading(false)}onToggle()}
-  return(
+const RentalCard = ({ rental, expanded, onToggle, onCopy, onExtend, onFetchInbox, getRemainingTime, t }: { rental: Rental; expanded: boolean; onToggle: () => void; onCopy: (t: string) => void; onExtend: (id: string) => void; onFetchInbox: (id: string) => Promise<Message[]>; getRemainingTime: (d: string) => string; t: (key: string) => string }) => {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(false)
+  const handleExpand = async () => { if (!expanded) { setLoading(true); setMessages(await onFetchInbox(rental.id)); setLoading(false) } onToggle() }
+  return (
     <Card className="p-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1"><img src={getServiceLogo(rental.service_code)} alt={`Service ${rental.service_code}`} className="w-10 h-10"/><div><div className="font-medium">{rental.phone}</div><div className="text-sm text-muted-foreground">{rental.service_code} • {rental.country_code}</div></div></div>
-        <div className="flex items-center gap-2"><div className="text-right mr-4"><div className="text-sm font-medium">{getRemainingTime(rental.end_date)}</div><div className="text-xs text-muted-foreground">${rental.price.toFixed(2)}</div></div><Button variant="outline" size="sm" onClick={()=>onCopy(rental.phone)}><Copy className="w-4 h-4"/></Button><Button variant="outline" size="sm" onClick={()=>onExtend(rental.id)}><Plus className="w-4 h-4"/></Button><Button variant="ghost" size="sm" onClick={handleExpand}>{expanded?<ChevronUp className="w-4 h-4"/>:<ChevronDown className="w-4 h-4"/>}</Button></div>
+        <div className="flex items-center gap-3 flex-1"><img src={getServiceLogo(rental.service_code)} alt={`Service ${rental.service_code}`} className="w-10 h-10" /><div><div className="font-medium">{rental.phone}</div><div className="text-sm text-muted-foreground">{rental.service_code} • {rental.country_code}</div></div></div>
+        <div className="flex items-center gap-2"><div className="text-right mr-4"><div className="text-sm font-medium">{getRemainingTime(rental.end_date)}</div><div className="text-xs text-muted-foreground">${rental.price.toFixed(2)}</div></div><Button variant="outline" size="sm" onClick={() => onCopy(rental.phone)}><Copy className="w-4 h-4" /></Button><Button variant="outline" size="sm" onClick={() => onExtend(rental.id)}><Plus className="w-4 h-4" /></Button><Button variant="ghost" size="sm" onClick={handleExpand}>{expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</Button></div>
       </div>
-      {expanded&&<div className="mt-4 pt-4 border-t space-y-3"><div className="flex justify-between mb-2"><h4 className="font-medium">{t('rent.smsInbox')} ({messages.length})</h4><Button variant="outline" size="sm" onClick={handleExpand} disabled={loading}><RefreshCw className={`w-3 h-3 ${loading?'animate-spin':''}`}/></Button></div>{loading?<div className="text-center py-4 text-muted-foreground">{t('rent.loading')}</div>:messages.length===0?<div className="text-center py-4 text-muted-foreground">{t('rent.noMessages')}</div>:<div className="space-y-2 max-h-64 overflow-y-auto">{messages.map((m,i)=><Card key={i} className="p-3"><div className="flex justify-between mb-1"><span className="text-xs text-muted-foreground">{m.service}</span><span className="text-xs text-muted-foreground">{new Date(m.date).toLocaleString()}</span></div><div className="text-sm">{m.text}</div>{m.code&&<div className="mt-2 flex items-center gap-2"><code className="bg-muted px-2 py-1 rounded text-sm font-mono">{m.code}</code><Button variant="ghost" size="sm" onClick={()=>onCopy(m.code!)}><Copy className="w-3 h-3"/></Button></div>}</Card>)}</div>}</div>}
+      {expanded && <div className="mt-4 pt-4 border-t space-y-3"><div className="flex justify-between mb-2"><h4 className="font-medium">{t('rent.smsInbox')} ({messages.length})</h4><Button variant="outline" size="sm" onClick={handleExpand} disabled={loading}><RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /></Button></div>{loading ? <div className="text-center py-4 text-muted-foreground">{t('rent.loading')}</div> : messages.length === 0 ? <div className="text-center py-4 text-muted-foreground">{t('rent.noMessages')}</div> : <div className="space-y-2 max-h-64 overflow-y-auto">{messages.map((m, i) => <Card key={i} className="p-3"><div className="flex justify-between mb-1"><span className="text-xs text-muted-foreground">{m.service}</span><span className="text-xs text-muted-foreground">{new Date(m.date).toLocaleString()}</span></div><div className="text-sm">{m.text}</div>{m.code && <div className="mt-2 flex items-center gap-2"><code className="bg-muted px-2 py-1 rounded text-sm font-mono">{m.code}</code><Button variant="ghost" size="sm" onClick={() => onCopy(m.code!)}><Copy className="w-3 h-3" /></Button></div>}</Card>)}</div>}</div>}
     </Card>
   )
 }

@@ -1,0 +1,55 @@
+[
+  {
+    "5sim": {
+      "whatsapp": {
+        "russia": 12,
+        "usa": 20,
+        "france": 25
+      },
+      "telegram": {
+        "russia": 10,
+        "usa": 18,
+        "france": 22
+      },
+      "instagram": {
+        "russia": 15,
+        "usa": 30,
+        "france": 35
+      },
+      "discord": {
+        "russia": 8,
+        "usa": 15,
+        "france": 18
+      },
+      "google": {
+        "usa": 50
+      }
+    },
+    "smsactivate": {
+      "whatsapp": {
+        "russia": 11,
+        "usa": 22,
+        "france": 26
+      },
+      "telegram": {
+        "russia": 9,
+        "usa": 19,
+        "france": 23
+      },
+      "instagram": {
+        "russia": 14,
+        "usa": 32,
+        "france": 36
+      },
+      "discord": {
+        "russia": 7,
+        "usa": 16,
+        "france": 19
+      },
+      "google": {
+        "usa": 55
+      }
+    },
+    "timestamp": "2025-12-16T10:59:42.994Z"
+  }
+]

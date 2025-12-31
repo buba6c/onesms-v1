@@ -3,7 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -139,24 +139,24 @@ serve(async (req) => {
 
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const authHeader = req.headers.get('Authorization') ?? ''
 
-    // User-scoped client (for auth) + admin client (bypasses RLS for writes)
-    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } }
-    })
-
+    // Admin client with SERVICE_ROLE_KEY for all operations (bypasses RLS)
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
     })
 
-    const {
-      data: { user },
-    } = await supabaseUser.auth.getUser()
+    // Extract and verify user from JWT token
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Unauthorized - No token provided')
+    }
+    
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
 
-    if (!user) {
+    if (authError || !user) {
+      console.error('❌ [BUY-RENT] Auth error:', authError?.message)
       throw new Error('Unauthorized')
     }
 
@@ -285,7 +285,7 @@ serve(async (req) => {
       duration: rentTime
     })
 
-    // 5. Create rental record (avec frozen_amount pour refléter le gel)
+    // 5. Create rental record (avec frozen_amount=0 initialement, sera mis à jour par secure_freeze_balance)
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from('rentals')
       .insert({
@@ -305,7 +305,7 @@ serve(async (req) => {
         duration_hours: rentTime, // Duplicate for compatibility
         provider: 'sms-activate',
         message_count: 0,
-        frozen_amount: price
+        frozen_amount: 0  // ✅ Sera mis à jour atomiquement par secure_freeze_balance
       })
       .select()
       .single()
@@ -336,7 +336,7 @@ serve(async (req) => {
       duration_hours: rental.duration_hours
     })
 
-    // 6. Freeze atomique via RPC (ledger + users + rental.frozen_amount)
+    // 6. ✅ Freeze atomique via secure_freeze_balance (vérifie available balance et fait ledger+update atomiquement)
     const { data: freezeResult, error: freezeError } = await supabaseAdmin.rpc('secure_freeze_balance', {
       p_user_id: userId,
       p_amount: price,
@@ -345,14 +345,19 @@ serve(async (req) => {
     })
 
     if (freezeError || !freezeResult?.success) {
-      // Rollback provider rent to avoid orphan number
+      console.error('❌ [BUY-RENT] secure_freeze_balance failed:', freezeError || freezeResult)
+      // Rollback: Cancel rent on SMS-Activate
       try {
         await fetch(`${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=setRentStatus&id=${rentId}&status=2`)
       } catch (e) {
         console.error('Failed to cancel rent on SMS-Activate after freeze failure:', e)
       }
-      throw new Error(`Failed to freeze balance: ${freezeError?.message || 'unknown error'}`)
+      // Delete the rental record we just created
+      await supabaseAdmin.from('rentals').delete().eq('id', rental.id)
+      throw new Error(freezeResult?.error || freezeError?.message || 'Failed to freeze balance')
     }
+    
+    console.log('✅ [BUY-RENT] Balance frozen via secure_freeze_balance:', freezeResult)
 
     const { error: transactionError } = await supabaseAdmin
       .from('transactions')

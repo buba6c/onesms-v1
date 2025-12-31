@@ -17,7 +17,7 @@ const corsHeaders = {
 const templates = {
   // Email de confirmation de recharge
   recharge_success: (data: { name: string; amount: number; balance: number; date: string }) => ({
-    subject: `Recharge de ${data.amount} credits confirmee - One SMS`,
+    subject: `Confirmation de votre transaction - ${data.amount} activations ajoutees`,
     html: `
 <!DOCTYPE html>
 <html>
@@ -46,21 +46,21 @@ const templates = {
     <div class="content">
       <span class="success-badge">✅ Recharge réussie</span>
       <p>Bonjour <strong>${data.name}</strong>,</p>
-      <p>Nous vous confirmons que votre recharge de credits sur la plateforme One SMS a été effectuée avec succès.</p>
-      <p>Vous pouvez maintenant utiliser vos credits pour acheter des numéros temporaires et recevoir des SMS de vérification.</p>
+      <p>Nous vous confirmons que votre transaction sur la plateforme One SMS a été traitée avec succès.</p>
+      <p>Vos activations sont maintenant disponibles dans votre compte.</p>
       
       <div class="amount-box">
-        <div style="font-size: 14px; opacity: 0.9;">Montant crédité</div>
+        <div style="font-size: 14px; opacity: 0.9;">Activations ajoutées</div>
         <div class="amount">+${data.amount}Ⓐ</div>
       </div>
       
       <div class="balance-info">
-        <strong>💰 Nouveau solde :</strong> ${data.balance}Ⓐ<br>
+        <strong>💰 Solde actuel :</strong> ${data.balance} activations<br>
         <strong>📅 Date :</strong> ${data.date}
       </div>
       
       <p style="text-align: center;">
-        <a href="https://onesms-sn.com/services" class="btn">Acheter des numéros →</a>
+        <a href="https://onesms-sn.com/dashboard" class="btn">Accéder à mon compte</a>
       </p>
     </div>
     <div class="footer">

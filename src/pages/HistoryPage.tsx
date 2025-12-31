@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { formatPhoneNumber } from '@/utils/phoneFormatter';
 import { useRealtimeActivations, useRealtimeRentals, useRealtimeTransactions } from '@/hooks/useRealtimeSubscription';
-import { 
+import {
   Copy,
   Clock,
   ChevronLeft,
@@ -27,7 +27,8 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   MessageSquare,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -43,6 +44,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Timer } from 'lucide-react';
 import { getServiceLogo, getServiceLogoFallback, getServiceIcon, getCountryFlag, getFlagEmoji } from '@/lib/logo-service';
 
 // Type pour les messages de rent
@@ -59,7 +68,7 @@ type RentMessagesCache = Record<string, RentMessage[]>;
 // Gestionnaire d'erreur pour les images - utilise fallback SVG
 const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode?: string) => {
   const target = e.target as HTMLImageElement
-  
+
   // Empêcher les multiples déclenchements et boucles infinies
   if (target.dataset.fallbackLoaded === 'true') {
     // Si le fallback échoue aussi, afficher l'emoji
@@ -70,7 +79,7 @@ const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>, serviceCode
     }
     return
   }
-  
+
   // Si on a un serviceCode, charger le fallback SVG
   if (serviceCode) {
     target.dataset.fallbackLoaded = 'true'
@@ -111,7 +120,7 @@ interface Rental {
   operator: string;
   total_cost: number;
   hourly_rate: number;
-  status: 'active' | 'completed' | 'cancelled';
+  status: 'active' | 'completed' | 'cancelled' | 'expired';
   message_count: number;
   created_at: string;
   end_date: string;
@@ -158,6 +167,30 @@ export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState<Tab>('orders');
   const [ordersPage, setOrdersPage] = useState(1);
   const [paymentsPage, setPaymentsPage] = useState(1);
+
+  // Helper pour extraire le nombre d'activations d'une transaction
+  const getTransactionActivations = (payment: Payment): number => {
+    // Priorité 1: activations explicites dans metadata
+    if (payment.metadata?.activations) return payment.metadata.activations;
+
+    // Priorité 2: Pour les anciennes transactions MoneyFusion où amount = activations
+    if (payment.metadata?.payment_provider === 'moneyfusion' && payment.amount && Math.abs(payment.amount) < 1000) {
+      return Math.abs(payment.amount);
+    }
+
+    // Priorité 3: Pour deposits/recharges, calculer depuis amount (1 activation ≈ 500 FCFA)
+    if (payment.type === 'deposit' && payment.amount > 0) {
+      return Math.round(payment.amount / 500);
+    }
+
+    // Pour les achats négatifs (purchase), c'est le nombre d'activations
+    if (payment.type === 'purchase' && payment.amount < 0) {
+      return Math.abs(payment.amount);
+    }
+
+    // Par défaut
+    return Math.abs(payment.amount);
+  };
   const itemsPerPage = 10;
 
   // State pour le modal des messages de rental
@@ -190,7 +223,7 @@ export default function HistoryPage() {
       }
     }
   });
-  
+
   useRealtimeRentals(user?.id);
   useRealtimeTransactions(user?.id);
 
@@ -338,17 +371,18 @@ export default function HistoryPage() {
     return elapsed >= 300; // 5 minutes = 300 secondes
   };
 
-  const cancelActivation = async (activationId: string, orderId: string) => {
+  const cancelActivation = async (activationId: string, orderId: string, provider?: string) => {
     try {
-      // console.log('🚫 [CANCEL] Starting cancellation for:', { activationId, orderId });
+      // console.log('🚫 [CANCEL] Starting cancellation for:', { activationId, orderId, provider });
 
-      // 1. Cancel via Edge Function (plus sécurisé)
-      const { data, error } = await cloudFunctions.invoke('cancel-sms-activate-order', {
-        body: { orderId: parseInt(orderId) }
+      // 1. Cancel via Edge Function - use provider-specific function
+      const cancelFunction = provider === '5sim' ? 'cancel-5sim-order' : 'cancel-sms-activate-order';
+      const { data, error } = await cloudFunctions.invoke(cancelFunction, {
+        body: { orderId: parseInt(orderId), activationId, userId: user?.id }
       });
 
       if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || '5sim cancellation failed');
+        throw new Error(data?.error || error?.message || `${provider || 'Provider'} cancellation failed`);
       }
 
       // console.log('✅ [CANCEL] 5sim cancellation successful');
@@ -356,7 +390,7 @@ export default function HistoryPage() {
       // 2. Update Supabase status
       const { error: updateError } = await (supabase
         .from('activations') as any)
-        .update({ 
+        .update({
           status: 'cancelled',
           charged: false
         })
@@ -387,6 +421,136 @@ export default function HistoryPage() {
       });
     }
   };
+
+  // Extend rental function with dialog
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [extendingRentalData, setExtendingRentalData] = useState<{ id: string; phone: string; service_code: string; rent_hours: number } | null>(null);
+  const [extensionHours, setExtensionHours] = useState<string>('4');
+  const [isExtending, setIsExtending] = useState(false);
+  const [extensionPrice, setExtensionPrice] = useState<number | null>(null);
+  const [extensionPriceLoading, setExtensionPriceLoading] = useState(false);
+  const [extensionError, setExtensionError] = useState<string | null>(null);
+  const [userCanAfford, setUserCanAfford] = useState(true);
+  const [maxHoursAvailable, setMaxHoursAvailable] = useState<number | null>(null);
+
+  // Fetch extension price when hours change
+  const fetchExtensionPrice = async (rentalId: string, hours: number) => {
+    setExtensionPriceLoading(true);
+    setExtensionError(null);
+    setExtensionPrice(null);
+
+    try {
+      const { data, error } = await cloudFunctions.invoke('get-rent-extension-price', {
+        body: { rentalId, userId: user?.id, hours }
+      });
+
+      // Handle blocked response (CHANNELS_LIMIT)
+      if (data?.blocked) {
+        setExtensionError(data.error || 'Prolongation temporairement indisponible');
+        setExtensionPriceLoading(false);
+        return;
+      }
+
+      // Handle MAX_HOURS_EXCEED response (success: false with maxHoursAvailable)
+      if (data?.maxHoursAvailable !== undefined) {
+        setMaxHoursAvailable(data.maxHoursAvailable);
+        if (data.maxHoursAvailable > 0) {
+          setExtensionError(`Maximum ${data.maxHoursAvailable}h disponibles`);
+          // Auto-select max available hours if current selection exceeds
+          if (hours > data.maxHoursAvailable) {
+            setExtensionHours(String(data.maxHoursAvailable));
+            // Retry with valid hours
+            fetchExtensionPrice(rentalId, data.maxHoursAvailable);
+            return;
+          }
+        } else {
+          setExtensionError('Cette location ne peut plus être prolongée');
+        }
+        setExtensionPriceLoading(false);
+        return;
+      }
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || 'Impossible d\'obtenir le prix');
+      }
+
+      setMaxHoursAvailable(null); // Reset if successful
+      setExtensionPrice(data.data.price);
+      setUserCanAfford(data.data.canAfford);
+    } catch (err: any) {
+      console.error('❌ [PRICE] Error:', err);
+      setExtensionError(err.message);
+    } finally {
+      setExtensionPriceLoading(false);
+    }
+  };
+
+  // Open dialog to choose duration
+  const handleExtendRental = (rentalId: string) => {
+    const rental = rentals?.find(r => r.id === rentalId);
+    if (!rental) return;
+    setExtendingRentalData({
+      id: rental.id,
+      phone: rental.phone,
+      service_code: rental.service_code,
+      rent_hours: rental.rent_hours || 4
+    });
+    const defaultHours = rental.rent_hours || 4;
+    setExtensionHours(String(defaultHours));
+    setExtensionPrice(null);
+    setExtensionError(null);
+    setExtendDialogOpen(true);
+    // Fetch price for default duration
+    fetchExtensionPrice(rental.id, defaultHours);
+  };
+
+  // Handle hours change
+  const handleExtensionHoursChange = (hours: string) => {
+    setExtensionHours(hours);
+    if (extendingRentalData) {
+      fetchExtensionPrice(extendingRentalData.id, parseInt(hours));
+    }
+  };
+
+  // Perform extension with selected duration
+  const performExtension = async () => {
+    if (!extendingRentalData || isExtending || !extensionPrice) return;
+    setIsExtending(true);
+
+    try {
+      const { data, error } = await cloudFunctions.invoke('continue-sms-activate-rent', {
+        body: { rentalId: extendingRentalData.id, userId: user?.id, hours: parseInt(extensionHours) }
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Failed to extend rental');
+      }
+
+      toast({
+        title: t('history.rentalExtended'),
+        description: `+${data.data?.hours || extensionHours}h • ${data.data?.price}Ⓐ • ${t('rent.newEnd')}: ${new Date(data.data?.end_date).toLocaleString()}`,
+      });
+
+      setExtendDialogOpen(false);
+      setExtendingRentalData(null);
+      setExtensionPrice(null);
+
+      // Refresh rentals on both History and Dashboard pages
+      await queryClient.invalidateQueries({ queryKey: ['rentals-history'] });
+      await queryClient.invalidateQueries({ queryKey: ['rentals'] }); // Also refresh Dashboard
+
+    } catch (error: any) {
+      console.error('❌ [EXTEND] Error:', error);
+      toast({
+        title: t('common.error'),
+        description: error?.message || t('history.extendFailed'),
+        variant: 'destructive'
+      });
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
 
   const checkActivationStatus = async (activationId: string) => {
     try {
@@ -419,6 +583,23 @@ export default function HistoryPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Format temps restant pour les rentals (avec jours si > 24h)
+  const formatRentalTimeRemaining = (seconds: number): string => {
+    if (seconds <= 0) return 'Expiré';
+    const totalHours = Math.floor(seconds / 3600);
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    const mins = Math.floor((seconds % 3600) / 60);
+
+    if (days > 0) {
+      return `${days}j ${hours}h ${mins}min`;
+    } else if (totalHours > 0) {
+      return `${hours}h ${mins}min`;
+    } else {
+      return `${mins} min`;
+    }
+  };
+
   const getTimeRemaining = (expiresAt: string): number => {
     const expires = new Date(expiresAt).getTime();
     const now = Date.now();
@@ -436,18 +617,18 @@ export default function HistoryPage() {
       }
       return item.status; // 'active', 'completed', 'cancelled', 'expired'
     }
-    
+
     // Pour les activations - statuts terminaux
     if (['received', 'timeout', 'cancelled', 'refunded', 'expired'].includes(item.status)) {
       return item.status;
     }
-    
+
     // Vérifier l'expiration en temps réel
     const timeRemaining = getTimeRemaining(item.expiresAt);
     if (timeRemaining <= 0 && (item.status === 'waiting' || item.status === 'pending')) {
       return 'timeout';
     }
-    
+
     return item.status === 'pending' ? 'waiting' : item.status;
   };
 
@@ -463,7 +644,7 @@ export default function HistoryPage() {
       'kk': 'KakaoTalk',
       'sg': 'Signal',
       'sk': 'Skype',
-      
+
       // Social
       'ig': 'Instagram',
       'fb': 'Facebook',
@@ -475,7 +656,7 @@ export default function HistoryPage() {
       'tn': 'LinkedIn',
       'ok': 'Odnoklassniki',
       'bnl': 'Reddit',
-      
+
       // Tech
       'go': 'Google',
       'mm': 'Microsoft',
@@ -485,7 +666,7 @@ export default function HistoryPage() {
       'pm': 'AOL',
       'zm': 'Zoom',
       'sl': 'Slack',
-      
+
       // Finance
       'ts': 'PayPal',
       'aon': 'Binance',
@@ -494,7 +675,7 @@ export default function HistoryPage() {
       'bo': 'Wise',
       'ti': 'Crypto.com',
       'nc': 'Payoneer',
-      
+
       // Shopping
       'am': 'Amazon',
       'hx': 'AliExpress',
@@ -503,12 +684,12 @@ export default function HistoryPage() {
       'ep': 'Temu',
       'dl': 'Lazada',
       'xt': 'Flipkart',
-      
+
       // Entertainment
       'nf': 'Netflix',
       'alj': 'Spotify',
       'hb': 'Twitch',
-      
+
       // Dating
       'oi': 'Tinder',
       'gr': 'Grindr',
@@ -516,7 +697,7 @@ export default function HistoryPage() {
       'qv': 'Badoo',
       'vz': 'Hinge',
       'df': 'Happn',
-      
+
       // Delivery
       'ub': 'Uber',
       'jg': 'Grab',
@@ -524,14 +705,14 @@ export default function HistoryPage() {
       'aq': 'Glovo',
       'nz': 'Foodpanda',
       'rr': 'Wolt',
-      
+
       // Gaming
       'mt': 'Steam',
       'aiw': 'Roblox',
       'blm': 'Epic Games',
       'bz': 'Blizzard',
       'ah': 'Tarkov',
-      
+
       // Legacy/full names
       'instagram': 'Instagram',
       'whatsapp': 'WhatsApp',
@@ -562,7 +743,7 @@ export default function HistoryPage() {
       'line': 'Line',
       'signal': 'Signal',
       'openai': 'OpenAI',
-      
+
       // Rent
       'full': 'Full Rent'
     };
@@ -647,7 +828,7 @@ export default function HistoryPage() {
       'ie': 'Irlande',
       'uz': 'Ouzbékistan',
       'kg': 'Kirghizistan',
-      
+
       // SMS-Activate numeric IDs
       '0': 'Russie',
       '1': 'Ukraine',
@@ -709,7 +890,7 @@ export default function HistoryPage() {
       '117': 'Portugal',
       '175': 'Australie',
       '187': 'États-Unis',
-      
+
       // Legacy names
       'russia': 'Russie',
       'ukraine': 'Ukraine',
@@ -786,26 +967,24 @@ export default function HistoryPage() {
       <div className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6">
           <h1 className="text-xl sm:text-3xl font-bold text-foreground text-center mb-4">{t('history.title')}</h1>
-          
+
           {/* Tabs - Full width on mobile */}
           <div className="flex gap-1 bg-muted p-1 rounded-lg max-w-xs mx-auto">
             <button
               onClick={() => setActiveTab('orders')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'orders'
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'orders'
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               {t('history.orders')}
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'payments'
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'payments'
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-              }`}
+                }`}
             >
               {t('history.payments')}
             </button>
@@ -838,70 +1017,409 @@ export default function HistoryPage() {
                   const timeRemaining = getTimeRemaining(item.expiresAt);
                   const isRental = item.type === 'rental';
                   const hasSms = !!item.smsCode;
-                  
+
                   return (
-                  <div
-                    key={item.id}
-                    className={`bg-card border rounded-xl p-3 sm:px-5 sm:py-4 hover:shadow-md transition-all ${
-                      isRental ? 'border-purple-200 dark:border-purple-800' : 'border-border'
-                    }`}>
-                    {/* Badge type rental */}
-                    {isRental && (
-                      <div className="flex items-center gap-1 mb-2">
-                        <Home className="w-3 h-3 text-purple-500" />
-                        <span className="text-xs font-medium text-purple-600 dark:text-purple-400">{t('history.rentalHours', { hours: item.durationHours })}</span>
-                      </div>
-                    )}
-                    {/* Mobile Layout */}
-                    <div className="flex flex-col sm:hidden gap-3">
-                      {/* Top row: Logo + Service + Price */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {/* Logo + Flag */}
-                          <div className="relative flex-shrink-0">
-                            <div className={`w-11 h-11 border rounded-xl flex items-center justify-center ${
-                              isRental ? 'bg-purple-50 border-purple-200' : 'bg-muted border-border'
-                            }`}>
-                              <img 
-                                src={getServiceLogo(item.serviceCode)}
-                                alt={item.serviceCode}
-                                className="w-6 h-6 object-contain"
-                                onError={(e) => handleImageError(e, item.serviceCode)}
-                              />
-                              <span className="text-base hidden items-center justify-center">{getServiceIcon(item.serviceCode)}</span>
+                    <div
+                      key={item.id}
+                      className={`bg-card border rounded-xl p-3 sm:px-5 sm:py-4 hover:shadow-md transition-all ${isRental ? 'border-purple-200 dark:border-purple-800' : 'border-border'
+                        }`}>
+                      {/* Badge type rental avec temps restant */}
+                      {isRental && (
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <Home className="w-3 h-3 text-purple-500" />
+                            <span className="text-xs font-medium text-purple-600 dark:text-purple-400">{t('history.rentalHours', { hours: item.durationHours })}</span>
+                          </div>
+                          {actualStatus === 'active' && timeRemaining > 0 && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                              <Clock className="w-3 h-3 text-purple-500" />
+                              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
+                                {formatRentalTimeRemaining(timeRemaining)}
+                              </span>
                             </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-background overflow-hidden bg-background shadow-md flex items-center justify-center">
-                              <img 
-                                src={getCountryFlag(item.countryCode)}
-                                alt={item.countryCode}
-                                className="w-full h-full object-cover"
-                                onError={(e) => handleImageError(e)}
-                              />
-                              <span className="text-xs hidden items-center justify-center">{getFlagEmoji(item.countryCode)}</span>
+                          )}
+                        </div>
+                      )}
+                      {/* Mobile Layout */}
+                      <div className="flex flex-col sm:hidden gap-3">
+                        {/* Top row: Logo + Service + Price */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {/* Logo + Flag */}
+                            <div className="relative flex-shrink-0">
+                              <div className={`w-11 h-11 border rounded-xl flex items-center justify-center ${isRental ? 'bg-purple-50 border-purple-200' : 'bg-muted border-border'
+                                }`}>
+                                <img
+                                  src={getServiceLogo(item.serviceCode)}
+                                  alt={item.serviceCode}
+                                  className="w-6 h-6 object-contain"
+                                  onError={(e) => handleImageError(e, item.serviceCode)}
+                                />
+                                <span className="text-base hidden items-center justify-center">{getServiceIcon(item.serviceCode)}</span>
+                              </div>
+                              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-background overflow-hidden bg-background shadow-md flex items-center justify-center">
+                                <img
+                                  src={getCountryFlag(item.countryCode)}
+                                  alt={item.countryCode}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => handleImageError(e)}
+                                />
+                                <span className="text-xs hidden items-center justify-center">{getFlagEmoji(item.countryCode)}</span>
+                              </div>
+                            </div>
+                            {/* Service Name */}
+                            <div>
+                              <p className="font-semibold text-sm text-foreground leading-tight">
+                                {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{getCountryName(item.countryCode)}</p>
                             </div>
                           </div>
-                          {/* Service Name */}
-                          <div>
-                            <p className="font-semibold text-sm text-foreground leading-tight">
-                              {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{getCountryName(item.countryCode)}</p>
+                          {/* Price + Menu */}
+                          <div className="flex items-center gap-2">
+                            <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full ${isRental ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}>
+                              <span className="text-xs font-semibold">{Math.floor(item.price)}</span>
+                              <span className="text-[10px] ml-0.5">Ⓐ</span>
+                            </div>
+                            {!isRental ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+                                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                  {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') && (
+                                    <DropdownMenuItem
+                                      onClick={() => checkActivationStatus(item.id)}
+                                      className="cursor-pointer text-sm"
+                                    >
+                                      <RefreshCw className="h-4 w-4 mr-2 text-blue-500" />
+                                      Vérifier SMS
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {hasSms && (
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                          ? item.smsCode.split(':')[1]
+                                          : item.smsCode || '';
+                                        copyToClipboard(cleanCode);
+                                      }}
+                                      className="cursor-pointer text-sm"
+                                    >
+                                      <Copy className="h-4 w-4 mr-2" />
+                                      Copier le code
+                                    </DropdownMenuItem>
+                                  )}
+
+                                  {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') ? (
+                                    canCancelActivation(item.expiresAt) ? (
+                                      <DropdownMenuItem
+                                        onClick={() => cancelActivation(item.id, item.orderId)}
+                                        className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
+                                      >
+                                        <XCircle className="h-4 w-4 mr-2" />
+                                        {t('dashboard.cancel')}
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem
+                                        disabled
+                                        className="cursor-not-allowed opacity-50 text-xs"
+                                      >
+                                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                                        <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
+                                      </DropdownMenuItem>
+                                    )
+                                  ) : null}
+
+                                  {(actualStatus === 'cancelled' || actualStatus === 'timeout') && (
+                                    <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
+                                      <X className="h-4 w-4 mr-2 text-gray-400" />
+                                      <span>{actualStatus === 'cancelled' ? t('history.cancelled') : t('history.timeout')}</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              // Placeholder bouton désactivé pour garder l'UI cohérente
+                              <button className="p-1.5 rounded-lg opacity-50 cursor-not-allowed" disabled>
+                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                              </button>
+                            )}
                           </div>
                         </div>
-                        {/* Price + Menu */}
+
+                        {/* Phone number row */}
                         <div className="flex items-center gap-2">
-                          <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full ${isRental ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}>
+                          <span className="font-mono text-sm font-semibold text-foreground bg-muted px-2.5 py-1 rounded flex-1">
+                            {formatPhoneNumber(item.phone)}
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(item.phone)}
+                            className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+                          >
+                            <Copy className="h-4 w-4 text-primary" />
+                          </button>
+                        </div>
+
+                        {/* Status / SMS Code row */}
+                        <div className="flex items-center justify-between">
+                          {isRental ? (
+                            /* RENTAL: Afficher messages ou status */
+                            actualStatus === 'active' || actualStatus === 'completed' ? (
+                              <div className="flex items-center gap-2 flex-1">
+                                <button
+                                  onClick={() => {
+                                    setSelectedRentalForMessages({
+                                      rentalId: item.orderId,
+                                      phone: item.phone,
+                                      service: item.serviceCode
+                                    });
+                                    loadRentalMessages(item.orderId);
+                                    setShowRentMessagesModal(true);
+                                  }}
+                                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 text-left active:scale-95 transition-transform"
+                                >
+                                  <span className="font-medium text-xs leading-relaxed block">
+                                    📨 {t('history.messagesReceived', { count: item.messageCount || 0 })}
+                                  </span>
+                                  <span className="text-[10px] opacity-70 flex items-center gap-1 mt-1">
+                                    {t('history.clickToView')}
+                                  </span>
+                                </button>
+                                {/* Extend button for active and completed rentals on mobile (per SMS-Activate API docs) */}
+                                {(actualStatus === 'active' || actualStatus === 'completed') && (
+                                  <button
+                                    onClick={() => handleExtendRental(item.id)}
+                                    disabled={isExtending && extendingRentalData?.id === item.id}
+                                    className="p-2 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/40 rounded-lg transition-colors disabled:opacity-50"
+                                    title={t('history.extendRental')}
+                                  >
+                                    {isExtending && extendingRentalData?.id === item.id ? (
+                                      <RefreshCw className="h-4 w-4 text-purple-600 animate-spin" />
+                                    ) : (
+                                      <Plus className="h-4 w-4 text-purple-600" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-red-600">
+                                <span className="text-xs">✕</span>
+                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
+                              </div>
+                            )
+                          ) : (
+                            /* ACTIVATION: Logique existante */
+                            actualStatus === 'received' && item.smsCode ? (
+                              <button
+                                onClick={() => {
+                                  const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                    ? item.smsCode.split(':')[1]
+                                    : item.smsCode || '';
+                                  copyToClipboard(cleanCode);
+                                }}
+                                className="bg-primary text-primary-foreground rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 mr-2 text-left active:scale-95 transition-transform"
+                              >
+                                <span className="font-medium text-xs leading-relaxed block">
+                                  {(() => {
+                                    const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                      ? item.smsCode.split(':')[1]
+                                      : item.smsCode;
+                                    return item.smsText && !item.smsText.includes('STATUS_OK:')
+                                      ? item.smsText
+                                      : `Code: ${cleanCode}`;
+                                  })()}
+                                </span>
+                                <span className="text-[10px] opacity-70 flex items-center gap-1 mt-1">
+                                  <Copy className="w-3 h-3" /> {t('dashboard.clickToCopy')}
+                                </span>
+                              </button>
+                            ) : actualStatus === 'waiting' ? (
+                              <div className="flex items-center gap-2 flex-1">
+                                <div className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin"></div>
+                                <span className="text-xs text-muted-foreground">{t('dashboard.waitingForSMS')}</span>
+                              </div>
+                            ) : actualStatus === 'timeout' ? (
+                              <div className="flex items-center gap-1.5 text-orange-600">
+                                <span className="text-xs">⏰</span>
+                                <span className="text-xs font-semibold">{t('history.timeout')}</span>
+                              </div>
+                            ) : actualStatus === 'cancelled' ? (
+                              <div className="flex items-center gap-1.5 text-red-600">
+                                <span className="text-xs">✕</span>
+                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{t('dashboard.noSMS')}</span>
+                            )
+                          )}
+
+                          {/* Timer - only when waiting (activation only) */}
+                          {!isRental && actualStatus === 'waiting' && (
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span className="text-xs font-semibold">{formatTime(timeRemaining)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden sm:flex items-center gap-3">
+                        {/* Logo + Flag (48px zone) */}
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-12 h-12 border rounded-xl flex items-center justify-center ${isRental ? 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-700' : 'bg-muted border-border'
+                            }`}>
+                            <img
+                              src={getServiceLogo(item.serviceCode)}
+                              alt={item.serviceCode}
+                              className="w-6 h-6 object-contain"
+                              onError={(e) => handleImageError(e, item.serviceCode)}
+                            />
+                            <span className="text-lg hidden items-center justify-center">{getServiceIcon(item.serviceCode)}</span>
+                          </div>
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-background overflow-hidden bg-background shadow-sm flex items-center justify-center">
+                            <img
+                              src={getCountryFlag(item.countryCode)}
+                              alt={item.countryCode}
+                              className="w-full h-full object-cover"
+                              onError={(e) => handleImageError(e)}
+                            />
+                            <span className="text-sm hidden items-center justify-center">{getFlagEmoji(item.countryCode)}</span>
+                          </div>
+                        </div>
+
+                        {/* Service + Country (130px) */}
+                        <div className="w-[130px] flex-shrink-0">
+                          <div className="flex items-center gap-1">
+                            <p className="font-semibold text-sm text-foreground leading-tight truncate">
+                              {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
+                            </p>
+                            {isRental && <Home className="w-3 h-3 text-purple-500 flex-shrink-0" />}
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-tight truncate">{getCountryName(item.countryCode)}</p>
+                        </div>
+
+                        {/* Phone number avec fond gris */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="font-mono text-sm font-semibold text-foreground bg-muted px-2 py-1 rounded">
+                            {formatPhoneNumber(item.phone)}
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(item.phone)}
+                            className="p-1 hover:bg-primary/10 rounded-md transition-colors"
+                            title="Copier le numéro"
+                          >
+                            <Copy className="h-4 w-4 text-primary" />
+                          </button>
+                        </div>
+
+                        {/* Flexible right section */}
+                        <div className="flex items-center gap-3 flex-1 justify-end min-w-0">
+                          {/* Status / SMS - zone flexible avec limite */}
+                          <div className="flex-1 min-w-0 max-w-[280px]">
+                            {/* Pour RENTAL: Afficher messages ou status */}
+                            {isRental ? (
+                              actualStatus === 'active' || actualStatus === 'completed' ? (
+                                <button
+                                  onClick={() => {
+                                    setSelectedRentalForMessages({
+                                      rentalId: item.orderId,
+                                      phone: item.phone,
+                                      service: item.serviceCode
+                                    });
+                                    loadRentalMessages(item.orderId);
+                                    setShowRentMessagesModal(true);
+                                  }}
+                                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl px-3 py-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all w-full text-left"
+                                >
+                                  <span className="font-medium text-xs leading-relaxed block truncate">
+                                    📨 {t('history.messagesReceivedShort', { count: item.messageCount || 0, hours: item.durationHours })}
+                                  </span>
+                                </button>
+                              ) : actualStatus === 'expired' ? (
+                                <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
+                                  <span className="text-sm">⏰</span>
+                                  <span className="text-xs font-semibold">{t('history.expired')}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+                                  <span className="text-sm">✕</span>
+                                  <span className="text-xs font-semibold">{t('history.cancelled')}</span>
+                                </div>
+                              )
+                            ) : actualStatus === 'received' && item.smsCode ? (
+                              <button
+                                onClick={() => {
+                                  const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                    ? item.smsCode.split(':')[1]
+                                    : item.smsCode || '';
+                                  copyToClipboard(cleanCode);
+                                }}
+                                className="bg-primary text-primary-foreground rounded-xl px-3 py-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all w-full text-left"
+                              >
+                                <span className="font-medium text-xs leading-relaxed block truncate">
+                                  {(() => {
+                                    const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                      ? item.smsCode.split(':')[1]
+                                      : item.smsCode;
+
+                                    return item.smsText && !item.smsText.includes('STATUS_OK:')
+                                      ? item.smsText
+                                      : `Code: ${cleanCode}`;
+                                  })()}
+                                </span>
+                                <span className="text-[10px] opacity-70 flex items-center gap-1 mt-0.5">
+                                  <Copy className="w-2.5 h-2.5" /> {t('history.copy')}
+                                </span>
+                              </button>
+                            ) : actualStatus === 'waiting' || actualStatus === 'pending' ? (
+                              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
+                                <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-500 rounded-full animate-spin flex-shrink-0"></div>
+                                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{t('dashboard.waitingForSMS')}</span>
+                              </div>
+                            ) : actualStatus === 'timeout' ? (
+                              <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
+                                <span className="text-sm">⏰</span>
+                                <span className="text-xs font-semibold">{t('history.timeout')}</span>
+                              </div>
+                            ) : actualStatus === 'cancelled' || actualStatus === 'refunded' ? (
+                              <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+                                <span className="text-sm">✕</span>
+                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{t('dashboard.noSMS')}</span>
+                            )}
+                          </div>
+
+                          {/* Timer (only when waiting) - Only for activations */}
+                          {!isRental && (actualStatus === 'waiting' || actualStatus === 'pending') && timeRemaining > 0 && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-lg flex-shrink-0">
+                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-xs font-semibold text-foreground">{formatTime(timeRemaining)}</span>
+                            </div>
+                          )}
+
+                          {/* Prix Badge */}
+                          <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full flex-shrink-0 ${isRental ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-muted text-muted-foreground'
+                            }`}>
                             <span className="text-xs font-semibold">{Math.floor(item.price)}</span>
                             <span className="text-[10px] ml-0.5">Ⓐ</span>
                           </div>
+
+                          {/* Menu dropdown - Aligné sur le comportement du dashboard (attente SMS) */}
                           {!isRental ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+                                <button className="p-1.5 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
                                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuContent align="end" sideOffset={5} className="w-44">
                                 {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') && (
                                   <DropdownMenuItem
                                     onClick={() => checkActivationStatus(item.id)}
@@ -915,8 +1433,8 @@ export default function HistoryPage() {
                                 {hasSms && (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      const cleanCode = item.smsCode?.includes('STATUS_OK:') 
-                                        ? item.smsCode.split(':')[1] 
+                                      const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                        ? item.smsCode.split(':')[1]
                                         : item.smsCode || '';
                                       copyToClipboard(cleanCode);
                                     }}
@@ -941,346 +1459,72 @@ export default function HistoryPage() {
                                       disabled
                                       className="cursor-not-allowed opacity-50 text-xs"
                                     >
-                                      <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                                      <Clock className="h-3.5 w-3.5 mr-2 text-gray-400" />
                                       <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
                                     </DropdownMenuItem>
                                   )
                                 ) : null}
 
                                 {(actualStatus === 'cancelled' || actualStatus === 'timeout') && (
-                                  <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
-                                    <X className="h-4 w-4 mr-2 text-gray-400" />
+                                  <DropdownMenuItem>
                                     <span>{actualStatus === 'cancelled' ? t('history.cancelled') : t('history.timeout')}</span>
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           ) : (
-                            // Placeholder bouton désactivé pour garder l'UI cohérente
-                            <button className="p-1.5 rounded-lg opacity-50 cursor-not-allowed" disabled>
-                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Phone number row */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-foreground bg-muted px-2.5 py-1 rounded flex-1">
-                          {formatPhoneNumber(item.phone)}
-                        </span>
-                        <button
-                          onClick={() => copyToClipboard(item.phone)}
-                          className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
-                        >
-                          <Copy className="h-4 w-4 text-primary" />
-                        </button>
-                      </div>
-                      
-                      {/* Status / SMS Code row */}
-                      <div className="flex items-center justify-between">
-                        {isRental ? (
-                          /* RENTAL: Afficher messages ou status */
-                          actualStatus === 'active' || actualStatus === 'completed' ? (
-                            <button
-                              onClick={() => {
-                                setSelectedRentalForMessages({
-                                  rentalId: item.orderId,
-                                  phone: item.phone,
-                                  service: item.serviceCode
-                                });
-                                loadRentalMessages(item.orderId);
-                                setShowRentMessagesModal(true);
-                              }}
-                              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 mr-2 text-left active:scale-95 transition-transform"
-                            >
-                              <span className="font-medium text-xs leading-relaxed block">
-                                📨 {t('history.messagesReceived', { count: item.messageCount || 0 })}
-                              </span>
-                              <span className="text-[10px] opacity-70 flex items-center gap-1 mt-1">
-                                {t('history.clickToView')}
-                              </span>
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-1.5 text-red-600">
-                              <span className="text-xs">✕</span>
-                              <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                            </div>
-                          )
-                        ) : (
-                          /* ACTIVATION: Logique existante */
-                          actualStatus === 'received' && item.smsCode ? (
-                          <button
-                            onClick={() => {
-                              const cleanCode = item.smsCode?.includes('STATUS_OK:') 
-                                ? item.smsCode.split(':')[1] 
-                                : item.smsCode || '';
-                              copyToClipboard(cleanCode);
-                            }}
-                            className="bg-primary text-primary-foreground rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 mr-2 text-left active:scale-95 transition-transform"
-                          >
-                            <span className="font-medium text-xs leading-relaxed block">
-                              {(() => {
-                                const cleanCode = item.smsCode?.includes('STATUS_OK:') 
-                                  ? item.smsCode.split(':')[1] 
-                                  : item.smsCode;
-                                return item.smsText && !item.smsText.includes('STATUS_OK:') 
-                                  ? item.smsText 
-                                  : `Code: ${cleanCode}`;
-                              })()}
-                            </span>
-                            <span className="text-[10px] opacity-70 flex items-center gap-1 mt-1">
-                              <Copy className="w-3 h-3" /> {t('dashboard.clickToCopy')}
-                            </span>
-                          </button>
-                        ) : actualStatus === 'waiting' ? (
-                          <div className="flex items-center gap-2 flex-1">
-                            <div className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin"></div>
-                            <span className="text-xs text-muted-foreground">{t('dashboard.waitingForSMS')}</span>
-                          </div>
-                        ) : actualStatus === 'timeout' ? (
-                          <div className="flex items-center gap-1.5 text-orange-600">
-                            <span className="text-xs">⏰</span>
-                            <span className="text-xs font-semibold">{t('history.timeout')}</span>
-                          </div>
-                        ) : actualStatus === 'cancelled' ? (
-                          <div className="flex items-center gap-1.5 text-red-600">
-                            <span className="text-xs">✕</span>
-                            <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{t('dashboard.noSMS')}</span>
-                        )
-                        )}
-                        
-                        {/* Timer - only when waiting (activation only) */}
-                        {!isRental && actualStatus === 'waiting' && (
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span className="text-xs font-semibold">{formatTime(timeRemaining)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                            // Menu pour les rentals
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1.5 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
+                                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" sideOffset={5} className="w-48">
+                                {/* Extend rental - for active and completed rentals (per SMS-Activate API docs) */}
+                                {(actualStatus === 'active' || actualStatus === 'completed') && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleExtendRental(item.id)}
+                                    disabled={isExtending && extendingRentalData?.id === item.id}
+                                    className="cursor-pointer text-sm"
+                                  >
+                                    {isExtending && extendingRentalData?.id === item.id ? (
+                                      <>
+                                        <RefreshCw className="h-4 w-4 mr-2 animate-spin text-purple-500" />
+                                        {t('common.loading')}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-4 w-4 mr-2 text-purple-500" />
+                                        {t('history.extendRental')}
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                )}
 
-                    {/* Desktop Layout */}
-                    <div className="hidden sm:flex items-center gap-3">
-                      {/* Logo + Flag (48px zone) */}
-                      <div className="relative flex-shrink-0">
-                        <div className={`w-12 h-12 border rounded-xl flex items-center justify-center ${
-                          isRental ? 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-700' : 'bg-muted border-border'
-                        }`}>
-                          <img 
-                            src={getServiceLogo(item.serviceCode)}
-                            alt={item.serviceCode}
-                            className="w-6 h-6 object-contain"
-                            onError={(e) => handleImageError(e, item.serviceCode)}
-                          />
-                          <span className="text-lg hidden items-center justify-center">{getServiceIcon(item.serviceCode)}</span>
-                        </div>
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-background overflow-hidden bg-background shadow-sm flex items-center justify-center">
-                          <img 
-                            src={getCountryFlag(item.countryCode)}
-                            alt={item.countryCode}
-                            className="w-full h-full object-cover"
-                            onError={(e) => handleImageError(e)}
-                          />
-                          <span className="text-sm hidden items-center justify-center">{getFlagEmoji(item.countryCode)}</span>
-                        </div>
-                      </div>
-
-                      {/* Service + Country (130px) */}
-                      <div className="w-[130px] flex-shrink-0">
-                        <div className="flex items-center gap-1">
-                          <p className="font-semibold text-sm text-foreground leading-tight truncate">
-                            {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
-                          </p>
-                          {isRental && <Home className="w-3 h-3 text-purple-500 flex-shrink-0" />}
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-tight truncate">{getCountryName(item.countryCode)}</p>
-                      </div>
-
-                      {/* Phone number avec fond gris */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="font-mono text-sm font-semibold text-foreground bg-muted px-2 py-1 rounded">
-                          {formatPhoneNumber(item.phone)}
-                        </span>
-                        <button
-                          onClick={() => copyToClipboard(item.phone)}
-                          className="p-1 hover:bg-primary/10 rounded-md transition-colors"
-                          title="Copier le numéro"
-                        >
-                          <Copy className="h-4 w-4 text-primary" />
-                        </button>
-                      </div>
-
-                      {/* Flexible right section */}
-                      <div className="flex items-center gap-3 flex-1 justify-end min-w-0">
-                        {/* Status / SMS - zone flexible avec limite */}
-                        <div className="flex-1 min-w-0 max-w-[280px]">
-                          {/* Pour RENTAL: Afficher messages ou status */}
-                          {isRental ? (
-                            actualStatus === 'active' || actualStatus === 'completed' ? (
-                              <button
-                                onClick={() => {
-                                  setSelectedRentalForMessages({
-                                    rentalId: item.orderId,
-                                    phone: item.phone,
-                                    service: item.serviceCode
-                                  });
-                                  loadRentalMessages(item.orderId);
-                                  setShowRentMessagesModal(true);
-                                }}
-                                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl px-3 py-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all w-full text-left"
-                              >
-                                <span className="font-medium text-xs leading-relaxed block truncate">
-                                  📨 {t('history.messagesReceivedShort', { count: item.messageCount || 0, hours: item.durationHours })}
-                                </span>
-                              </button>
-                            ) : actualStatus === 'expired' ? (
-                              <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
-                                <span className="text-sm">⏰</span>
-                                <span className="text-xs font-semibold">{t('history.expired')}</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-                                <span className="text-sm">✕</span>
-                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                              </div>
-                            )
-                          ) : actualStatus === 'received' && item.smsCode ? (
-                            <button
-                              onClick={() => {
-                                const cleanCode = item.smsCode?.includes('STATUS_OK:') 
-                                  ? item.smsCode.split(':')[1] 
-                                  : item.smsCode || '';
-                                copyToClipboard(cleanCode);
-                              }}
-                              className="bg-primary text-primary-foreground rounded-xl px-3 py-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all w-full text-left"
-                            >
-                              <span className="font-medium text-xs leading-relaxed block truncate">
-                                {(() => {
-                                  const cleanCode = item.smsCode?.includes('STATUS_OK:') 
-                                    ? item.smsCode.split(':')[1] 
-                                    : item.smsCode;
-                                  
-                                  return item.smsText && !item.smsText.includes('STATUS_OK:') 
-                                    ? item.smsText 
-                                    : `Code: ${cleanCode}`;
-                                })()}
-                              </span>
-                              <span className="text-[10px] opacity-70 flex items-center gap-1 mt-0.5">
-                                <Copy className="w-2.5 h-2.5" /> {t('history.copy')}
-                              </span>
-                            </button>
-                          ) : actualStatus === 'waiting' || actualStatus === 'pending' ? (
-                            <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
-                              <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-500 rounded-full animate-spin flex-shrink-0"></div>
-                              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{t('dashboard.waitingForSMS')}</span>
-                            </div>
-                          ) : actualStatus === 'timeout' ? (
-                            <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
-                              <span className="text-sm">⏰</span>
-                              <span className="text-xs font-semibold">{t('history.timeout')}</span>
-                            </div>
-                          ) : actualStatus === 'cancelled' || actualStatus === 'refunded' ? (
-                            <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-                              <span className="text-sm">✕</span>
-                              <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">{t('dashboard.noSMS')}</span>
-                          )}
-                        </div>
-
-                        {/* Timer (only when waiting) - Only for activations */}
-                        {!isRental && (actualStatus === 'waiting' || actualStatus === 'pending') && timeRemaining > 0 && (
-                          <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-lg flex-shrink-0">
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-xs font-semibold text-foreground">{formatTime(timeRemaining)}</span>
-                          </div>
-                        )}
-
-                        {/* Prix Badge */}
-                        <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full flex-shrink-0 ${
-                          isRental ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-muted text-muted-foreground'
-                        }`}>
-                          <span className="text-xs font-semibold">{Math.floor(item.price)}</span>
-                          <span className="text-[10px] ml-0.5">Ⓐ</span>
-                        </div>
-
-                        {/* Menu dropdown - Aligné sur le comportement du dashboard (attente SMS) */}
-                        {!isRental ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="p-1.5 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" sideOffset={5} className="w-44">
-                              {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') && (
+                                {/* Copy phone */}
                                 <DropdownMenuItem
-                                  onClick={() => checkActivationStatus(item.id)}
-                                  className="cursor-pointer text-sm"
-                                >
-                                  <RefreshCw className="h-4 w-4 mr-2 text-blue-500" />
-                                  Vérifier SMS
-                                </DropdownMenuItem>
-                              )}
-
-                              {hasSms && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    const cleanCode = item.smsCode?.includes('STATUS_OK:') 
-                                      ? item.smsCode.split(':')[1] 
-                                      : item.smsCode || '';
-                                    copyToClipboard(cleanCode);
-                                  }}
+                                  onClick={() => copyToClipboard(item.phone)}
                                   className="cursor-pointer text-sm"
                                 >
                                   <Copy className="h-4 w-4 mr-2" />
-                                  Copier le code
+                                  {t('common.copyNumber')}
                                 </DropdownMenuItem>
-                              )}
 
-                              {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') ? (
-                                canCancelActivation(item.expiresAt) ? (
-                                  <DropdownMenuItem
-                                    onClick={() => cancelActivation(item.id, item.orderId)}
-                                    className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer text-sm"
-                                  >
-                                    <XCircle className="h-4 w-4 mr-2" />
-                                    {t('dashboard.cancel')}
+                                {/* Status info for non-active */}
+                                {actualStatus !== 'active' && (
+                                  <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
+                                    <X className="h-4 w-4 mr-2 text-gray-400" />
+                                    <span>{actualStatus === 'expired' ? t('history.expired') : t('history.cancelled')}</span>
                                   </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    disabled
-                                    className="cursor-not-allowed opacity-50 text-xs"
-                                  >
-                                    <Clock className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                                    <span>{t('history.cancelIn', { minutes: Math.ceil((300 - getTimeElapsedSinceCreation(item.expiresAt)) / 60) })}</span>
-                                  </DropdownMenuItem>
-                                )
-                              ) : null}
-
-                              {(actualStatus === 'cancelled' || actualStatus === 'timeout') && (
-                                <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
-                                  <X className="h-4 w-4 mr-2 text-gray-400" />
-                                  <span>{actualStatus === 'cancelled' ? t('history.cancelled') : t('history.timeout')}</span>
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : (
-                          // Bouton désactivé pour garder l'alignement (même visuel que menu)
-                          <button className="p-1.5 rounded-lg opacity-50 cursor-not-allowed flex-shrink-0" disabled>
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                        )}
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
+                  );
                 })}
               </div>
             )}
@@ -1307,11 +1551,10 @@ export default function HistoryPage() {
                       <button
                         key={page}
                         onClick={() => setOrdersPage(page)}
-                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
-                          page === ordersPage
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${page === ordersPage
                             ? 'bg-primary text-primary-foreground'
                             : 'hover:bg-muted text-foreground'
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>
@@ -1366,7 +1609,7 @@ export default function HistoryPage() {
                       case 'bonus':
                         return <Gift className="w-5 h-5 text-yellow-600" />;
                       default:
-                        return payment.amount > 0 
+                        return payment.amount > 0
                           ? <ArrowUpCircle className="w-5 h-5 text-green-600" />
                           : <ArrowDownCircle className="w-5 h-5 text-red-600" />;
                     }
@@ -1428,9 +1671,8 @@ export default function HistoryPage() {
                       {/* Layout unifié Mobile + Desktop */}
                       <div className="flex items-start gap-3">
                         {/* Icône */}
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                          payment.amount > 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
-                        }`}>
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${payment.amount > 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+                          }`}>
                           {getTransactionIcon()}
                         </div>
 
@@ -1444,20 +1686,19 @@ export default function HistoryPage() {
                               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                                 {(payment.type === 'rent' || payment.type === 'rental')
                                   ? formatRentalLabel(
-                                      payment.description || payment.metadata?.service_code || 'rent',
-                                      payment.metadata?.rent_hours || payment.metadata?.duration_hours,
-                                      payment.metadata?.country_code
-                                    )
+                                    payment.description || payment.metadata?.service_code || 'rent',
+                                    payment.metadata?.rent_hours || payment.metadata?.duration_hours,
+                                    payment.metadata?.country_code
+                                  )
                                   : (payment.description || '-')}
                               </p>
                             </div>
-                            {/* Montant */}
-                            <div className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold ${
-                              payment.amount > 0
+                            {/* Montant en activations */}
+                            <div className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold ${payment.amount > 0
                                 ? 'bg-green-50 text-green-600 dark:bg-green-900/20'
                                 : 'bg-red-50 text-red-600 dark:bg-red-900/20'
-                            }`}>
-                              <span>{payment.amount > 0 ? '+' : ''}{Math.floor(payment.amount)}</span>
+                              }`}>
+                              <span>{payment.amount > 0 ? '+' : '-'}{getTransactionActivations(payment)}</span>
                               <span className="text-xs">Ⓐ</span>
                             </div>
                           </div>
@@ -1468,7 +1709,7 @@ export default function HistoryPage() {
                             <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor()}`}>
                               {getStatusLabel()}
                             </span>
-                            
+
                             {/* Date et heure */}
                             <span className="text-xs text-muted-foreground">
                               {new Date(payment.created_at).toLocaleDateString('fr-FR', {
@@ -1510,11 +1751,10 @@ export default function HistoryPage() {
                       <button
                         key={page}
                         onClick={() => setPaymentsPage(page)}
-                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${
-                          page === paymentsPage
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all ${page === paymentsPage
                             ? 'bg-primary text-primary-foreground'
                             : 'hover:bg-muted text-foreground'
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>
@@ -1552,7 +1792,7 @@ export default function HistoryPage() {
                   </p>
                 )}
               </div>
-              <button 
+              <button
                 onClick={() => setShowRentMessagesModal(false)}
                 className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
               >
@@ -1589,7 +1829,7 @@ export default function HistoryPage() {
                       break;
                     }
                   }
-                  
+
                   return (
                     <div key={index} className="bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm">
                       {/* Code Section */}
@@ -1607,10 +1847,10 @@ export default function HistoryPage() {
                           </div>
                         </div>
                       )}
-                      
+
                       {/* Message */}
                       <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{text}</p>
-                      
+
                       {/* Footer */}
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
                         <span className="text-xs text-gray-400">{msg.phoneFrom || 'SMS'}</span>
@@ -1633,14 +1873,95 @@ export default function HistoryPage() {
 
           {/* Footer */}
           <div className="p-4 border-t bg-white dark:bg-gray-900">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowRentMessagesModal(false)}
               className="w-full h-11 rounded-xl"
             >
               {t('history.rentMessages.close')}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extension Duration Dialog */}
+      <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Timer className="w-5 h-5" />
+              {t('rent.extendRental')}
+            </DialogTitle>
+            <DialogDescription>
+              {extendingRentalData && (
+                <span>{extendingRentalData.phone} • {extendingRentalData.service_code}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t('rent.extensionDuration')}</label>
+              <Select value={extensionHours} onValueChange={handleExtensionHoursChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('rent.selectDuration')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {[4, 8, 12, 24, 48, 72, 168].filter(h => !maxHoursAvailable || h <= maxHoursAvailable).map(h => (
+                    <SelectItem key={h} value={String(h)}>
+                      {h} {t('rent.hours')}{h === 24 ? ` (1 ${t('rent.day')})` : h === 48 ? ` (2 ${t('rent.days')})` : h === 72 ? ` (3 ${t('rent.days')})` : h === 168 ? ` (1 ${t('rent.week')})` : ''}
+                    </SelectItem>
+                  ))}
+                  {maxHoursAvailable && maxHoursAvailable > 0 && ![4, 8, 12, 24, 48, 72, 168].includes(maxHoursAvailable) && (
+                    <SelectItem value={String(maxHoursAvailable)}>
+                      {maxHoursAvailable} {t('rent.hours')} (max)
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {maxHoursAvailable !== null && maxHoursAvailable > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  ⚠️ Maximum disponible: {maxHoursAvailable}h
+                </p>
+              )}
+            </div>
+
+            {/* Price display */}
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">{t('rent.extensionPrice')}:</span>
+                {extensionPriceLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : extensionError ? (
+                  <span className="text-sm text-destructive">{t('common.error')}</span>
+                ) : extensionPrice !== null ? (
+                  <span className="text-lg font-bold text-primary">{extensionPrice} Ⓐ</span>
+                ) : (
+                  <span className="text-sm text-muted-foreground">--</span>
+                )}
+              </div>
+              {extensionError && (
+                <p className="text-xs text-destructive">{extensionError}</p>
+              )}
+              {!userCanAfford && extensionPrice !== null && (
+                <p className="text-xs text-destructive">{t('rent.insufficientBalance')}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtendDialogOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              onClick={performExtension}
+              disabled={isExtending || extensionPriceLoading || !extensionPrice || !userCanAfford}
+            >
+              {isExtending ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />{t('rent.extending')}</>
+              ) : (
+                <><Plus className="w-4 h-4 mr-2" />{t('rent.extend')} {extensionPrice ? `(${extensionPrice}Ⓐ)` : ''}</>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

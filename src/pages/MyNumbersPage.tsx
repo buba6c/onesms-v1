@@ -1,372 +1,307 @@
-import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, cloudFunctions } from '@/lib/supabase';
-import { useAuthStore } from '@/stores/authStore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { 
-  Phone, 
-  MessageSquare, 
-  Clock, 
-  CheckCircle, 
-  XCircle,
-  Copy,
-  RefreshCw,
-  Trash2,
-  Eye,
-  AlertCircle
-} from 'lucide-react';
-import { formatDate, formatCurrency, calculateTimeRemaining } from '@/lib/utils';
-import { formatPhoneNumber } from '@/utils/phoneFormatter';
-import { toast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '@/stores/authStore'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import { Loader2, RefreshCw, Smartphone, Clock, XCircle, Home, ShoppingCart, MessageSquare, Copy, CheckCircle2, ChevronRight, Phone } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
+import { getServiceLogo, getCountryFlag, getFlagEmoji } from '@/lib/logo-service'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatDate, calculateTimeRemaining } from '@/lib/utils'
 
-interface VirtualNumber {
-  id: string;
-  provider_id: string;
-  phone_number: string;
-  country: string;
-  operator: string;
-  service: string;
-  status: string;
-  purchase_type: string;
-  cost: number;
-  created_at: string;
-  expires_at: string;
-  sms?: Array<{
-    id: string;
-    sender: string;
-    text: string;
-    code: string | null;
-    created_at: string;
-  }>;
+// Reuse interfaces from HistoryPage mostly
+interface Activation {
+  id: string
+  order_id: string
+  phone: string
+  service_code: string
+  country_code: string
+  price: number
+  status: 'pending' | 'waiting' | 'received' | 'timeout' | 'cancelled' | 'refunded' | 'expired' | 'completed'
+  sms_code?: string
+  sms_text?: string
+  created_at: string
+  expires_at: string
+  type: 'activation'
 }
 
+interface Rental {
+  id: string
+  rent_id: string
+  phone: string
+  service_code: string
+  country_code: string
+  total_cost: number
+  status: 'active' | 'completed' | 'cancelled' | 'expired'
+  message_count: number
+  created_at: string
+  end_date: string
+  type: 'rental'
+}
+
+type NumberItem = Activation | Rental
+
 export default function MyNumbersPage() {
-  const { t } = useTranslation();
-  const { user } = useAuthStore();
-  const queryClient = useQueryClient();
-  const [selectedNumber, setSelectedNumber] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { t } = useTranslation()
+  const { user } = useAuthStore()
+  const { toast } = useToast()
 
-  // 🔴 REALTIME: Écoute les changements sur virtual_numbers en temps réel
-  useRealtimeSubscription({
-    table: 'virtual_numbers',
-    filter: user?.id ? `user_id=eq.${user.id}` : undefined,
-    enabled: !!user?.id,
-    queryKeys: [['virtual-numbers', user?.id]],
-    onUpdate: (payload) => {
-      const newData = payload.new as any;
-      if (newData?.sms && newData.sms.length > 0) {
-        toast({
-          title: '📱 Nouveau SMS !',
-          description: `Message reçu sur ${newData.phone_number}`,
-          duration: 5000,
-        });
-      }
-    }
-  });
-
-  // Fetch user's virtual numbers
-  const { data: numbers, isLoading } = useQuery<VirtualNumber[]>({
-    queryKey: ['virtual-numbers', user?.id],
+  // Queries
+  const { data: activations = [], isLoading: loadingActivations, refetch: refetchActivations } = useQuery({
+    queryKey: ['my-numbers-activations', user?.id],
     queryFn: async () => {
-      if (!user?.id) throw new Error('User not authenticated');
-
+      if (!user?.id) return []
       const { data, error } = await supabase
-        .from('virtual_numbers')
-        .select(`
-          *,
-          sms:sms_received(
-            id,
-            sender,
-            text,
-            code,
-            created_at
-          )
-        `)
+        .from('activations')
+        .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
-      if (error) throw error;
-      return data as VirtualNumber[];
+      if (error) throw error
+      return (data || []).map(a => ({ ...a, type: 'activation' as const }))
     },
-    enabled: !!user?.id,
-    // Polling désactivé - realtime activé
-    refetchInterval: false,
-  });
+    enabled: !!user
+  })
 
-  // Cancel/Delete number mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (numberId: string) => {
-      const number = numbers?.find(n => n.id === numberId);
-      if (!number) throw new Error('Number not found');
+  const { data: rentals = [], isLoading: loadingRentals, refetch: refetchRentals } = useQuery({
+    queryKey: ['my-numbers-rentals', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return []
+      const { data, error } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
 
-      // Cancel via SMS-Activate Edge Function if still active
-      if (number.status === 'active' || number.status === 'pending') {
-        try {
-          await cloudFunctions.invoke('cancel-sms-activate-order', {
-            body: { activationId: number.id, userId: user?.id }
-          });
-        } catch (error) {
-          console.error('Error canceling activation:', error);
-        }
-      }
-
-      // Delete from database
-      const { error } = await supabase
-        .from('virtual_numbers')
-        .delete()
-        .eq('id', numberId);
-
-      if (error) throw error;
+      if (error) throw error
+      return (data || []).map(r => ({ ...r, type: 'rental' as const }))
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['virtual-numbers'] });
-      toast({
-        title: t('toasts.deleted'),
-        description: t('toasts.deletedDesc'),
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: t('common.error'),
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
+    enabled: !!user
+  })
+
+  const loading = loadingActivations || loadingRentals
+
+  // Combine & Filter
+  const allNumbers = [...activations, ...rentals] as NumberItem[]
+
+  // Filter for "Active" numbers (Pending, Waiting, Received, Active)
+  const activeNumbers = allNumbers.filter(n => {
+    if (n.type === 'activation') {
+      return ['pending', 'waiting', 'received'].includes(n.status)
+    } else {
+      // Rental
+      return n.status === 'active'
+    }
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  const hasNumbers = activeNumbers.length > 0
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast({ title: t('common.copied'), description: text })
+  }
+
+  const handleRefresh = () => {
+    refetchActivations()
+    refetchRentals()
+    toast({ title: t('common.refreshed') })
+  }
+
+  // --- Render Helpers ---
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-      active: { label: t('status.active'), variant: 'default' },
-      pending: { label: t('status.pending'), variant: 'secondary' },
-      completed: { label: t('status.completed'), variant: 'outline' },
-      expired: { label: t('status.expired'), variant: 'destructive' },
-      cancelled: { label: t('status.cancelled'), variant: 'destructive' },
-    };
-    return config[status] || { label: status, variant: 'outline' };
-  };
-
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast({
-      title: t('toasts.copied'),
-      description: t('toasts.copiedNumber'),
-    });
-  };
-
-  const activeNumbers = numbers?.filter(n => n.status === 'active' || n.status === 'pending') || [];
-  const completedNumbers = numbers?.filter(n => n.status === 'completed') || [];
-  const expiredNumbers = numbers?.filter(n => n.status === 'expired' || n.status === 'cancelled') || [];
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8 pt-10 lg:pt-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-32 bg-gray-200 rounded"></div>
-          ))}
-        </div>
-      </div>
-    );
+    switch (status) {
+      case 'active':
+      case 'received':
+        return <Badge className="bg-green-500 hover:bg-green-600">Actif</Badge>
+      case 'pending':
+      case 'waiting':
+        return <Badge className="bg-amber-500 hover:bg-amber-600 animate-pulse">En attente</Badge>
+      default:
+        return <Badge variant="secondary">{status}</Badge>
+    }
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 pt-10 lg:pt-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto max-w-4xl pb-24 px-4 pt-6">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Mes Numéros</h1>
-          <p className="text-gray-600">Gérez vos numéros virtuels et consultez vos SMS</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('nav.myNumbers')}</h1>
+          <p className="text-sm text-gray-500 mt-1">Vos numéros temporaires et locations actifs</p>
         </div>
-        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['virtual-numbers'] })}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Actualiser
+        <Button variant="outline" size="icon" onClick={handleRefresh}>
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Actifs</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeNumbers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Complétés</CardTitle>
-            <MessageSquare className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{completedNumbers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Expirés</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{expiredNumbers.length}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Active Numbers */}
-      {activeNumbers.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Numéros Actifs</h2>
-          <div className="space-y-4">
-            {activeNumbers.map(number => (
-              <Card key={number.id} className="border-l-4 border-l-green-600">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl font-mono">{formatPhoneNumber(number.phone_number)}</CardTitle>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => copyToClipboard(number.phone_number, number.id)}
-                        >
-                          {copiedId === number.id ? 
-                            <CheckCircle className="h-4 w-4 text-green-600" /> : 
-                            <Copy className="h-4 w-4" />
-                          }
-                        </Button>
-                      </div>
-                      <CardDescription className="flex flex-wrap gap-2">
-                        <span className="capitalize">{number.country}</span>
-                        <span>•</span>
-                        <span className="capitalize">{number.service}</span>
-                        <span>•</span>
-                        <span>{formatDate(number.created_at)}</span>
-                      </CardDescription>
-                    </div>
-                    <Badge {...getStatusBadge(number.status)}>
-                      {getStatusBadge(number.status).label}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {/* SMS Display */}
-                  {number.sms && number.sms.length > 0 ? (
-                    <div className="space-y-2">
-                      {number.sms.map(sms => (
-                        <div key={sms.id} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <span className="text-sm font-medium text-green-800">De: {sms.sender}</span>
-                            <span className="text-xs text-green-600">{formatDate(sms.created_at)}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 mb-2">{sms.text}</p>
-                          {sms.code && (
-                            <div className="bg-white rounded px-3 py-2 inline-block">
-                              <span className="text-xs text-green-600 font-medium">Code: </span>
-                              <span className="text-lg font-mono font-bold text-green-800">{sms.code}</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                      <MessageSquare className="h-8 w-8 mx-auto mb-2 text-blue-600 animate-pulse" />
-                      <p className="text-sm text-blue-800">En attente du SMS...</p>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 mt-4">
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(number.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Supprimer
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-gray-500">Chargement de vos numéros...</p>
         </div>
-      )}
-
-      {/* Completed Numbers */}
-      {completedNumbers.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Numéros Complétés</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {completedNumbers.map(number => (
-              <Card key={number.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg font-mono">{formatPhoneNumber(number.phone_number)}</CardTitle>
-                      <CardDescription className="capitalize">
-                        {number.country} - {number.service}
-                      </CardDescription>
-                    </div>
-                    <Badge {...getStatusBadge(number.status)}>
-                      {getStatusBadge(number.status).label}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {number.sms?.length || 0} SMS reçu(s)
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedNumber(selectedNumber === number.id ? null : number.id)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    {selectedNumber === number.id ? 'Masquer' : 'Voir les SMS'}
-                  </Button>
-
-                  {selectedNumber === number.id && number.sms && (
-                    <div className="mt-4 space-y-2">
-                      {number.sms.map(sms => (
-                        <div key={sms.id} className="bg-gray-50 rounded p-3">
-                          <p className="text-xs text-gray-600 mb-1">{sms.sender} - {formatDate(sms.created_at)}</p>
-                          <p className="text-sm">{sms.text}</p>
-                          {sms.code && (
-                            <p className="text-sm font-mono font-bold text-blue-600 mt-1">Code: {sms.code}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+      ) : !hasNumbers ? (
+        <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-6 bg-gray-50 rounded-3xl border border-gray-100/50 dashed">
+          <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2">
+            <Smartphone className="w-8 h-8" />
           </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {numbers?.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Phone className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-xl font-bold mb-2">Aucun numéro</h3>
-            <p className="text-gray-600 mb-4">Vous n'avez pas encore acheté de numéro virtuel</p>
-            <Button onClick={() => window.location.href = '/catalog'}>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-gray-900">Aucun numéro actif</h3>
+            <p className="text-sm text-gray-500 max-w-xs mx-auto">
+              Vous n'avez aucun numéro en cours d'utilisation. Achetez un numéro pour commencer.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button className="rounded-xl" onClick={() => window.location.href = '/buy'}>
+              <ShoppingCart className="w-4 h-4 mr-2" />
               Acheter un numéro
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {activeNumbers.map((item) => (
+            <div key={`${item.type}-${item.id}`}>
+
+              {/* --- DESKTOP VIEW (Hidden on Mobile) --- */}
+              <Card className="hidden md:block p-0 overflow-hidden border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-all">
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Icon / Service Info */}
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <img
+                          src={getServiceLogo(item.service_code)}
+                          alt={item.service_code}
+                          className="w-12 h-12 rounded-xl object-contain bg-gray-50 p-1"
+                          onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.png'}
+                        />
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow-sm">
+                          <span className="text-xs">{getFlagEmoji(item.country_code)}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-lg tabular-nums tracking-tight text-gray-900">
+                            {item.phone}
+                          </h3>
+                          {getStatusBadge(item.status)}
+                        </div>
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">
+                          {item.type === 'rental' ? 'Location' : 'Activation'} • {item.service_code}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400" onClick={() => copyToClipboard(item.phone)}>
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* SMS Code Display (For Activations) */}
+                  {item.type === 'activation' && item.sms_code && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-100 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-green-700 font-bold uppercase">Code SMS</p>
+                          <p className="text-lg font-mono font-bold text-green-800 tracking-widest">{item.sms_code}</p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="ghost" className="text-green-700 hover:bg-green-100" onClick={() => copyToClipboard(item.sms_code!)}>
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Footer Info */}
+                  <div className="mt-4 flex items-center gap-4 text-xs text-gray-400 border-t pt-3">
+                    <div className="flex items-center gap-1.5 basis-1/2">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>
+                        {item.type === 'activation'
+                          ? `Expire: ${formatDate(item.expires_at)}`
+                          : `Fin: ${formatDate(item.end_date)}`
+                        }
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 basis-1/2 justify-end">
+                      <span className="font-medium text-gray-600">
+                        {item.type === 'rental' ? item.total_cost : item.price} Ⓐ
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+
+              {/* --- MOBILE VIEW (Visible only on Mobile) --- */}
+              <div className="md:hidden bg-white rounded-2xl p-4 shadow-sm border border-gray-100 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <img
+                        src={getServiceLogo(item.service_code)}
+                        alt={item.service_code}
+                        className="w-10 h-10 rounded-lg object-contain bg-gray-50 p-1"
+                        onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.png'}
+                      />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm text-[10px]">
+                        {getFlagEmoji(item.country_code)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-bold text-base text-gray-900 flex items-center gap-2">
+                        {item.phone}
+                      </div>
+                      <p className="text-[10px] text-gray-500 uppercase font-medium">{item.service_code}</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 -mr-2" onClick={() => copyToClipboard(item.phone)}>
+                    <Copy className="w-4 h-4 text-gray-400" />
+                  </Button>
+                </div>
+
+                {/* Status & Timer row */}
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2 mb-3">
+                  {getStatusBadge(item.status)}
+                  <div className="flex items-center text-xs text-gray-500 gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>
+                      {calculateTimeRemaining(item.type === 'activation' ? item.expires_at : item.end_date)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* SMS Code Section for Mobile */}
+                {item.type === 'activation' && item.sms_code ? (
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-3 flex flex-col items-center justify-center text-center gap-1 cursor-pointer active:scale-[0.98] transition-all" onClick={() => copyToClipboard(item.sms_code!)}>
+                    <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Votre Code</p>
+                    <p className="text-2xl font-mono font-black text-green-700 tracking-[0.2em]">{item.sms_code}</p>
+                    <p className="text-[10px] text-green-500/80">Tapez pour copier</p>
+                  </div>
+                ) : item.type === 'activation' && (
+                  <div className="bg-gray-50 border border-gray-100 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-xs">En attente du SMS...</span>
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+          ))}
+        </div>
       )}
     </div>
-  );
+  )
 }

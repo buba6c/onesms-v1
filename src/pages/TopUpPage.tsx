@@ -1,37 +1,50 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  Loader2, 
-  Sparkles, 
-  Shield, 
-  Zap,
+import {
+  Loader2,
   CheckCircle2,
-  ArrowRight,
-  Wallet,
-  Star,
+  Gift,
+  ChevronLeft,
+  Minus,
+  Plus,
   CreditCard,
-  Ticket,
+  ChevronRight,
+  Shield,
   X,
-  Gift
+  AlertCircle
 } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase, cloudFunctions } from '@/lib/supabase';
 import { packagesApi } from '@/lib/api/packages';
+import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
+import { ActivationPackage } from '@/lib/api/packages';
+
+interface PaymentProvider {
+  id: string;
+  provider_code: string;
+  provider_name: string;
+  is_active: boolean;
+  priority: number;
+  is_default: boolean;
+  config?: any;
+}
 
 export default function TopUpPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const { user } = useAuthStore();
   const { toast } = useToast();
-  
+
   // Promo code state
   const [promoCode, setPromoCode] = useState('');
+  const [showPromoInput, setShowPromoInput] = useState(false);
   const [promoResult, setPromoResult] = useState<{
     valid: boolean;
     discount_amount?: number;
@@ -42,8 +55,12 @@ export default function TopUpPage() {
   } | null>(null);
   const [validatingPromo, setValidatingPromo] = useState(false);
 
-  // Load packages from database
-  const { data: packages = [], isLoading: loadingPackages } = useQuery({
+  // Payment Dialog State
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+
+  // Load packages
+  const { data: packages = [], isLoading: loadingPackages } = useQuery<ActivationPackage[]>({
     queryKey: ['activation-packages'],
     queryFn: packagesApi.getActivePackages,
   });
@@ -58,7 +75,6 @@ export default function TopUpPage() {
           .select('value')
           .eq('key', 'promo_code_field_visible')
           .single();
-        
         return result.data?.value !== 'false';
       } catch {
         return true;
@@ -67,7 +83,21 @@ export default function TopUpPage() {
     staleTime: 60000,
   });
 
-  // Auto-select first popular package or first package
+  // Payment Providers
+  const { data: paymentProviders = [] } = useQuery<PaymentProvider[]>({
+    queryKey: ['payment-providers'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('payment_providers')
+        .select('*')
+        .eq('is_active', true)
+        .order('priority', { ascending: true });
+      return (data as any[]) || [];
+    },
+    staleTime: 60000,
+  });
+
+  // Auto-select package & provider
   useEffect(() => {
     if (packages.length > 0 && !selectedPackageId) {
       const popularPackage = packages.find(pkg => pkg.is_popular);
@@ -75,19 +105,23 @@ export default function TopUpPage() {
     }
   }, [packages, selectedPackageId]);
 
-  // Reset promo result when package changes
+  useEffect(() => {
+    if (paymentProviders.length > 0 && !selectedProvider) {
+      const defaultProvider = paymentProviders.find(p => p.is_default);
+      setSelectedProvider(defaultProvider?.provider_code || paymentProviders[0].provider_code);
+    }
+  }, [paymentProviders, selectedProvider]);
+
+  // Reset promo
   useEffect(() => {
     if (promoResult?.valid && promoCode) {
-      // Re-validate when package changes
       setPromoResult(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPackageId]);
 
-  // Validate promo code
+  // Validate promo
   const validatePromoCode = async () => {
     if (!promoCode.trim() || !user || !selectedPackageId) return;
-    
     const packageData = packages.find(pkg => pkg.id === selectedPackageId);
     if (!packageData) return;
 
@@ -98,82 +132,35 @@ export default function TopUpPage() {
         p_user_id: user.id,
         p_purchase_amount: packageData.activations
       });
-      
-      const { data, error } = result || {};
 
+      const { data, error } = result || {};
       if (error) throw error;
       if (data) {
         setPromoResult(data);
-        
-        if (data.valid) {
-          toast({
-            title: '🎉 Code promo appliqué !',
-            description: data.message,
-          });
-        }
+        if (data.valid) toast({ title: '🎉 Code valid !', description: data.message });
       }
     } catch (error: any) {
-      console.error('Promo validation error:', error);
-      setPromoResult({ valid: false, error: 'Erreur de validation' });
+      setPromoResult({ valid: false, error: 'Invalid code' });
     } finally {
       setValidatingPromo(false);
     }
   };
 
-  const clearPromoCode = () => {
-    setPromoCode('');
-    setPromoResult(null);
-  };
-
-  // Get active payment providers
-  const { data: paymentProviders = [] } = useQuery({
-    queryKey: ['payment-providers'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('payment_providers')
-        .select('*')
-        .eq('is_active', true)
-        .order('priority', { ascending: true });
-      return data || [];
-    },
-    staleTime: 60000,
-  });
-
-  const [selectedProvider, setSelectedProvider] = useState<string>('');
-
-  // Auto-select default provider
-  useEffect(() => {
-    if (paymentProviders.length > 0 && !selectedProvider) {
-      const defaultProvider = paymentProviders.find(p => p.is_default);
-      setSelectedProvider(defaultProvider?.provider_code || paymentProviders[0].provider_code);
-    }
-  }, [paymentProviders, selectedProvider]);
-
+  // Mutation
   const rechargeMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedPackageId) {
-        throw new Error('Veuillez sélectionner un montant');
-      }
-      if (!user) {
-        throw new Error('Vous devez être connecté pour recharger');
-      }
-
+      if (!selectedPackageId) throw new Error('Select a package');
+      if (!user) throw new Error('Login required');
       const packageData = packages.find(pkg => pkg.id === selectedPackageId);
-      if (!packageData) {
-        throw new Error('Package non trouvé');
-      }
+      if (!packageData) throw new Error('Package not found');
 
       const amount = packageData.price_xof;
-      
-      // Calculate bonus activations from promo code
       const bonusActivations = promoResult?.valid ? promoResult.discount_amount || 0 : 0;
       const totalActivations = packageData.activations + bonusActivations;
-      
-      // Payment return URLs
-      const returnUrl = window.location.hostname === 'localhost' 
+
+      const returnUrl = window.location.hostname === 'localhost'
         ? 'https://onesms-sn.com/dashboard?payment=success'
         : `${window.location.origin}/dashboard?payment=success`;
-
       const cancelUrl = window.location.hostname === 'localhost'
         ? 'http://localhost:5173/topup?payment=cancel'
         : `${window.location.origin}/topup?payment=cancel`;
@@ -189,30 +176,12 @@ export default function TopUpPage() {
         promo_code: promoResult?.valid ? promoCode.trim().toUpperCase() : null
       };
 
-      // Route to appropriate payment provider
       if (selectedProvider === 'wave') {
-        // Wave - Redirection simple vers page de paiement + upload de preuve
-        // Récupérer la config du provider
-        const { data: waveProvider } = await supabase
-          .from('payment_providers')
-          .select('config')
-          .eq('provider_code', 'wave')
-          .eq('is_active', true)
-          .single();
+        const { data: waveProvider } = await supabase.from('payment_providers').select('config').eq('provider_code', 'wave').single() as { data: { config: any } | null, error: any };
+        if (!waveProvider) throw new Error('Wave unavailable');
+        const waveUrl = waveProvider.config?.payment_link_template?.replace('{amount}', amount.toString());
+        if (!waveUrl) throw new Error('Wave config error');
 
-        if (!waveProvider) {
-          throw new Error('Wave non disponible. Contactez le support.');
-        }
-
-        const paymentLinkTemplate = waveProvider.config?.payment_link_template;
-        if (!paymentLinkTemplate) {
-          throw new Error('Configuration Wave invalide');
-        }
-
-        // Construire l'URL Wave avec le montant dynamique
-        const waveUrl = paymentLinkTemplate.replace('{amount}', amount.toString());
-        
-        // Rediriger vers la page de paiement avec les infos nécessaires
         const params = new URLSearchParams({
           amount: amount.toString(),
           activations: totalActivations.toString(),
@@ -220,397 +189,256 @@ export default function TopUpPage() {
           bonus_activations: bonusActivations.toString(),
           wave_url: waveUrl
         });
-        
-        return { 
-          redirect_url: `/wave-proof?${params.toString()}`,
-          isLocalRedirect: true 
-        };
+        return { redirect_url: `/wave-proof?${params.toString()}`, isLocalRedirect: true };
 
       } else if (selectedProvider === 'paydunya') {
-        // PayDunya payment
         const { data, error } = await cloudFunctions.invoke('paydunya-create-payment', {
           body: {
-            amount: amount,
-            userId: user.id,
-            email: user.email || '',
-            phone: user.user_metadata?.phone || '',
-            metadata: {
-              ...metadata,
-              description: `Rechargement ${totalActivations} activations ONE SMS${bonusActivations > 0 ? ` (dont ${bonusActivations} bonus)` : ''}`,
-              return_url: returnUrl,
-              cancel_url: cancelUrl
-            }
+            amount, userId: user.id, email: user.email, phone: user.user_metadata?.phone,
+            metadata: { ...metadata, description: `Topup ${totalActivations} ONE SMS`, return_url: returnUrl, cancel_url: cancelUrl }
           }
         });
+        if (error || !data?.payment_url) throw new Error(error?.message || 'Payment init failed');
+        return { redirect_url: data.payment_url };
 
-        if (error) throw new Error(error.message || t('common.error'));
-        
-        const paymentUrl = data?.payment_url;
-        if (!paymentUrl) throw new Error(t('topup.noPaymentUrl', 'Payment URL not received'));
-
-        return { redirect_url: paymentUrl };
-
+      } else if (selectedProvider === 'moneroo') {
+        const { data, error } = await cloudFunctions.invoke('init-moneroo-payment', {
+          body: {
+            amount, currency: 'XOF', description: `Topup ${totalActivations} ONE SMS`,
+            customer: { email: user.email, first_name: user.user_metadata?.first_name || 'Client', last_name: 'ONESMS', phone: user.user_metadata?.phone },
+            return_url: returnUrl,
+            metadata
+          }
+        });
+        if (error || !data?.data?.checkout_url) throw new Error(error?.message || 'Payment init failed');
+        return { redirect_url: data.data.checkout_url };
       } else {
-        // MoneyFusion payment (default)
         const { data, error } = await cloudFunctions.invoke('init-moneyfusion-payment', {
           body: {
-            amount: amount,
-            currency: 'XOF',
-            description: `Rechargement ${totalActivations} activations ONE SMS${bonusActivations > 0 ? ` (dont ${bonusActivations} bonus)` : ''}`,
-            metadata: {
-              ...metadata,
-              provider: 'moneyfusion'
-            },
-            return_url: returnUrl,
-            customer: {
-              email: user.email || '',
-              first_name: user.user_metadata?.first_name || 'Client',
-              last_name: user.user_metadata?.last_name || 'ONESMS',
-              phone: user.user_metadata?.phone || '00000000'
-            }
+            amount, currency: 'XOF', description: `Topup ${totalActivations} ONE SMS`,
+            metadata: { ...metadata, provider: 'moneyfusion' }, return_url: returnUrl,
+            customer: { email: user.email, first_name: 'Client', last_name: 'ONESMS', phone: '00000000' }
           }
         });
-
-        // console.log('🔍 [MONEYFUSION] Response:', data, error);
-
-        if (error) throw new Error(error.message || t('common.error'));
-        
-        const checkoutUrl = data?.data?.checkout_url || data?.checkout_url;
-        if (!checkoutUrl) throw new Error(t('topup.noPaymentUrl', 'Payment URL not received'));
-
-        return { redirect_url: checkoutUrl };
+        if (error || !data?.checkout_url && !data?.data?.checkout_url) throw new Error(error?.message || 'Payment init failed');
+        return { redirect_url: data.checkout_url || data.data.checkout_url };
       }
     },
-    onSuccess: (payment) => {
-      // Si c'est une redirection locale (Wave proof), utiliser navigate
-      if (payment.isLocalRedirect) {
-        window.location.href = payment.redirect_url;
-      } else {
-        window.location.href = payment.redirect_url;
+    onSuccess: (payment) => window.location.href = payment.redirect_url,
+    onError: (e) => toast({ title: 'Error', description: e.message, variant: 'destructive' })
+  });
+
+  // Check stock shortage mode
+  const { data: isStockShortage = false } = useQuery({
+    queryKey: ['stock-shortage-mode'],
+    queryFn: async () => {
+      try {
+        const result = await (supabase as any)
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'stock_shortage_mode')
+          .single();
+        return result.data?.value === 'true';
+      } catch {
+        return false;
       }
     },
-    onError: (error: any) => {
-      toast({
-        title: t('common.error'),
-        description: error.message || t('topup.paymentError', 'Payment error'),
-        variant: 'destructive',
-      });
-    }
+    staleTime: 30000,
   });
 
   const selectedPackageData = packages.find(pkg => pkg.id === selectedPackageId);
 
-  if (loadingPackages) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Stepper
+  const handleAmountStep = (dir: 'up' | 'down') => {
+    if (!selectedPackageId || packages.length === 0) return;
+    const idx = packages.findIndex(pkg => pkg.id === selectedPackageId);
+    let newIdx = dir === 'up' ? idx + 1 : idx - 1;
+    if (newIdx < 0) newIdx = 0;
+    if (newIdx >= packages.length) newIdx = packages.length - 1;
+    setSelectedPackageId(packages[newIdx].id);
+  };
+
+  const currentProvider = paymentProviders.find(p => p.provider_code === selectedProvider);
+
+  if (loadingPackages) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-cyan-50/30 pt-4 lg:pt-0">
-      <div className="container mx-auto px-4 py-6 max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-100 to-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold mb-3 shadow-sm">
-            <Wallet className="w-4 h-4" />
-            <span>Rechargement</span>
+    <div className="min-h-screen bg-slate-50 font-sans pb-32">
+
+      {/* Header with Brand Gradient */}
+      <div className="sticky top-0 z-20 overflow-hidden bg-slate-50">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 opacity-100 rounded-b-[2rem] shadow-lg shadow-blue-500/20" />
+
+        <div className="relative z-10 px-4 py-4 pt-4 pb-8">
+          <div className="flex items-center gap-3 text-white mb-6">
+            <Button variant="ghost" className="h-10 w-10 p-0 rounded-full hover:bg-white/10 text-white" onClick={() => navigate(-1)}>
+              <ChevronLeft className="w-6 h-6" />
+            </Button>
+            <h1 className="text-lg font-bold">{t('topUpPage.title', 'Top Up')}</h1>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-cyan-900 bg-clip-text text-transparent mb-2">
-            Acheter des Activations
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Choisissez un pack pour recevoir des SMS de vérification
-          </p>
-        </div>
 
-        {/* Packages Grid - Vertical Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-          {packages.map((pkg) => {
-            const isSelected = selectedPackageId === pkg.id;
-            const pricePerActivation = Math.round(pkg.price_xof / pkg.activations);
-            
-            return (
-              <Card
-                key={pkg.id}
-                className={`relative p-4 cursor-pointer transition-all duration-300 active:scale-[0.98] flex flex-col items-center text-center ${
-                  isSelected
-                    ? 'border-2 border-cyan-500 bg-gradient-to-br from-cyan-50 to-blue-50 shadow-xl shadow-cyan-500/20 ring-2 ring-cyan-500/30'
-                    : 'border border-gray-200 bg-white hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/10'
-                }`}
-                onClick={() => setSelectedPackageId(pkg.id)}
-              >
-                {/* Popular Badge */}
-                {pkg.is_popular && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-500 hover:to-amber-500 text-white text-[10px] px-2 py-0.5 shadow-lg shadow-orange-500/30">
-                      <Star className="w-2.5 h-2.5 mr-0.5" />
-                      Populaire
-                    </Badge>
-                  </div>
-                )}
-
-                {/* Selection indicator */}
-                {isSelected && (
-                  <div className="absolute top-2 right-2">
-                    <CheckCircle2 className="w-5 h-5 text-cyan-600" />
-                  </div>
-                )}
-
-                {/* Activations Count */}
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl mb-3 mt-2 transition-all duration-300 ${
-                  isSelected 
-                    ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/40' 
-                    : 'bg-gradient-to-br from-gray-100 to-gray-50 text-gray-700'
-                }`}>
-                  {pkg.activations}
-                </div>
-
-                {/* Label */}
-                <p className="font-semibold text-foreground text-sm mb-1">
-                  Activations
-                </p>
-
-                {/* Price per activation */}
-                <p className="text-[11px] text-muted-foreground mb-3">
-                  ~{pricePerActivation.toLocaleString()} F/unité
-                </p>
-
-                {/* Price */}
-                <div className={`w-full py-2 px-3 rounded-xl transition-all duration-300 ${
-                  isSelected 
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white' 
-                    : 'bg-gray-100'
-                }`}>
-                  <p className={`text-lg font-bold ${isSelected ? '' : 'text-gray-900'}`}>
-                    {pkg.price_xof.toLocaleString()}
-                  </p>
-                  <p className={`text-[10px] ${isSelected ? 'opacity-80' : 'text-gray-500'}`}>
-                    FCFA
-                  </p>
-                </div>
-
-                {/* Savings Badge */}
-                {pkg.savings_percentage > 0 && (
-                  <Badge variant="secondary" className="text-[10px] mt-2 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-0">
-                    <Sparkles className="w-2.5 h-2.5 mr-0.5" />
-                    -{pkg.savings_percentage}%
-                  </Badge>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Promo Code Section - Only show if enabled */}
-        {promoFieldVisible && (
-          <Card className="p-4 mb-4 border-dashed border-2 border-purple-200 bg-purple-50/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Ticket className="w-5 h-5 text-purple-600" />
-              <span className="font-semibold text-purple-900">Code promo</span>
+          {/* Main Display Amount */}
+          <div className="text-center text-white space-y-1">
+            <p className="text-blue-100 text-xs font-bold uppercase tracking-widest">{t('topUpPage.totalAmount', 'Total amount')}</p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-5xl font-black tracking-tight drop-shadow-sm">
+                {selectedPackageData?.price_xof.toLocaleString() || '0'}
+              </span>
+              <span className="text-lg font-bold text-blue-100 mt-3">FCFA</span>
             </div>
-            
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  value={promoCode}
-                  onChange={(e) => {
-                    setPromoCode(e.target.value.toUpperCase());
-                    if (promoResult) setPromoResult(null);
-                  }}
-                  placeholder="Entrez votre code"
-                  className={`font-mono uppercase ${
-                    promoResult?.valid 
-                      ? 'border-green-500 bg-green-50' 
-                      : promoResult?.error 
-                        ? 'border-red-500 bg-red-50' 
-                        : ''
-                  }`}
-                  disabled={validatingPromo}
-                />
-                {promoCode && (
-                  <button
-                    onClick={clearPromoCode}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+            {selectedPackageData?.savings_percentage > 0 && (
+              <div className="inline-block bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-white mt-2">
+                {t('topUpPage.save', 'Save')} {selectedPackageData.savings_percentage}%
               </div>
-              <Button
-                variant="outline"
-                onClick={validatePromoCode}
-                disabled={!promoCode.trim() || validatingPromo || !selectedPackageId}
-                className="border-purple-300 text-purple-700 hover:bg-purple-100"
-              >
-                {validatingPromo ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  'Appliquer'
-                )}
-              </Button>
-            </div>
+            )}
+          </div>
+        </div>
+      </div>
 
-            {/* Promo Result */}
-            {promoResult && (
-              <div className={`mt-3 p-3 rounded-lg flex items-center gap-2 ${
-                promoResult.valid 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {promoResult.valid ? (
-                  <>
-                    <Gift className="w-5 h-5 text-green-600" />
-                    <div>
-                      <span className="font-semibold">{promoResult.message}</span>
-                      <span className="ml-2 text-sm">
-                        (+{promoResult.discount_amount} activations bonus)
-                      </span>
+      <div className="px-4 -mt-6 relative z-10 max-w-lg mx-auto space-y-6">
+
+        {/* 1. Control Panel */}
+        <div className="bg-white rounded-[2rem] p-4 shadow-xl shadow-gray-200/60 border border-gray-100">
+
+          {/* Stepper */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-2 mb-6">
+            <button
+              onClick={() => handleAmountStep('down')}
+              className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-gray-600 active:scale-95 transition-all"
+            >
+              <Minus className="w-5 h-5" />
+            </button>
+            <div className="text-center">
+              <p className="text-sm font-black text-gray-900">{selectedPackageData?.activations} {t('topUpPage.credits', 'CREDITS')}</p>
+            </div>
+            <button
+              onClick={() => handleAmountStep('up')}
+              className="w-12 h-12 rounded-xl bg-blue-600 shadow-lg shadow-blue-500/30 flex items-center justify-center text-white active:scale-95 transition-all"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Package Pills */}
+          <div className="space-y-3">
+            <p className="text-center text-xs text-gray-400 font-bold uppercase tracking-widest">{t('topUpPage.quickSelect', 'Quick Select')}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {packages.map(pkg => (
+                <button
+                  key={pkg.id}
+                  onClick={() => setSelectedPackageId(pkg.id)}
+                  className={`relative p-4 rounded-2xl border transition-all text-left ${selectedPackageId === pkg.id
+                    ? 'bg-gradient-to-br from-blue-600 to-cyan-500 text-white border-blue-600 shadow-lg shadow-blue-500/20 scale-[1.02]'
+                    : 'bg-white text-gray-600 border-gray-100 hover:border-gray-200 shadow-sm'
+                    }`}
+                >
+                  {/* Popular Badge */}
+                  {pkg.is_popular && (
+                    <div className={`absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm ${selectedPackageId === pkg.id
+                      ? 'bg-white text-blue-600'
+                      : 'bg-blue-100 text-blue-600'
+                      }`}>
+                      Popular
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <X className="w-5 h-5" />
-                    <span>{promoResult.error}</span>
-                  </>
+                  )}
+
+                  <div className="flex flex-col gap-1">
+                    <span className={`text-2xl font-black ${selectedPackageId === pkg.id ? 'text-white' : 'text-gray-900'}`}>
+                      {pkg.activations} <span className="text-base">Ⓐ</span>
+                    </span>
+                    <span className={`text-xs font-medium ${selectedPackageId === pkg.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                      {pkg.price_xof.toLocaleString()} FCFA
+                    </span>
+                  </div>
+                  {selectedPackageId === pkg.id && (
+                    <div className="absolute top-2 right-2">
+                      <CheckCircle2 className="w-5 h-5 text-white" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* 2. Promo Code (Collapsible) */}
+        {promoFieldVisible && (
+          <div className="space-y-3">
+            {promoResult?.valid ? (
+              <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-4 text-white shadow-lg shadow-pink-500/20 flex justify-between items-center">
+                <div className="flex items-center gap-2 font-bold text-sm">
+                  <Gift className="w-4 h-4" />
+                  {t('topUpPage.codeApplied', 'Code Applied!')}
+                </div>
+                <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold backdrop-blur-md">
+                  +{promoResult.discount_amount} {t('topUpPage.bonus', 'Bonus')}
+                </span>
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                <button
+                  onClick={() => setShowPromoInput(!showPromoInput)}
+                  className="w-full flex items-center justify-between p-4 text-sm font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <span>{t('topUpPage.haveCode', 'Do you have a promo code?')}</span>
+                  <ChevronRight className={`w-4 h-4 transition-transform ${showPromoInput ? 'rotate-90' : ''}`} />
+                </button>
+
+                {showPromoInput && (
+                  <div className="p-4 pt-0 flex gap-2 animate-in slide-in-from-top-2">
+                    <Input
+                      className="bg-gray-50 border-gray-200 font-bold tracking-widest uppercase"
+                      placeholder={t('topUpPage.placeholderCode', 'CODE')}
+                      value={promoCode}
+                      onChange={e => setPromoCode(e.target.value)}
+                    />
+                    <Button onClick={validatePromoCode} disabled={validatingPromo} className="bg-gray-900 text-white">
+                      {validatingPromo ? <Loader2 className="w-4 h-4 animate-spin" /> : t('topUpPage.apply', 'APPLY')}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
-          </Card>
-        )}
-
-        {/* Payment Button */}
-        {selectedPackageData && (
-          <div className="sticky bottom-4 z-10">
-            <Card className="p-4 bg-gradient-to-r from-cyan-600 via-blue-600 to-blue-700 text-white shadow-2xl shadow-blue-500/30 border-0">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-sm opacity-90">Total à payer</p>
-                  <p className="text-2xl font-bold">
-                    {selectedPackageData.price_xof.toLocaleString()} FCFA
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm opacity-90">
-                    {promoResult?.valid 
-                      ? `${selectedPackageData.activations} + ${promoResult.discount_amount} bonus`
-                      : selectedPackageData.activations
-                    }
-                  </p>
-                  <p className="text-lg font-semibold">
-                    {promoResult?.valid 
-                      ? `${selectedPackageData.activations + (promoResult.discount_amount || 0)} Activations`
-                      : 'Activations'
-                    }
-                  </p>
-                </div>
-              </div>
-              
-              {/* Bonus highlight */}
-              {promoResult?.valid && (
-                <div className="flex items-center gap-2 mb-3 p-2 bg-white/20 rounded-lg">
-                  <Gift className="w-4 h-4" />
-                  <span className="text-sm font-medium">
-                    🎁 {promoResult.message} appliqué !
-                  </span>
-                </div>
-              )}
-
-              {/* Payment Provider Selection */}
-              {paymentProviders.length > 1 && (
-                <div className="mb-3">
-                  <p className="text-xs opacity-80 mb-2">Moyen de paiement</p>
-                  <div className="flex gap-2">
-                    {paymentProviders.map((provider) => (
-                      <button
-                        key={provider.provider_code}
-                        onClick={() => setSelectedProvider(provider.provider_code)}
-                        className={`flex-1 py-2 px-3 rounded-lg font-medium text-sm transition-all ${
-                          selectedProvider === provider.provider_code
-                            ? 'bg-white text-blue-700 shadow-md'
-                            : 'bg-white/20 text-white hover:bg-white/30'
-                        }`}
-                      >
-                        {provider.provider_name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <Button 
-                className="w-full h-12 bg-white text-blue-700 hover:bg-white/95 font-bold text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
-                onClick={() => rechargeMutation.mutate()}
-                disabled={!selectedPackageData || rechargeMutation.isPending}
-              >
-                {rechargeMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Traitement...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    Payer maintenant
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
-                )}
-              </Button>
-
-              <div className="flex items-center justify-center gap-2 mt-3 text-xs opacity-80">
-                <Shield className="w-3 h-3" />
-                <span>Paiement sécurisé via Mobile Money</span>
-              </div>
-            </Card>
           </div>
         )}
 
-        {/* Info Cards */}
-        <div className="space-y-3 mt-6 pb-24">
-          <Card className="p-4 border-cyan-200 bg-gradient-to-r from-cyan-50 to-blue-50">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/30">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Crédit instantané</p>
-                <p className="text-xs text-gray-600">
-                  Vos activations sont ajoutées immédiatement après le paiement.
-                </p>
-              </div>
-            </div>
-          </Card>
+        {/* Info Text */}
+        <div className="flex items-start gap-3 px-2 opacity-60">
+          <Shield className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-gray-500 leading-relaxed">
+            {t('topUpPage.securityInfo', 'Secure payment encrypted. Credits are added instantly to your account after verification.')}
+          </p>
+        </div>
 
-          <Card className="p-4 bg-white border-gray-200">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-green-500/30">
-                <Shield className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Paiement sécurisé</p>
-                <p className="text-xs text-gray-600">
-                  Orange Money, Wave, MTN Mobile Money, Moov Money
-                </p>
-              </div>
-            </div>
-          </Card>
+      </div>
 
-          <Card className="p-4 bg-white border-gray-200">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-orange-500/30">
-                <Sparkles className="w-5 h-5 text-white" />
+      {/* Footer Fixed */}
+      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-30">
+        <div className="max-w-lg mx-auto">
+          {isStockShortage ? (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-600" />
               </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">1 Activation = 1 Numéro</p>
-                <p className="text-xs text-gray-600">
-                  Recevez des codes SMS sur WhatsApp, Telegram, Instagram, TikTok et 1000+ services.
-                </p>
+              <div className="flex-1">
+                <p className="font-black text-gray-900">Recharge indisponible</p>
+                <p className="text-xs font-medium text-gray-500">Actuellement en rupture de stock de numéros.</p>
               </div>
             </div>
-          </Card>
+          ) : (
+            <Button
+              className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 text-white font-bold text-lg shadow-xl shadow-blue-500/30 active:scale-[0.98] transition-all"
+              onClick={() => rechargeMutation.mutate()}
+              disabled={rechargeMutation.isPending}
+            >
+              {rechargeMutation.isPending ? <Loader2 className="animate-spin" /> : t('topUpPage.confirmPay', 'Confirm & Pay')}
+            </Button>
+          )}
         </div>
       </div>
-    </div>
+
+    </div >
   );
 }

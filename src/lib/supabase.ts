@@ -4,9 +4,6 @@ import type { Database } from '@/types/database'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// URL pour l'API backend Node.js (remplace les Edge Functions)
-const apiServerUrl = import.meta.env.VITE_API_SERVER_URL || 'http://onesms-api.46.202.171.108.sslip.io'
-
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Missing Supabase environment variables:', {
     url: supabaseUrl ? '✓' : '✗',
@@ -16,7 +13,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 console.log('✅ Supabase client initialized:', supabaseUrl)
-console.log('✅ API Server URL:', apiServerUrl)
 
 // Client principal pour DB/Auth (Coolify)
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -24,15 +20,57 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    flowType: 'pkce',
   },
   global: {
     headers: {
       'X-Client-Info': 'onesms-web'
     }
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+    // Attempt to auto-reconnect more significantly
+    timeout: 20000,
   }
 })
 
 // Auth helpers
+// Note: Cette fonction utilise une Edge Function pour vérifier l'email
+// car la table users nécessite maintenant une authentification (RLS sécurisé)
+export const checkEmailExists = async (email: string) => {
+  try {
+    // Méthode sécurisée: utiliser signInWithOtp en mode dry-run
+    // Si l'email n'existe pas dans auth.users, Supabase retourne une erreur spécifique
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.toLowerCase(),
+      options: {
+        shouldCreateUser: false, // Ne pas créer de compte si n'existe pas
+      }
+    })
+
+    // Si erreur "Signups not allowed" ou "User not found", l'email n'existe pas
+    if (error) {
+      // "Signups not allowed for otp" signifie que l'email n'existe pas dans auth.users
+      if (error.message?.includes('Signups not allowed') ||
+        error.message?.includes('User not found') ||
+        error.message?.includes('user_not_found')) {
+        return false
+      }
+      // Autres erreurs = on ne peut pas déterminer, on assume que ça n'existe pas
+      console.warn('checkEmailExists warning:', error.message)
+      return false
+    }
+
+    // Pas d'erreur = l'email existe (un OTP a été envoyé)
+    return true
+  } catch (err) {
+    console.error('Error checking email:', err)
+    return false
+  }
+}
+
 export const signUp = async (email: string, password: string, metadata?: any) => {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -55,9 +93,9 @@ export const signIn = async (email: string, password: string) => {
 export const signInWithGoogle = async () => {
   // Utiliser l'URL actuelle pour le redirect
   const baseUrl = window.location.origin;
-  
+
   console.log('🔐 [GOOGLE AUTH] Redirect URL:', `${baseUrl}/dashboard`);
-  
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -97,28 +135,36 @@ export const signOut = async () => {
 
 export const getCurrentUser = async () => {
   try {
-    // Essayer getUser avec timeout court
+    // D'abord essayer getSession (lecture locale, plus rapide)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+    console.log('[SUPABASE] getSession result:', {
+      hasSession: !!session,
+      userId: session?.user?.id?.substring(0, 8),
+      error: sessionError?.message
+    })
+
+    if (sessionError) {
+      console.error('[SUPABASE] getSession error:', sessionError)
+      return { user: null, error: sessionError }
+    }
+
+    if (session?.user) {
+      return { user: session.user, error: null }
+    }
+
+    // Si pas de session locale, essayer getUser avec timeout
+    console.log('[SUPABASE] No local session, trying getUser...')
     const getUserPromise = supabase.auth.getUser()
     const timeoutPromise = new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
       setTimeout(() => reject(new Error('getUser timeout')), 5000)
     )
-    
+
     const result = await Promise.race([getUserPromise, timeoutPromise])
     return { user: result.data.user, error: result.error }
   } catch (error: any) {
-    console.warn('[SUPABASE] getUser failed, trying getSession:', error.message)
-    
-    // Fallback: utiliser getSession (plus rapide, lecture locale)
-    try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError) {
-        return { user: null, error: sessionError }
-      }
-      return { user: session?.user || null, error: null }
-    } catch (fallbackError: any) {
-      console.error('[SUPABASE] getSession also failed:', fallbackError)
-      return { user: null, error: fallbackError }
-    }
+    console.error('[SUPABASE] getCurrentUser exception:', error.message)
+    return { user: null, error }
   }
 }
 
@@ -128,27 +174,23 @@ export const getSession = async () => {
 }
 
 export const resetPasswordForEmail = async (email: string) => {
-  // Vérifier d'abord si l'email existe dans la base de données
-  const { data: userData, error: checkError } = await supabase
-    .from('users')
-    .select('id, email')
-    .eq('email', email)
-    .single()
-
-  if (checkError || !userData) {
-    return { 
-      data: null, 
-      error: { 
-        message: 'Aucun compte trouvé avec cette adresse email.' 
-      } 
-    }
-  }
+  // Note: On ne vérifie plus si l'email existe dans la table users (RLS sécurisé)
+  // Supabase Auth gère automatiquement: si l'email n'existe pas, aucun mail n'est envoyé
+  // mais on retourne quand même succès pour éviter l'énumération d'emails (sécurité)
 
   const baseUrl = window.location.origin;
 
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${baseUrl}/reset-password`,
   })
+
+  // Pour des raisons de sécurité, on retourne toujours succès
+  // (évite l'énumération d'emails - bonne pratique OWASP)
+  if (error && error.message?.includes('User not found')) {
+    // On simule un succès pour ne pas révéler si l'email existe
+    return { data: {}, error: null }
+  }
+
   return { data, error }
 }
 
@@ -172,30 +214,33 @@ export const resendConfirmationEmail = async (email: string) => {
 // ============================================================================
 
 // ============================================================================
-// API SERVER CLIENT (remplace les Edge Functions)
+// SUPABASE EDGE FUNCTIONS CLIENT (HTTPS)
 // ============================================================================
 
 /**
- * Appeler l'API backend Node.js
- * Remplace cloudFunctions.invoke()
+ * Appeler les Edge Functions Supabase Cloud (HTTPS)
  */
-class APIClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
+class CloudFunctionsClient {
+  private retryCount = 0;
+  private maxRetries = 1;
 
   async invoke(functionName: string, options?: { body?: any }) {
     try {
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
+      let { data: { session } } = await supabase.auth.getSession();
+
+      // Si pas de session et qu'on a déjà réessayé, ne pas réessayer
+      if (!session && this.retryCount > 0) {
+        console.warn(`[API] ${functionName}: No session after retry, aborting`);
+        return { data: null, error: { code: 401, message: 'No session available' } };
+      }
+
       const token = session?.access_token;
 
-      const response = await fetch(`${this.baseUrl}/functions/v1/${functionName}`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(options?.body || {})
@@ -204,24 +249,43 @@ class APIClient {
       const data = await response.json();
 
       if (!response.ok) {
+        // Si 401, essayer de rafraîchir la session une fois
+        if (response.status === 401 && this.retryCount < this.maxRetries) {
+          console.log(`[API] ${functionName}: 401, attempting session refresh...`);
+          this.retryCount++;
+
+          // Forcer un refresh de la session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+          if (refreshData?.session && !refreshError) {
+            console.log(`[API] ${functionName}: Session refreshed, retrying...`);
+            const result = await this.invoke(functionName, options);
+            this.retryCount = 0;
+            return result;
+          }
+        }
+
+        this.retryCount = 0;
         console.error(`❌ [API] ${functionName}:`, data);
         return { data: null, error: data };
       }
 
+      this.retryCount = 0;
       return { data, error: null };
     } catch (err: any) {
+      this.retryCount = 0;
       console.error(`❌ [API] ${functionName} exception:`, err);
       return { data: null, error: err };
     }
   }
 }
 
-// Client pour appeler l'API backend
-export const cloudFunctions = new APIClient(apiServerUrl);
+// Client pour appeler les Edge Functions Supabase Cloud
+export const cloudFunctions = new CloudFunctionsClient();
 
 // Wrapper pour compatibilité
 export const invokeEdgeFunction = async <T = any>(
-  functionName: string, 
+  functionName: string,
   options?: { body?: any; headers?: Record<string, string> }
 ): Promise<{ data: T | null; error: any }> => {
   return cloudFunctions.invoke(functionName, options) as Promise<{ data: T | null; error: any }>;

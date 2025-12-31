@@ -62,13 +62,25 @@ serve(async (req) => {
 
     const providers: ProviderStatus[] = []
 
-    // Check SMS-Activate
-    const smsActivateKey = Deno.env.get('SMS_ACTIVATE_API_KEY')
+    // Check SMS-Activate (HeroSMS)
+    // Try DB first, then fallback to env var
+    let smsActivateKey = Deno.env.get('SMS_ACTIVATE_API_KEY')
+
+    const { data: smsActivateSetting } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'sms_activate_api_key')
+      .single()
+
+    if (smsActivateSetting?.value) {
+      smsActivateKey = smsActivateSetting.value
+    }
+
     if (smsActivateKey) {
       try {
         const startTime = Date.now()
         const response = await fetch(
-          `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${smsActivateKey}&action=getBalance`,
+          `https://hero-sms.com/stubs/handler_api.php?api_key=${smsActivateKey}&action=getBalance`,
           { signal: AbortSignal.timeout(5000) }
         )
         const responseTime = Date.now() - startTime
@@ -76,7 +88,7 @@ serve(async (req) => {
 
         if (text.startsWith('ACCESS_BALANCE:')) {
           const balance = parseFloat(text.split(':')[1])
-          
+
           // Get today's purchases
           const today = new Date()
           today.setHours(0, 0, 0, 0)
@@ -91,7 +103,7 @@ serve(async (req) => {
             status: 'active',
             balance,
             currency: 'RUB',
-            apiUrl: 'https://api.sms-activate.ae',
+            apiUrl: 'https://hero-sms.com',
             lastCheck: new Date().toISOString(),
             stats: {
               todayPurchases: purchases?.length || 0,
@@ -108,15 +120,38 @@ serve(async (req) => {
           status: 'error',
           balance: 0,
           currency: 'RUB',
-          apiUrl: 'https://api.sms-activate.ae',
+          apiUrl: 'https://hero-sms.com',
           lastCheck: new Date().toISOString(),
           error: error.message
         })
       }
+    } else {
+      providers.push({
+        name: 'SMS-Activate',
+        status: 'inactive',
+        balance: 0,
+        currency: 'RUB',
+        apiUrl: 'https://hero-sms.com',
+        lastCheck: new Date().toISOString(),
+        error: 'API Key not configured'
+      })
     }
 
     // Check 5sim
-    const fivesimKey = Deno.env.get('FIVESIM_API_KEY')
+    // Try DB first, then fallback to env var
+    let fivesimKey = Deno.env.get('FIVESIM_API_KEY')
+
+    // Try to get from database settings
+    const { data: fivesimSetting } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', '5sim_api_key')
+      .single()
+
+    if (fivesimSetting?.value) {
+      fivesimKey = fivesimSetting.value
+    }
+
     if (fivesimKey) {
       try {
         const startTime = Date.now()
@@ -128,7 +163,7 @@ serve(async (req) => {
 
         if (response.ok) {
           const data = await response.json()
-          
+
           // Get today's purchases
           const today = new Date()
           today.setHours(0, 0, 0, 0)
@@ -165,6 +200,164 @@ serve(async (req) => {
           error: error.message
         })
       }
+    } else {
+      providers.push({
+        name: '5sim',
+        status: 'inactive',
+        balance: 0,
+        currency: 'RUB',
+        apiUrl: 'https://5sim.net',
+        lastCheck: new Date().toISOString(),
+        error: 'API Key not configured'
+      })
+    }
+
+    // Check SMSPVA
+    let smspvaKey = Deno.env.get('SMSPVA_API_KEY')
+
+    const { data: smspvaSetting } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'smspva_api_key')
+      .single()
+
+    if (smspvaSetting?.value) {
+      smspvaKey = smspvaSetting.value
+    }
+
+    if (smspvaKey) {
+      try {
+        const startTime = Date.now()
+        const response = await fetch(
+          `https://smspva.com/priemnik.php?metod=get_balance&service=opt4&apikey=${smspvaKey}`,
+          { signal: AbortSignal.timeout(5000) }
+        )
+        const responseTime = Date.now() - startTime
+        const data = await response.json()
+
+        if (data.response === '1' || data.response === 1) {
+          const balance = parseFloat(data.balance) || 0
+
+          // Get today's purchases
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const { data: purchases } = await supabaseClient
+            .from('activations')
+            .select('id')
+            .eq('provider', 'smspva')
+            .gte('created_at', today.toISOString())
+
+          providers.push({
+            name: 'SMSPVA',
+            status: 'active',
+            balance,
+            currency: 'USD',
+            apiUrl: 'https://smspva.com',
+            lastCheck: new Date().toISOString(),
+            stats: {
+              todayPurchases: purchases?.length || 0,
+              totalAvailable: 0,
+              avgResponseTime: responseTime
+            }
+          })
+        } else {
+          throw new Error(data.response || 'Unknown error')
+        }
+      } catch (error: any) {
+        providers.push({
+          name: 'SMSPVA',
+          status: 'error',
+          balance: 0,
+          currency: 'USD',
+          apiUrl: 'https://smspva.com',
+          lastCheck: new Date().toISOString(),
+          error: error.message
+        })
+      }
+    } else {
+      providers.push({
+        name: 'SMSPVA',
+        status: 'inactive',
+        balance: 0,
+        currency: 'USD',
+        apiUrl: 'https://smspva.com',
+        lastCheck: new Date().toISOString(),
+        error: 'API Key not configured'
+      })
+    }
+
+    // Check OnlineSIM
+    let onlinesimKey = Deno.env.get('ONLINESIM_API_KEY')
+
+    const { data: onlinesimSetting } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'onlinesim_api_key')
+      .single()
+
+    if (onlinesimSetting?.value) {
+      onlinesimKey = onlinesimSetting.value
+    }
+
+    if (onlinesimKey) {
+      try {
+        const startTime = Date.now()
+        const response = await fetch(
+          `https://onlinesim.io/api/getBalance.php?apikey=${onlinesimKey}`,
+          { signal: AbortSignal.timeout(5000) }
+        )
+        const responseTime = Date.now() - startTime
+        const data = await response.json()
+
+        if (data.response === 1 || data.response === '1') {
+          const balance = parseFloat(data.balance) || 0
+
+          // Get today's purchases
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          const { data: purchases } = await supabaseClient
+            .from('activations')
+            .select('id')
+            .eq('provider', 'onlinesim')
+            .gte('created_at', today.toISOString())
+
+          providers.push({
+            name: 'OnlineSIM',
+            status: 'active',
+            balance,
+            currency: 'USD',
+            apiUrl: 'https://onlinesim.io',
+            lastCheck: new Date().toISOString(),
+            stats: {
+              todayPurchases: purchases?.length || 0,
+              totalAvailable: 0,
+              avgResponseTime: responseTime
+            }
+          })
+        } else {
+          throw new Error(data.response || 'Unknown error')
+        }
+      } catch (error: any) {
+        providers.push({
+          name: 'OnlineSIM',
+          status: 'error',
+          balance: 0,
+          currency: 'USD',
+          apiUrl: 'https://onlinesim.io',
+          lastCheck: new Date().toISOString(),
+          error: error.message
+        })
+      }
+    } else {
+      providers.push({
+        name: 'OnlineSIM',
+        status: 'inactive',
+        balance: 0,
+        currency: 'USD',
+        apiUrl: 'https://onlinesim.io',
+        lastCheck: new Date().toISOString(),
+        error: 'API Key not configured'
+      })
     }
 
     // Log the check

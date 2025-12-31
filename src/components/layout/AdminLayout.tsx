@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
@@ -13,11 +13,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { t, i18n } = useTranslation()
   const location = useLocation()
   const { user, signOut } = useAuthStore()
+  const navigate = useNavigate()
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'fr' : 'en'
     i18n.changeLanguage(newLang)
     localStorage.setItem('language', newLang)
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      navigate('/login')
+    }
   }
 
   const menuItems = [
@@ -73,7 +84,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               {user && (
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">{user.email}</span>
-                  <Button variant="ghost" size="icon" onClick={signOut}>
+                  <Button variant="ghost" size="icon" onClick={handleSignOut}>
                     <LogOut className="h-5 w-5" />
                   </Button>
                 </div>
@@ -91,11 +102,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`block px-4 py-2 rounded-lg mb-1 ${
-                  location.pathname === item.path
-                    ? 'bg-primary text-white'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                className={`block px-4 py-2 rounded-lg mb-1 ${location.pathname === item.path
+                  ? 'bg-primary text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+                  }`}
               >
                 {item.label}
               </Link>

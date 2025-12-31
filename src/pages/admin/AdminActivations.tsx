@@ -152,16 +152,16 @@ export default function AdminActivations() {
       const pending = data.filter((a: any) => a.status === 'pending' || a.status === 'waiting').length;
       const cancelled = data.filter((a: any) => a.status === 'cancelled' || a.status === 'timeout').length;
       const refunded = data.filter((a: any) => a.status === 'refunded').length;
-      
+
       // ✅ Model A: Revenus = activations charged=true (fonds débloqués et consommés)
       const revenue = data
         .filter((a: any) => a.charged === true)
         .reduce((sum: number, a: any) => sum + (parseFloat(a.price) || 0), 0);
-      
+
       // 🔒 Total frozen (fonds actuellement gelés)
       const totalFrozen = data
         .reduce((sum: number, a: any) => sum + (parseFloat(a.frozen_amount) || 0), 0);
-      
+
       // Taux de succès
       const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -174,7 +174,7 @@ export default function AdminActivations() {
   const refundMutation = useMutation({
     mutationFn: async (activation: Activation) => {
       console.log('[AdminActivations] Refund starting for:', activation.id);
-      
+
       // Model A: Utiliser atomic_refund qui gère tout atomiquement
       // - Débloque frozen (frozen -= amount)
       // - Balance INCHANGÉ (Model A)
@@ -183,9 +183,11 @@ export default function AdminActivations() {
       const { data: refundResult, error: refundError } = await (supabase as any).rpc('atomic_refund', {
         p_user_id: activation.user_id,
         p_activation_id: activation.id,
+        p_rental_id: null,
+        p_transaction_id: null,
         p_reason: `Admin refund - ${activation.service_code} (${activation.phone})`
       });
-      
+
       if (refundError) {
         console.error('[AdminActivations] atomic_refund failed:', refundError);
         throw new Error(`Refund failed: ${refundError.message}`);
@@ -217,14 +219,14 @@ export default function AdminActivations() {
   // Filter activations avec date, charged, frozen
   const filteredActivations = activations.filter((a: Activation) => {
     const search = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       a.phone?.toLowerCase().includes(search) ||
       a.user?.email?.toLowerCase().includes(search) ||
       a.service_code?.toLowerCase().includes(search) ||
       a.country_code?.toLowerCase().includes(search) ||
       a.sms_code?.toLowerCase().includes(search);
     const matchesService = !serviceFilter || a.service_code?.toLowerCase().includes(serviceFilter.toLowerCase());
-    
+
     // Filtre par statut (inclut charged et frozen)
     let matchesStatus = true;
     if (statusFilter === 'charged') {
@@ -234,7 +236,7 @@ export default function AdminActivations() {
     } else if (statusFilter !== 'all') {
       matchesStatus = a.status === statusFilter;
     }
-    
+
     // Filtre par date
     let matchesDate = true;
     if (dateFilter !== 'all') {
@@ -250,7 +252,7 @@ export default function AdminActivations() {
         matchesDate = activationDate >= monthAgo;
       }
     }
-    
+
     return matchesSearch && matchesService && matchesDate && matchesStatus;
   });
 
@@ -336,7 +338,7 @@ export default function AdminActivations() {
   // Priorité: 1) Fonds gelés → 2) Remboursé (manuel ou auto) → 3) Facturé → 4) Bloqué → 5) Non facturé
   const getPaymentBadge = (activation: Activation) => {
     const frozenAmount = activation.frozen_amount || 0;
-    
+
     // 1. Si fonds encore gelés (en attente de résolution)
     if (frozenAmount > 0 && ['pending', 'waiting'].includes(activation.status)) {
       return (
@@ -346,7 +348,7 @@ export default function AdminActivations() {
         </Badge>
       );
     }
-    
+
     // 2. Si remboursé manuellement (status = 'refunded')
     if (activation.status === 'refunded') {
       return (
@@ -356,7 +358,7 @@ export default function AdminActivations() {
         </Badge>
       );
     }
-    
+
     // 3. Si facturé (activation réussie, fonds consommés)
     if (activation.charged === true || ['received', 'completed'].includes(activation.status)) {
       return (
@@ -366,7 +368,7 @@ export default function AdminActivations() {
         </Badge>
       );
     }
-    
+
     // 4. Si fonds encore gelés sur activation annulée/expirée (BUG: devrait être remboursé)
     if (frozenAmount > 0 && ['cancelled', 'timeout', 'no_numbers', 'expired'].includes(activation.status)) {
       return (
@@ -376,7 +378,7 @@ export default function AdminActivations() {
         </Badge>
       );
     }
-    
+
     // 5. Remboursé automatiquement (cancelled/timeout/expired avec frozen=0 et charged=false)
     // Ces activations ont été annulées et les fonds ont été retournés automatiquement
     if (['cancelled', 'timeout', 'no_numbers', 'expired'].includes(activation.status) && frozenAmount === 0) {
@@ -387,7 +389,7 @@ export default function AdminActivations() {
         </Badge>
       );
     }
-    
+
     // 6. Non facturé (cas par défaut - ne devrait pas arriver souvent)
     return (
       <Badge className="bg-gray-100 text-gray-600 flex items-center gap-1 w-fit">
@@ -401,27 +403,27 @@ export default function AdminActivations() {
   // Le bouton ne doit s'afficher QUE si des fonds sont réellement gelés à rembourser
   const canRefund = (activation: Activation): boolean => {
     const frozenAmount = activation.frozen_amount || 0;
-    
+
     // Jamais de bouton si déjà remboursé manuellement
     if (activation.status === 'refunded') return false;
-    
+
     // Jamais de bouton si déjà facturé (SMS reçu)
     if (activation.charged === true || ['received', 'completed'].includes(activation.status)) return false;
-    
+
     // Bouton uniquement si fonds gelés > 0 (il y a quelque chose à rembourser)
     if (frozenAmount > 0) return true;
-    
+
     // Si frozen_amount = 0 et status cancelled/timeout/expired → déjà remboursé auto, pas de bouton
     if (['cancelled', 'timeout', 'expired', 'no_numbers'].includes(activation.status) && frozenAmount === 0) {
       return false;
     }
-    
+
     // Cas spécial: pending/waiting sans frozen_amount (ancien système avant wallet atomique)
     // Permettre le remboursement manuel pour ces cas legacy
     if (['pending', 'waiting'].includes(activation.status)) {
       return true;
     }
-    
+
     return false;
   };
 
@@ -652,180 +654,181 @@ export default function AdminActivations() {
                   const timeStatus = getTimeStatus(activation);
                   const flagUrl = getCountryFlag(activation.country_code);
                   return (
-                  <React.Fragment key={activation.id}>
-                    <tr className={`hover:bg-gray-50 ${isExpired(activation) && activation.status === 'pending' ? 'bg-red-50' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <User className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <button 
-                              onClick={() => navigate(`/admin/users?search=${activation.user?.email}`)}
-                              className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1"
-                            >
-                              {activation.user?.email || 'N/A'}
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
-                            <p className="text-xs text-gray-500">{Math.floor(activation.user?.balance || 0)} Ⓐ</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="relative flex-shrink-0">
-                            <div className="w-10 h-10 border rounded-lg bg-gray-50 flex items-center justify-center">
-                              <img
-                                src={getServiceLogo(activation.service_code)}
-                                alt={activation.service_code}
-                                className="w-6 h-6 object-contain"
-                                onError={(e) => handleImageError(e, activation.service_code)}
-                              />
-                              <span className="text-sm hidden items-center justify-center">{getServiceIcon(activation.service_code)}</span>
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white overflow-hidden bg-white shadow-sm flex items-center justify-center">
-                              {flagUrl ? (
-                                <>
-                                  <img
-                                    src={flagUrl}
-                                    alt={activation.country_code}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => handleImageError(e)}
-                                  />
-                                  <span className="text-[10px] hidden items-center justify-center">{getFlagEmoji(activation.country_code)}</span>
-                                </>
-                              ) : (
-                                <span className="text-[10px] inline-flex items-center justify-center">{getFlagEmoji(activation.country_code)}</span>
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{activation.service_code}</p>
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
-                              <Globe className="w-3 h-3" />
-                              {activation.country_code}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <code className="text-sm bg-gray-100 px-2 py-1 rounded">{activation.phone}</code>
-                          <button onClick={() => copyToClipboard(activation.phone)} className="text-gray-400 hover:text-gray-600">
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-medium">{activation.price} Ⓐ</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {getStatusBadge(activation.status)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {getPaymentBadge(activation)}
-                      </td>
-                      <td className="px-4 py-3">
-                        {activation.sms_code ? (
+                    <React.Fragment key={activation.id}>
+                      <tr className={`hover:bg-gray-50 ${isExpired(activation) && activation.status === 'pending' ? 'bg-red-50' : ''}`}>
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <code className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded font-bold">
-                              {activation.sms_code}
-                            </code>
-                            <button onClick={() => copyToClipboard(activation.sms_code!)} className="text-gray-400 hover:text-gray-600">
-                              <Copy className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-xs text-gray-500">
-                          <p>{new Date(activation.created_at).toLocaleDateString('fr-FR')}</p>
-                          <p>{new Date(activation.created_at).toLocaleTimeString('fr-FR')}</p>
-                          {timeStatus && (
-                            <p className={`mt-1 flex items-center gap-1 ${timeStatus.expired ? 'text-red-500' : 'text-orange-500'}`}>
-                              <Timer className="w-3 h-3" />
-                              {timeStatus.text}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleRow(activation.id)}
-                          >
-                            {expandedRows.has(activation.id) ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </Button>
-                          {/* Bouton remboursement: vérifie via canRefund() */}
-                          {canRefund(activation) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => {
-                                setActivationToRefund(activation);
-                                setRefundDialogOpen(true);
-                              }}
-                              title={`Rembourser ${activation.frozen_amount || activation.price} Ⓐ`}
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {/* Expanded row with full details */}
-                    {expandedRows.has(activation.id) && (
-                      <tr className="bg-gray-50">
-                        <td colSpan={9} className="px-4 py-4">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-500 text-xs mb-1">ID Activation</p>
-                              <code className="text-xs bg-gray-200 px-2 py-1 rounded">{activation.id}</code>
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <User className="w-4 h-4 text-blue-600" />
                             </div>
                             <div>
-                              <p className="text-gray-500 text-xs mb-1">Order ID (Provider)</p>
-                              <code className="text-xs bg-gray-200 px-2 py-1 rounded">{activation.order_id}</code>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 text-xs mb-1">Opérateur</p>
-                              <p className="font-medium">{activation.operator || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-500 text-xs mb-1">Expiration</p>
-                              <p className="font-medium">{activation.expires_at ? new Date(activation.expires_at).toLocaleString('fr-FR') : 'N/A'}</p>
-                            </div>
-                            {activation.sms_text && (
-                              <div className="col-span-4">
-                                <p className="text-gray-500 text-xs mb-1">SMS Complet</p>
-                                <div className="bg-white border rounded-lg p-3 text-sm">
-                                  {activation.sms_text}
-                                </div>
-                              </div>
-                            )}
-                            <div className="col-span-4">
-                              <p className="text-gray-500 text-xs mb-1">Solde utilisateur actuel</p>
-                              <p className="font-medium">{Math.floor(activation.user?.balance || 0)} Ⓐ</p>
+                              <button
+                                onClick={() => navigate(`/admin/users?search=${activation.user?.email}`)}
+                                className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                {activation.user?.email || 'N/A'}
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                              <p className="text-xs text-gray-500">{Math.floor(activation.user?.balance || 0)} Ⓐ</p>
                             </div>
                           </div>
                         </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="relative flex-shrink-0">
+                              <div className="w-10 h-10 border rounded-lg bg-gray-50 flex items-center justify-center">
+                                <img
+                                  src={getServiceLogo(activation.service_code)}
+                                  alt={activation.service_code}
+                                  className="w-6 h-6 object-contain"
+                                  onError={(e) => handleImageError(e, activation.service_code)}
+                                />
+                                <span className="text-sm hidden items-center justify-center">{getServiceIcon(activation.service_code)}</span>
+                              </div>
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white overflow-hidden bg-white shadow-sm flex items-center justify-center">
+                                {flagUrl ? (
+                                  <>
+                                    <img
+                                      src={flagUrl}
+                                      alt={activation.country_code}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => handleImageError(e)}
+                                    />
+                                    <span className="text-[10px] hidden items-center justify-center">{getFlagEmoji(activation.country_code)}</span>
+                                  </>
+                                ) : (
+                                  <span className="text-[10px] inline-flex items-center justify-center">{getFlagEmoji(activation.country_code)}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{activation.service_code}</p>
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <Globe className="w-3 h-3" />
+                                {activation.country_code}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm bg-gray-100 px-2 py-1 rounded">{activation.phone}</code>
+                            <button onClick={() => copyToClipboard(activation.phone)} className="text-gray-400 hover:text-gray-600">
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm font-medium">{activation.price} Ⓐ</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {getStatusBadge(activation.status)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {getPaymentBadge(activation)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {activation.sms_code ? (
+                            <div className="flex items-center gap-2">
+                              <code className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded font-bold">
+                                {activation.sms_code}
+                              </code>
+                              <button onClick={() => copyToClipboard(activation.sms_code!)} className="text-gray-400 hover:text-gray-600">
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-xs text-gray-500">
+                            <p>{new Date(activation.created_at).toLocaleDateString('fr-FR')}</p>
+                            <p>{new Date(activation.created_at).toLocaleTimeString('fr-FR')}</p>
+                            {timeStatus && (
+                              <p className={`mt-1 flex items-center gap-1 ${timeStatus.expired ? 'text-red-500' : 'text-orange-500'}`}>
+                                <Timer className="w-3 h-3" />
+                                {timeStatus.text}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleRow(activation.id)}
+                            >
+                              {expandedRows.has(activation.id) ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )}
+                            </Button>
+                            {/* Bouton remboursement: vérifie via canRefund() */}
+                            {canRefund(activation) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => {
+                                  setActivationToRefund(activation);
+                                  setRefundDialogOpen(true);
+                                }}
+                                title={`Rembourser ${activation.frozen_amount || activation.price} Ⓐ`}
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                )})
+                      {/* Expanded row with full details */}
+                      {expandedRows.has(activation.id) && (
+                        <tr className="bg-gray-50">
+                          <td colSpan={9} className="px-4 py-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-gray-500 text-xs mb-1">ID Activation</p>
+                                <code className="text-xs bg-gray-200 px-2 py-1 rounded">{activation.id}</code>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 text-xs mb-1">Order ID (Provider)</p>
+                                <code className="text-xs bg-gray-200 px-2 py-1 rounded">{activation.order_id}</code>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 text-xs mb-1">Opérateur</p>
+                                <p className="font-medium">{activation.operator || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 text-xs mb-1">Expiration</p>
+                                <p className="font-medium">{activation.expires_at ? new Date(activation.expires_at).toLocaleString('fr-FR') : 'N/A'}</p>
+                              </div>
+                              {activation.sms_text && (
+                                <div className="col-span-4">
+                                  <p className="text-gray-500 text-xs mb-1">SMS Complet</p>
+                                  <div className="bg-white border rounded-lg p-3 text-sm">
+                                    {activation.sms_text}
+                                  </div>
+                                </div>
+                              )}
+                              <div className="col-span-4">
+                                <p className="text-gray-500 text-xs mb-1">Solde utilisateur actuel</p>
+                                <p className="font-medium">{Math.floor(activation.user?.balance || 0)} Ⓐ</p>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
-        
+
         {/* Footer avec pagination */}
         <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between">
           <div className="text-sm text-gray-500">
@@ -892,43 +895,43 @@ export default function AdminActivations() {
             const frozenAmount = activationToRefund.frozen_amount || 0;
             const refundAmount = frozenAmount > 0 ? frozenAmount : activationToRefund.price;
             return (
-            <div className="space-y-4 py-4">
-              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Utilisateur:</span>
-                  <span className="font-medium">{activationToRefund.user?.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Service:</span>
-                  <span className="font-medium">{activationToRefund.service_code}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Numéro:</span>
-                  <span className="font-medium">{activationToRefund.phone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Prix original:</span>
-                  <span className="font-medium">{activationToRefund.price} Ⓐ</span>
-                </div>
-                {frozenAmount > 0 && (
+              <div className="space-y-4 py-4">
+                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Fonds gelés:</span>
-                    <span className="font-medium text-orange-600">{frozenAmount} Ⓐ</span>
+                    <span className="text-gray-500">Utilisateur:</span>
+                    <span className="font-medium">{activationToRefund.user?.email}</span>
                   </div>
-                )}
-                <div className="flex justify-between border-t pt-2 mt-2">
-                  <span className="text-gray-700 font-medium">Montant à rembourser:</span>
-                  <span className="font-bold text-green-600">{refundAmount} Ⓐ</span>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Service:</span>
+                    <span className="font-medium">{activationToRefund.service_code}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Numéro:</span>
+                    <span className="font-medium">{activationToRefund.phone}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Prix original:</span>
+                    <span className="font-medium">{activationToRefund.price} Ⓐ</span>
+                  </div>
+                  {frozenAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Fonds gelés:</span>
+                      <span className="font-medium text-orange-600">{frozenAmount} Ⓐ</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t pt-2 mt-2">
+                    <span className="text-gray-700 font-medium">Montant à rembourser:</span>
+                    <span className="font-bold text-green-600">{refundAmount} Ⓐ</span>
+                  </div>
                 </div>
+                <p className="text-sm text-amber-600 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  {frozenAmount > 0
+                    ? `Cette action va dégeler et restituer ${refundAmount} Ⓐ au compte de l'utilisateur.`
+                    : `Cette action va créditer ${refundAmount} Ⓐ sur le compte de l'utilisateur.`
+                  }
+                </p>
               </div>
-              <p className="text-sm text-amber-600 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                {frozenAmount > 0 
-                  ? `Cette action va dégeler et restituer ${refundAmount} Ⓐ au compte de l'utilisateur.`
-                  : `Cette action va créditer ${refundAmount} Ⓐ sur le compte de l'utilisateur.`
-                }
-              </p>
-            </div>
             );
           })()}
           <DialogFooter>

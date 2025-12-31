@@ -14,11 +14,10 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'missing auth' }), { status: 401, headers: corsHeaders })
     }
 
@@ -29,12 +28,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'referral_code required' }), { status: 400, headers: corsHeaders })
     }
 
-    const supabaseAuth = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
     const supabaseAdmin = createClient(supabaseUrl, serviceKey)
 
-    const { data: userData, error: userError } = await supabaseAuth.auth.getUser()
+    // Verify user from JWT token using SERVICE_ROLE_KEY
+    const token = authHeader.replace('Bearer ', '')
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token)
     if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: corsHeaders })
     }

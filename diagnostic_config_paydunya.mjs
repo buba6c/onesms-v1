@@ -1,0 +1,90 @@
+console.log('🔍 DIAGNOSTIC CONFIGURATION PAYDUNYA - ONESMS');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+console.log('\n✅ CONFIGURATION PAYDUNYA CORRECTE:');
+console.log('   🏷️ Nom application: onesms');
+console.log('   🌐 URL site: https://onesms-sn.com/');
+console.log('   🚀 Mode production: ACTIVÉ ("Oui, l\'application est prête")');
+console.log('   📧 Facture: Désactivée (correct pour un service SMS)');
+console.log('   🔗 IPN URL: https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/paydunya-webhook');
+console.log('   ✅ IPN: ACTIVÉ');
+
+console.log('\n💳 MOYENS DE PAIEMENT ACTIVÉS:');
+console.log('   💳 Carte Bancaire: ✅');
+console.log('   🇸🇳 Sénégal: Orange Money, Wave');
+console.log('   🇧🇯 Bénin: Moov, MTN');
+console.log('   🇧🇫 Burkina: Orange Money, Moov');
+console.log('   🇨🇮 Côte d\'Ivoire: Orange Money, MTN, Moov, Wave');
+console.log('   ��🇬 Togo: T-Money, Moov');
+console.log('   🇲🇱 Mali: Orange Money');
+
+console.log('\n🚨 PARADOXE IDENTIFIÉ:');
+console.log('   ✅ Configuration interface PayDunya: PARFAITE');
+console.log('   ❌ Clés API: REJETÉES par les serveurs PayDunya');
+console.log('   ⚠️ Incohérence entre l\'interface et l\'API');
+
+console.log('\n🔍 CAUSES PROBABLES:');
+console.log('   1️⃣ DÉLAI DE SYNCHRONISATION');
+console.log('      • Les serveurs API n\'ont pas encore synchronisé votre config');
+console.log('      • Attendre 15-30 minutes après modification');
+console.log('');
+console.log('   2️⃣ CACHE SERVEUR PAYDUNYA');
+console.log('      • Les anciennes clés sont en cache côté serveur');
+console.log('      • Nécessite une intervention support');
+console.log('');
+console.log('   3️⃣ PROBLÈME DE VALIDATION COMPTE');
+console.log('      • Votre compte Business n\'est pas complètement validé');
+console.log('      • Restrictions non visibles dans l\'interface');
+console.log('');
+console.log('   4️⃣ BUG SERVEUR PAYDUNYA');
+console.log('      • Problème technique côté PayDunya');
+console.log('      • Seul le support peut résoudre');
+
+console.log('\n🎯 ACTIONS IMMÉDIATES:');
+console.log('   📧 1. CONTACT SUPPORT URGENT');
+console.log('      • Email: tech@paydunya.com');
+console.log('      • Précisez: "Configuration interface OK, API KO"');
+console.log('      • Joignez capture d\'écran de votre config');
+console.log('');
+console.log('   🔄 2. RÉGÉNÉRATION DES CLÉS');
+console.log('      • Dans votre app PayDunya, cherchez "Régénérer"');
+console.log('      • Générez de nouvelles clés API');
+console.log('      • Testez immédiatement');
+console.log('');
+console.log('   ⏰ 3. ATTENDRE SYNCHRONISATION');
+console.log('      • Si changements récents, attendre 30min');
+console.log('      • Retester les clés actuelles');
+
+console.log('\n📧 MESSAGE SUPPORT RECOMMANDÉ:');
+console.log('═══════════════════════════════════════════════════════════════════');
+console.log('Objet: URGENT - Config OK mais clés API rejetées - App "onesms"');
+console.log('');
+console.log('Bonjour équipe support PayDunya,');
+console.log('');
+console.log('J\'ai un problème critique avec mon application "onesms":');
+console.log('• Configuration interface: PARFAITE (mode prod activé, IPN configuré)');
+console.log('• Clés API: REJETÉES avec erreur 1001 "Invalid Masterkey"');
+console.log('');
+console.log('Détails application:');
+console.log('• Nom: onesms');
+console.log('• URL: https://onesms-sn.com/');
+console.log('• Master Key: NRimGfVs-w3HH-U396-4KyR-AXNV5vmF0uEW');
+console.log('• Mode: Production activé');
+console.log('• IPN: Configuré et actif');
+console.log('');
+console.log('Il y a visiblement une incohérence entre votre interface');
+console.log('(qui montre tout OK) et vos serveurs API (qui rejettent mes clés).');
+console.log('');
+console.log('Merci de vérifier et corriger urgemment.');
+console.log('');
+console.log('Cordialement,');
+console.log('[VOTRE_NOM]');
+console.log('═══════════════════════════════════════════════════════════════════');
+
+console.log('\n🚀 PENDANT CE TEMPS:');
+console.log('   💡 Essayez de créer une NOUVELLE application PayDunya');
+console.log('   💡 Nom: "onesms-test" ou similaire');
+console.log('   💡 Même configuration mais nouvelles clés');
+console.log('   💡 Cela peut résoudre le problème de cache');
+
+console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

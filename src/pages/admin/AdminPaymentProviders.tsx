@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { 
-  CreditCard, 
-  DollarSign, 
-  ToggleLeft, 
-  ToggleRight, 
-  Settings, 
+import {
+  CreditCard,
+  DollarSign,
+  ToggleLeft,
+  ToggleRight,
+  Settings,
   Star,
   Eye,
   EyeOff,
@@ -50,9 +50,80 @@ export default function AdminPaymentProviders() {
   const [configData, setConfigData] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
+  // Stock Shortage State
+  const [stockShortageMode, setStockShortageMode] = useState(false)
+
   useEffect(() => {
     loadProviders()
+    loadStockShortageMode()
   }, [])
+
+  const loadStockShortageMode = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'stock_shortage_mode')
+        .single()
+
+      if (data) {
+        setStockShortageMode(data.value === 'true')
+      }
+    } catch (error) {
+      console.error('Error loading stock shortage mode:', error)
+    }
+  }
+
+  const toggleStockShortage = async () => {
+    setSaving('stock_shortage')
+    try {
+      const newValue = !stockShortageMode
+
+      // Check if setting exists first
+      const { data: existing } = await (supabase as any)
+        .from('system_settings')
+        .select('id')
+        .eq('key', 'stock_shortage_mode')
+        .single()
+
+      let error;
+
+      if (existing) {
+        const { error: updateError } = await (supabase as any)
+          .from('system_settings')
+          .update({ value: String(newValue) })
+          .eq('key', 'stock_shortage_mode')
+        error = updateError
+      } else {
+        const { error: insertError } = await (supabase as any)
+          .from('system_settings')
+          .insert({
+            key: 'stock_shortage_mode',
+            value: String(newValue),
+            description: 'Active le mode rupture de stock pour bloquer les recharges'
+          })
+        error = insertError
+      }
+
+      if (error) throw error
+
+      setStockShortageMode(newValue)
+      showMessage('success', `Mode Rupture de Stock ${newValue ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`)
+
+      // Log action
+      await (supabase as any).from('admin_logs').insert({
+        admin_id: (await supabase.auth.getUser()).data.user?.id,
+        action: 'toggle_stock_shortage',
+        details: { value: newValue }
+      })
+
+    } catch (error) {
+      console.error('Error toggling stock shortage:', error)
+      showMessage('error', 'Impossible de modifier le mode rupture de stock')
+    } finally {
+      setSaving(null)
+    }
+  }
 
   const loadProviders = async () => {
     try {
@@ -218,6 +289,10 @@ export default function AdminPaymentProviders() {
         { key: 'api_secret', label: 'API Secret', type: 'password', placeholder: '...' },
         { key: 'env', label: 'Environment', type: 'select', placeholder: 'test|prod' },
       ],
+      moneroo: [
+        { key: 'test_mode', label: 'Mode', type: 'select', placeholder: 'true|false' },
+        { key: 'api_url', label: 'API URL', type: 'text', placeholder: 'https://api.moneroo.io/v1' },
+      ],
     }
     return configs[providerCode] || []
   }
@@ -233,23 +308,51 @@ export default function AdminPaymentProviders() {
   return (
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <CreditCard className="w-8 h-8 text-blue-600" />
-          Fournisseurs de Paiement
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Gérez les passerelles de paiement disponibles pour vos utilisateurs
-        </p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <CreditCard className="w-8 h-8 text-blue-600" />
+            Fournisseurs de Paiement
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Gérez les passerelles de paiement disponibles pour vos utilisateurs
+          </p>
+        </div>
+
+        {/* Stock Shortage Toggle */}
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-colors ${stockShortageMode
+          ? 'bg-red-50 border-red-200'
+          : 'bg-white border-gray-200'
+          }`}>
+          <div className="flex flex-col">
+            <span className={`text-sm font-bold ${stockShortageMode ? 'text-red-800' : 'text-gray-700'
+              }`}>
+              Mode Rupture de Stock
+            </span>
+            <span className="text-xs text-gray-500">
+              {stockShortageMode ? 'Recharges bloquées' : 'Recharges actives'}
+            </span>
+          </div>
+          <button
+            onClick={toggleStockShortage}
+            disabled={saving === 'stock_shortage'}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${stockShortageMode ? 'bg-red-600' : 'bg-gray-200'
+              }`}
+          >
+            <span
+              className={`${stockShortageMode ? 'translate-x-6' : 'translate-x-1'
+                } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Message de notification */}
       {message && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
-          message.type === 'success' 
-            ? 'bg-green-50 text-green-800 border border-green-200' 
-            : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
+        <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${message.type === 'success'
+          ? 'bg-green-50 text-green-800 border border-green-200'
+          : 'bg-red-50 text-red-800 border border-red-200'
+          }`}>
           {message.type === 'success' ? (
             <CheckCircle className="w-5 h-5" />
           ) : (
@@ -264,18 +367,17 @@ export default function AdminPaymentProviders() {
         {providers.map((provider) => (
           <div
             key={provider.id}
-            className={`bg-white rounded-xl shadow-sm border-2 p-6 transition-all ${
-              provider.is_active 
-                ? 'border-green-500 shadow-green-100' 
-                : 'border-gray-200 opacity-75'
-            }`}
+            className={`bg-white rounded-xl shadow-sm border-2 p-6 transition-all ${provider.is_active
+              ? 'border-green-500 shadow-green-100'
+              : 'border-gray-200 opacity-75'
+              }`}
           >
             {/* Header de la carte */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 {provider.logo_url ? (
-                  <img 
-                    src={provider.logo_url} 
+                  <img
+                    src={provider.logo_url}
                     alt={provider.provider_name}
                     className="w-12 h-12 rounded-lg object-contain bg-gray-50 p-2"
                   />
@@ -294,16 +396,15 @@ export default function AdminPaymentProviders() {
                   <p className="text-xs text-gray-500">{provider.provider_code}</p>
                 </div>
               </div>
-              
+
               {/* Toggle actif/inactif */}
               <button
                 onClick={() => toggleActive(provider)}
                 disabled={saving === provider.id}
-                className={`p-2 rounded-lg transition-colors ${
-                  provider.is_active
-                    ? 'bg-green-100 hover:bg-green-200 text-green-700'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
-                }`}
+                className={`p-2 rounded-lg transition-colors ${provider.is_active
+                  ? 'bg-green-100 hover:bg-green-200 text-green-700'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
+                  }`}
               >
                 {saving === provider.id ? (
                   <div className="w-6 h-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -327,7 +428,7 @@ export default function AdminPaymentProviders() {
               </p>
               <div className="flex flex-wrap gap-1">
                 {provider.supported_methods.slice(0, 4).map((method) => (
-                  <span 
+                  <span
                     key={method}
                     className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-full"
                   >
@@ -344,9 +445,8 @@ export default function AdminPaymentProviders() {
 
             {/* Statut */}
             <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 rounded-lg">
-              <div className={`w-2 h-2 rounded-full ${
-                provider.is_active ? 'bg-green-500' : 'bg-gray-400'
-              }`} />
+              <div className={`w-2 h-2 rounded-full ${provider.is_active ? 'bg-green-500' : 'bg-gray-400'
+                }`} />
               <span className="text-xs font-medium text-gray-700">
                 {provider.is_active ? 'Actif' : 'Inactif'}
               </span>
@@ -366,7 +466,7 @@ export default function AdminPaymentProviders() {
                 <Settings className="w-4 h-4" />
                 Configurer
               </button>
-              
+
               {!provider.is_default && provider.is_active && (
                 <button
                   onClick={() => setAsDefault(provider)}
@@ -411,8 +511,15 @@ export default function AdminPaymentProviders() {
                   </label>
                   {field.type === 'select' ? (
                     <select
-                      value={configData[field.key] || ''}
-                      onChange={(e) => setConfigData({ ...configData, [field.key]: e.target.value })}
+                      value={String(configData[field.key] || '')}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        // Convert to boolean for test_mode field
+                        const parsedValue = field.key === 'test_mode'
+                          ? value === 'true'
+                          : value
+                        setConfigData({ ...configData, [field.key]: parsedValue })
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="">Sélectionner...</option>

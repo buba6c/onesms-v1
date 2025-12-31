@@ -29,21 +29,21 @@ type ActionType = typeof actionTypes
 
 type Action =
   | {
-      type: ActionType["ADD_TOAST"]
-      toast: ToasterToast
-    }
+    type: ActionType["ADD_TOAST"]
+    toast: ToasterToast
+  }
   | {
-      type: ActionType["UPDATE_TOAST"]
-      toast: Partial<ToasterToast>
-    }
+    type: ActionType["UPDATE_TOAST"]
+    toast: Partial<ToasterToast>
+  }
   | {
-      type: ActionType["DISMISS_TOAST"]
-      toastId?: ToasterToast["id"]
-    }
+    type: ActionType["DISMISS_TOAST"]
+    toastId?: ToasterToast["id"]
+  }
   | {
-      type: ActionType["REMOVE_TOAST"]
-      toastId?: ToasterToast["id"]
-    }
+    type: ActionType["REMOVE_TOAST"]
+    toastId?: ToasterToast["id"]
+  }
 
 interface State {
   toasts: ToasterToast[]
@@ -99,9 +99,9 @@ export const reducer = (state: State, action: Action): State => {
         toasts: state.toasts.map((t) =>
           t.id === toastId || toastId === undefined
             ? {
-                ...t,
-                open: false,
-              }
+              ...t,
+              open: false,
+            }
             : t
         ),
       }
@@ -155,10 +155,13 @@ function toast({ ...props }: Toast) {
     },
   })
 
-  // Auto-dismiss après 2 secondes
-  setTimeout(() => {
-    dismiss()
-  }, TOAST_REMOVE_DELAY)
+  // Auto-dismiss only if duration is not Infinity
+  if (props.duration !== Infinity) {
+    const dismissDelay = props.duration || TOAST_REMOVE_DELAY;
+    setTimeout(() => {
+      dismiss()
+    }, dismissDelay)
+  }
 
   return {
     id: id,

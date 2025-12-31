@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 // Mapping des noms de pays vers codes ISO-2 (utilisé pour générer les bons codes)
 const NAME_TO_ISO: Record<string, string> = {
@@ -45,7 +45,7 @@ const NAME_TO_ISO: Record<string, string> = {
   'swaziland': 'sz', 'sweden': 'se', 'switzerland': 'ch', 'syria': 'sy', 'taiwan': 'tw',
   'tajikistan': 'tj', 'tanzania': 'tz', 'thailand': 'th', 'togo': 'tg', 'trinidad and tobago': 'tt',
   'tunisia': 'tn', 'turkey': 'tr', 'turkmenistan': 'tm', 'uganda': 'ug', 'ukraine': 'ua',
-  'united arab emirates': 'ae', 'united kingdom': 'gb', 'england': 'gb', 'usa': 'us', 
+  'united arab emirates': 'ae', 'united kingdom': 'gb', 'england': 'gb', 'usa': 'us',
   'united states': 'us', 'uruguay': 'uy', 'uzbekistan': 'uz', 'venezuela': 've', 'vietnam': 'vn',
   'yemen': 'ye', 'zambia': 'zm', 'zimbabwe': 'zw'
 }
@@ -56,24 +56,24 @@ async function fetchAllCountries(apiKey: string): Promise<Record<number, { name:
     const url = `${SMS_ACTIVATE_BASE_URL}?api_key=${apiKey}&action=getCountries`
     const response = await fetch(url)
     const data = await response.json()
-    
+
     const countryMap: Record<number, { name: string, code: string }> = {}
-    
+
     for (const [id, country] of Object.entries(data)) {
       const countryId = parseInt(id)
       const countryData = country as { eng: string, rus?: string, visible?: number, rent?: number }
-      
+
       const name = countryData.eng
       // Utiliser le mapping correct pour le code ISO
       const nameLower = name.toLowerCase()
       const code = NAME_TO_ISO[nameLower] || FALLBACK_COUNTRY_MAP[countryId]?.code || nameLower.substring(0, 2)
-      
+
       countryMap[countryId] = {
         name: name,
         code: code
       }
     }
-    
+
     console.log(`✅ Loaded ${Object.keys(countryMap).length} countries from SMS-Activate API`)
     return countryMap
   } catch (error) {
@@ -230,18 +230,18 @@ const COUNTRY_CODE_MAP: Record<string, number> = {
 // Fonction pour mapper le code pays vers ID SMS-Activate
 const mapCountryCode = (country: string): number | null => {
   if (!country) return null
-  
+
   // Si déjà un nombre
   if (/^\d+$/.test(country)) {
     return parseInt(country)
   }
-  
+
   // Pattern country_XX
   if (country.startsWith('country_')) {
     const num = parseInt(country.replace('country_', ''), 10)
     if (!isNaN(num)) return num
   }
-  
+
   // Lookup dans le map
   return COUNTRY_CODE_MAP[country.toLowerCase()] ?? null
 }
@@ -260,37 +260,37 @@ serve(async (req) => {
     const getServicesList = body.getServices === true
 
     const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')!
-    
+
     // =========================================================================
     // MODE 0: Récupérer la liste des services RENT avec quantités agrégées (getServices=true)
     // Agrège les quantités depuis plusieurs pays populaires pour afficher un total réel
     // =========================================================================
     if (getServicesList) {
       console.log('📦 Getting RENT services list with aggregated quantities...')
-      
+
       // Pays populaires pour l'agrégation (meilleure couverture)
       const POPULAR_COUNTRIES = [6, 52, 4, 16, 48]; // Indonésie, Thaïlande, Philippines, Égypte, Corée
-      
+
       // D'abord récupérer la liste des services disponibles (sans pays)
       const baseApiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&rent_time=${rentTime}`
       const baseResponse = await fetch(baseApiUrl)
       const baseData = await baseResponse.json()
-      
+
       if (!baseData.services) {
         return new Response(
           JSON.stringify({ error: 'No rent services available', success: false, services: {} }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      
+
       // Structure pour stocker les quantités agrégées
-      const aggregatedServices: Record<string, { 
+      const aggregatedServices: Record<string, {
         code: string;
         totalQuantity: number;
         minCost: number;
         searchName: string;
       }> = {};
-      
+
       // Initialiser avec tous les services disponibles
       for (const [code, serviceData] of Object.entries(baseData.services as Record<string, any>)) {
         aggregatedServices[code] = {
@@ -300,16 +300,16 @@ serve(async (req) => {
           searchName: serviceData.search_name || code
         };
       }
-      
+
       // Agréger les quantités depuis les pays populaires (en parallèle)
       console.log('📊 Aggregating quantities from popular countries:', POPULAR_COUNTRIES);
-      
+
       const countryPromises = POPULAR_COUNTRIES.map(async (countryId) => {
         try {
           const countryUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&rent_time=${rentTime}&country=${countryId}`
           const response = await fetch(countryUrl)
           const data = await response.json()
-          
+
           if (data.services) {
             for (const [code, svcData] of Object.entries(data.services as Record<string, any>)) {
               const quant = svcData.quant?.current || 0
@@ -329,9 +329,9 @@ serve(async (req) => {
           return { countryId, success: false }
         }
       })
-      
+
       await Promise.all(countryPromises)
-      
+
       // Transformer en format avec quantités
       const servicesWithQuantities: Record<string, any> = {}
       for (const [code, svc] of Object.entries(aggregatedServices)) {
@@ -342,13 +342,13 @@ serve(async (req) => {
           search_name: svc.searchName
         }
       }
-      
+
       const serviceCount = Object.keys(servicesWithQuantities).length
       const totalQuantity = Object.values(aggregatedServices).reduce((sum, s) => sum + s.totalQuantity, 0)
       console.log(`✅ Found ${serviceCount} RENT services with ${totalQuantity} total numbers available`)
-      
+
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           success: true,
           services: servicesWithQuantities,
           totalServices: serviceCount,
@@ -357,7 +357,7 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    
+
     // =========================================================================
     // MODE 1: Récupérer la liste des pays RENT disponibles (sans country param)
     // Si serviceCode est fourni, ne retourne que les pays où ce service a du stock
@@ -365,50 +365,50 @@ serve(async (req) => {
     if (getCountriesList) {
       const serviceCode = body.serviceCode as string | undefined // Ex: 'full' pour Full Rent
       console.log('🌍 Getting RENT countries list...', serviceCode ? `(with quantities for ${serviceCode})` : '')
-      
+
       // 1️⃣ D'abord récupérer la liste de TOUS les pays depuis l'API getCountries
       const allCountriesMap = await fetchAllCountries(SMS_ACTIVATE_API_KEY)
-      
+
       // 2️⃣ Ensuite récupérer les pays disponibles pour RENT
       const apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&rent_time=${rentTime}`
       const response = await fetch(apiUrl)
       const data = await response.json()
-      
+
       if (!data.countries) {
         return new Response(
           JSON.stringify({ error: 'No rent countries available', success: false }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-      
+
       // Liste des IDs de pays disponibles pour rent
       const countryIds = Object.values(data.countries as Record<string, number>)
-      
+
       // 💰 Récupérer la marge système depuis system_settings (défaut 30%)
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       )
-      
+
       const { data: marginSetting } = await supabase
         .from('system_settings')
         .select('value')
         .eq('key', 'pricing_margin_percentage')
         .single()
-      
+
       const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30
       const USD_TO_FCFA = 600
       const FCFA_TO_COINS = 100
       const MIN_PRICE_COINS = 5
-      
+
       // 3️⃣ Si serviceCode fourni, récupérer les quantités pour ce service dans chaque pays
       // MAIS retourner TOUS les pays (avec 0 si pas de stock)
       let countriesWithQuantities: { countryId: number; quantity: number; cost: number; sellingPrice: number; activationPrice: number }[] = []
-      
+
       if (serviceCode) {
         console.log(`🔍 Getting quantities for service: ${serviceCode} in all ${countryIds.length} countries`)
-        
+
         // Vérifier le stock de chaque pays en parallèle + récupérer prix d'activation
         const countryChecks = await Promise.all(
           countryIds.map(async (countryId) => {
@@ -417,23 +417,23 @@ serve(async (req) => {
               const checkUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&rent_time=${rentTime}&country=${countryId}`
               const checkResponse = await fetch(checkUrl)
               const checkData = await checkResponse.json()
-              
+
               const serviceData = checkData.services?.[serviceCode]
               const quantity = serviceData?.quant?.current || 0
               const cost = parseFloat(serviceData?.cost) || 0
-              
+
               // Calculer le prix de vente RENT
               const priceFCFA = cost * USD_TO_FCFA
               const priceCoins = priceFCFA / FCFA_TO_COINS
               let sellingPrice = Math.max(MIN_PRICE_COINS, Math.ceil(priceCoins * (1 + marginPercentage / 100)))
-              
+
               // Récupérer prix ACTIVATION pour comparaison
               let activationPrice = 0
               try {
                 const activationUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryId}`
                 const activationResponse = await fetch(activationUrl)
                 const activationData = await activationResponse.json()
-                
+
                 const activationCost = parseFloat(activationData?.[countryId]?.[serviceCode]?.cost || activationData?.[countryId]?.cost || 0)
                 if (activationCost > 0) {
                   const actPriceFCFA = activationCost * USD_TO_FCFA
@@ -443,13 +443,13 @@ serve(async (req) => {
               } catch (e) {
                 // Ignorer les erreurs de récupération du prix d'activation
               }
-              
+
               // 🔒 Le prix du rent doit être >= prix d'activation
               if (activationPrice > 0 && sellingPrice < activationPrice) {
                 console.log(`📈 ${serviceCode} in country ${countryId}: Rent ${sellingPrice}Ⓐ < Activation ${activationPrice}Ⓐ → Ajusté`)
                 sellingPrice = activationPrice
               }
-              
+
               return { countryId, quantity, cost, sellingPrice, activationPrice }
             } catch (e) {
               console.warn(`⚠️ Failed to check country ${countryId}:`, e)
@@ -457,16 +457,16 @@ serve(async (req) => {
             }
           })
         )
-        
+
         countriesWithQuantities = countryChecks
-        
+
         const countriesWithStock = countryChecks.filter(c => c.quantity > 0).length
         console.log(`✅ ${countriesWithStock} countries have stock for ${serviceCode} (showing all ${countryIds.length})`)
       } else {
         // Sans serviceCode, juste retourner les pays sans quantités
         countriesWithQuantities = countryIds.map(id => ({ countryId: id, quantity: 0, cost: 0, sellingPrice: MIN_PRICE_COINS, activationPrice: 0 }))
       }
-      
+
       // Transformer les IDs pays en objets avec nom/code et quantité
       // Trier: pays avec stock en premier (par quantité décroissante), puis les autres par nom
       const countriesArray = countriesWithQuantities
@@ -492,11 +492,11 @@ serve(async (req) => {
           // Parmi les pays sans stock, trier par nom
           return a.name.localeCompare(b.name)
         })
-      
+
       console.log(`✅ Returning ${countriesArray.length} RENT countries`)
-      
+
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           success: true,
           countries: countriesArray,
           totalCountries: countriesArray.length,
@@ -505,30 +505,45 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    
+
     // =========================================================================
     // MODE 2: Récupérer les services pour un pays spécifique
     // =========================================================================
     const countryId = countryInput ? mapCountryCode(countryInput) : 2 // Default Kazakhstan
-    
+
     console.log('🏠 Getting rent services:', { rentTime, countryInput, countryId, operator })
-    
+
     let apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries&rent_time=${rentTime}&country=${countryId}`
-    
+
     if (operator) {
       apiUrl += `&operator=${operator}`
     }
 
     console.log('📞 Calling SMS-Activate API...')
-    
+
     const response = await fetch(apiUrl)
-    const data = await response.json()
+    const responseText = await response.text()
+
+    // Validate JSON response
+    let data: any
+    try {
+      data = JSON.parse(responseText)
+    } catch (e) {
+      console.error('❌ SMS-Activate returned non-JSON response:', responseText.substring(0, 200))
+      return new Response(
+        JSON.stringify({
+          error: `SMS-Activate API error: ${responseText}`,
+          success: false
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     console.log('📨 SMS-Activate response keys:', Object.keys(data))
 
     if (!data.services) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'No rent services available for this country',
           success: false,
           countries: data.countries || {},
@@ -542,38 +557,38 @@ serve(async (req) => {
     // Transformer les services pour inclure les infos importantes
     // Format API: { "wa": { "cost": 10.01, "retail_cost": "15.02", "quant": { "current": 42, "total": 42 } } }
     // =========================================================================
-    
+
     // 💰 Récupérer la marge système depuis system_settings (défaut 30%)
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-    
+
     const { data: marginSetting } = await supabase
       .from('system_settings')
       .select('value')
       .eq('key', 'pricing_margin_percentage')
       .single()
-    
+
     const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30
     console.log(`💰 Using system margin: ${marginPercentage}%`)
-    
+
     // 💵 CONVERSION UNIFIÉE: USD → FCFA → Coins (Ⓐ) + marge système
     const USD_TO_FCFA = 600  // 1 USD = 600 FCFA
     const FCFA_TO_COINS = 100  // 1 Coin (Ⓐ) = 100 FCFA
     const MIN_PRICE_COINS = 5 // Prix minimum 5 Ⓐ
-    
+
     // 📊 NOUVEAU: Récupérer les prix d'activation pour ce pays
     // Le prix du rent doit être >= prix d'activation pour le même service/pays
     console.log(`📊 Fetching activation prices for country ${countryId} to ensure rent >= activation...`)
     let activationPrices: Record<string, number> = {}
-    
+
     try {
       const activationUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&country=${countryId}`
       const activationResponse = await fetch(activationUrl)
       const activationData = await activationResponse.json()
-      
+
       // Format: { "187": { "wa": { "cost": "2.50", "count": 100 }, ... } }
       if (activationData && activationData[countryId.toString()]) {
         const countryServices = activationData[countryId.toString()]
@@ -593,26 +608,26 @@ serve(async (req) => {
     } catch (e) {
       console.warn('⚠️ Failed to fetch activation prices, rent prices won\'t be validated:', e)
     }
-    
+
     const transformedServices: Record<string, any> = {}
-    
+
     for (const [code, serviceData] of Object.entries(data.services as Record<string, any>)) {
       const quant = serviceData.quant || { current: 0, total: 0 }
       const costUSD = parseFloat(serviceData.cost) || 0
-      
+
       // Calcul: $10.01 × 600 = 6006 FCFA ÷ 100 = 60.06Ⓐ × 1.3 = 78.08Ⓐ → 79Ⓐ
       const priceFCFA = costUSD * USD_TO_FCFA
       const priceCoins = priceFCFA / FCFA_TO_COINS
       const priceWithMargin = priceCoins * (1 + marginPercentage / 100)
       let sellingPrice = Math.max(MIN_PRICE_COINS, Math.ceil(priceWithMargin))
-      
+
       // 🔒 NOUVEAU: Le prix du rent doit être >= prix d'activation
       const activationPrice = activationPrices[code] || 0
       if (activationPrice > 0 && sellingPrice < activationPrice) {
         console.log(`📈 Rent ${code}: ${sellingPrice}Ⓐ < Activation ${activationPrice}Ⓐ → Ajusté à ${activationPrice}Ⓐ`)
         sellingPrice = activationPrice
       }
-      
+
       transformedServices[code] = {
         code,
         cost: costUSD, // Prix d'achat en USD
@@ -623,16 +638,16 @@ serve(async (req) => {
         activationPrice // Prix d'activation pour référence
       }
     }
-    
+
     // Trier par disponibilité
     const sortedServices = Object.values(transformedServices)
       .filter((s: any) => s.available > 0)
       .sort((a: any, b: any) => b.available - a.available)
-    
+
     console.log(`✅ Found ${sortedServices.length} services with availability for country ${countryId}`)
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         countryId,
         rentTime: parseInt(rentTime),

@@ -192,18 +192,19 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         type: 'deposit',
-        amount: activationsToAdd, // Amount is the number of activations to add
+        amount: amount, // Amount is the actual XOF amount (not activations!)
         balance_before: currentBalance,
         balance_after: currentBalance + activationsToAdd, // Will be updated in webhook when payment confirmed
         status: 'pending',
         reference: paymentRef,
         external_id: mfData.token, // MoneyFusion token
-        description: description || `Rechargement via MoneyFusion`,
+        description: description || `Rechargement ${activationsToAdd} activations ONE SMS`,
         metadata: {
           moneyfusion_token: mfData.token,
           checkout_url: mfData.url,
           phone: phone,
           amount_xof: amount,
+          activations: activationsToAdd,
           payment_provider: 'moneyfusion',
           ...metadata
         }

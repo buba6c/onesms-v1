@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 // Mapping intelligent des codes de services vers leurs noms réels
 const SERVICE_NAMES: Record<string, string> = {

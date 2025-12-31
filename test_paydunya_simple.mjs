@@ -1,42 +1,74 @@
-#!/usr/bin/env node
-/**
- * Test simple pour voir l'erreur exacte
- */
+// Test simple PayDunya sans passer par Supabase
+console.log('🧪 TEST PAYDUNYA DIRECT');
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-const SUPABASE_URL = 'https://htfqmamvmhdoixqcbbbw.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0ZnFtYW12bWhkb2l4cWNiYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE5NDQzODQsImV4cCI6MjA0NzUyMDM4NH0.LGEBnZAYH56hOTgbYX1S0Y97W3lzbJt2hfhZBjmG-lc';
+const PAYDUNYA_CONFIG = {
+  master_key: "vtupNxWs-2078-HpbK-9JNo-4U3y0v8g0r1v",
+  private_key: "live_private_m7xmzSrVcGu3SYMpwb2z7BbUdft",
+  token: "W0uQdlpM2EQLqb3tA33fDJSt7Wk"
+};
 
-async function testPayDunya() {
-  console.log('🧪 Test PayDunya avec fetch direct...\n');
+try {
+  console.log('\n📋 Configuration PayDunya:');
+  console.log(`   🔑 Master Key: ${PAYDUNYA_CONFIG.master_key.substring(0, 10)}...`);
+  console.log(`   🗝️ Private Key: ${PAYDUNYA_CONFIG.private_key.substring(0, 10)}...`);
+  console.log(`   🎫 Token: ${PAYDUNYA_CONFIG.token.substring(0, 10)}...`);
 
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/paydunya-create-payment`, {
+  const testPayment = {
+    amount: 1000,
+    description: "Test payment - 1000 CFA"
+  };
+
+  console.log('\n🚀 Test de création de paiement...');
+  
+  const response = await fetch('https://app.paydunya.com/api/v1/checkout-invoice/create', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'PAYDUNYA-MASTER-KEY': PAYDUNYA_CONFIG.master_key,
+      'PAYDUNYA-PRIVATE-KEY': PAYDUNYA_CONFIG.private_key,
+      'PAYDUNYA-TOKEN': PAYDUNYA_CONFIG.token,
     },
     body: JSON.stringify({
-      amount: 1000,
-      userId: '589c44ab-20aa-4e0c-b7a1-d5f4dda78137',
-      email: 'test@onesms.com',
-      phone: '+221771234567'
+      invoice: {
+        total_amount: testPayment.amount,
+        description: testPayment.description,
+      },
+      store: {
+        name: "One SMS",
+        tagline: "Service SMS Premium"
+      },
+      actions: {
+        cancel_url: "https://onesms-sn.com/dashboard?payment=failed",
+        return_url: "https://onesms-sn.com/dashboard?payment=success",
+        callback_url: "https://htfqmamvmhdoixqcbbbw.supabase.co/functions/v1/paydunya-webhook"
+      }
     })
   });
 
-  console.log('Status:', response.status);
-  console.log('Status Text:', response.statusText);
+  const result = await response.json();
   
-  const text = await response.text();
-  console.log('\nResponse body:');
-  console.log(text);
-
-  try {
-    const json = JSON.parse(text);
-    console.log('\nJSON parsed:');
-    console.log(JSON.stringify(json, null, 2));
-  } catch (e) {
-    console.log('(Not JSON)');
+  console.log(`\n📊 Réponse API Status: ${response.status}`);
+  
+  if (response.ok && result.response_code === "00") {
+    console.log('✅ SUCCÈS - Paiement créé !');
+    console.log(`   📄 Invoice Token: ${result.token}`);
+    console.log(`   🔗 Payment URL: ${result.response_text}`);
+    console.log('\n🎯 CONCLUSION: PayDunya fonctionne correctement !');
+  } else {
+    console.log('❌ ERREUR - Échec création paiement');
+    console.log('   📝 Réponse complète:', JSON.stringify(result, null, 2));
+    
+    if (result.response_code) {
+      console.log(`   🚨 Code erreur: ${result.response_code}`);
+    }
+    if (result.response_text) {
+      console.log(`   💬 Message: ${result.response_text}`);
+    }
   }
+
+} catch (error) {
+  console.error('🚨 ERREUR GÉNÉRALE:', error.message);
 }
 
-testPayDunya().catch(console.error);
+console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

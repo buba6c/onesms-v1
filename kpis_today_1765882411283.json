@@ -1,0 +1,27 @@
+{
+  "date": "2025-12-16T10:53:31.283Z",
+  "period": "today",
+  "stats": {
+    "users": {
+      "new": 19,
+      "total": 1422
+    },
+    "activations": {
+      "count": 0,
+      "revenue": "0.00",
+      "revenueFCFA": 0
+    },
+    "rentals": {
+      "active": 0
+    },
+    "topServices": [],
+    "conversion": {
+      "rate": "0.0"
+    }
+  },
+  "comparison": {
+    "users": "-67",
+    "activations": "0",
+    "revenue": "0"
+  }
+}

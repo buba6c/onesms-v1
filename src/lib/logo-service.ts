@@ -103,7 +103,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'gf': 'voice.google.com',       // GoogleVoice
   'yl': 'yalla.com',              // Yalla
   'uu': 'wildberries.ru',         // Wildberries
-  'sg': 'ozon.ru',                // OZON (PAS Signal!)
+  'sg': 'signal.org',             // Signal (CORRECTED - was OZON)
   'fz': 'kfc.com',                // KFC
   'vm': 'okcupid.com',            // OkCupid
   'pd': 'ifood.com.br',           // IFood
@@ -126,7 +126,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'dp': 'protonmail.com',         // ProtonMail (pas Disney+!)
   'acz': 'anthropic.com',         // Claude
   'aon': 'binance.com',           // Binance (code aon!)
-  
+
   // ============================================================================
   // Services demandés - Mappings ajoutés (30 Nov 2025)
   // ============================================================================
@@ -152,7 +152,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'my': 'caixabank.es',           // CAIXA
   'aol': 'paysera.com',           // Paysera
   'cad': 'bossrevolution.com',    // BOSS Revolution
-  
+
   // ============================================================================
   // TOP 100 Services populaires - Mappings complets
   // ============================================================================
@@ -162,9 +162,9 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'blm': 'epicgames.com',         // Epic Games
   'bnl': 'reddit.com',            // Reddit
   'xt': 'flipkart.com',           // Flipkart
-  'ln': 'grofers.com',            // Grofers
-  'kk': 'idealista.com',          // Idealista
-  'zm': 'offerup.com',            // OfferUp
+  'ln': 'line.me',                // Line (CORRECTED - was Grofers)
+  'kk': 'kakaocorp.com',          // KakaoTalk (CORRECTED - was Idealista)
+  'zm': 'zoom.us',                // Zoom (CORRECTED - was OfferUp)
   'cc': 'sms-activate.io',        // Service CC
   'bqp': 'zara.com',              // Zara
   'ccb': 'nintendo.com',          // Nintendo
@@ -180,7 +180,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'avu': 'karos.fr',              // Karos
   'bli': 'scalapay.com',          // Scalapay
   'bub': 'sparda.de',             // Sparda Bank
-  
+
   // ============================================================================
   // Services financiers et crypto populaires
   // ============================================================================
@@ -203,7 +203,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'moneygram': 'moneygram.com',   // MoneyGram
   'remitly': 'remitly.com',       // Remitly
   'worldremit': 'worldremit.com', // WorldRemit
-  
+
   // ============================================================================
   // Services de livraison et transport
   // ============================================================================
@@ -218,7 +218,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'didi': 'didiglobal.com',       // DiDi
   'lyft': 'lyft.com',             // Lyft
   'cabify': 'cabify.com',         // Cabify
-  
+
   // ============================================================================
   // Services de streaming et gaming
   // ============================================================================
@@ -237,7 +237,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'riotgames': 'riotgames.com',   // Riot Games
   'activision': 'activision.com', // Activision
   'bethesda': 'bethesda.net',     // Bethesda
-  
+
   // ============================================================================
   // Services de voyage et hébergement
   // ============================================================================
@@ -250,7 +250,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'trivago': 'trivago.com',       // Trivago
   'vrbo': 'vrbo.com',             // VRBO
   'hostelworld': 'hostelworld.com', // Hostelworld
-  
+
   // ============================================================================
   // Services professionnels et emploi
   // ============================================================================
@@ -261,7 +261,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'upwork': 'upwork.com',         // Upwork
   'fiverr': 'fiverr.com',         // Fiverr
   'freelancer': 'freelancer.com', // Freelancer
-  
+
   // ============================================================================
   // VPN et sécurité
   // ============================================================================
@@ -270,7 +270,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'surfshark': 'surfshark.com',   // Surfshark
   'protonvpn': 'protonvpn.com',   // ProtonVPN
   'cyberghost': 'cyberghostvpn.com', // CyberGhost
-  
+
   // Services additionnels
   'gr': 'grindr.com',             // Grindr (code SMS-Activate: gr)
   'afk': 'astropay.com',          // AstroPay (autre code possible)
@@ -283,8 +283,9 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'novaposhta': 'novaposhta.ua',  // Nova Poshta (nom complet)
   'pn': 'allegro.pl',             // Allegro
   'ld': 'zalo.me',                // Zalo
-  'bd': 'weverse.io',             // Weverse/Hybe
-  'dz': 'akulaku.com',            // Akulaku
+  'bd': 'baidu.com',              // Baidu (Corrected)
+  'dz': 'douyin.com',             // Douyin/TikTok (Corrected)
+  'xhs': 'xiaohongshu.com',       // Xiaohongshu
   // 'ot' déjà défini plus haut
   'st': 'steampowered.com',       // Steam (code st)
   'gl': 'globo.com',              // Globo
@@ -303,8 +304,10 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'sd': 'swiggy.com',             // Swiggy
   'sf': 'salesforce.com',         // Salesforce
   'sk': 'skype.com',              // Skype
-  'sl': 'shopee.com',             // Shopee (autre code)
+  'sl': 'slack.com',              // Slack (CORRECTED - was Shopee)
   'sm': 'samsung.com',            // Samsung
+  // 'ln', 'kk', 'sg', 'sk', 'sl' define below or above - keeping consistent single source
+  'mk': 'mercari.com',            // Mercari
   'sp': 'spotify.com',            // Spotify
   'sq': 'squarespace.com',        // Squarespace
   'sr': 'surveymonkey.com',       // SurveyMonkey
@@ -376,7 +379,7 @@ const SERVICE_DOMAINS: Record<string, string> = {
   'zx': 'zoox.com',               // Zoox
   'zy': 'zynga.com',              // Zynga
   'zz': 'zazzle.com',             // Zazzle
-  
+
   // Noms complets (fallback pour recherche)
   'whatsapp': 'whatsapp.com',
   'instagram': 'instagram.com',
@@ -441,7 +444,7 @@ const generateFallbackLogo = (serviceCode: string, emoji?: string): string => {
   const code = serviceCode.toLowerCase().trim()
   const displayEmoji = emoji || getServiceIcon(code)
   const firstLetter = code.charAt(0).toUpperCase()
-  
+
   // SVG avec emoji ou première lettre
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234f46e5;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%237c3aed;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23grad)' width='200' height='200' rx='20'/%3E%3Ctext x='50%25' y='50%25' font-family='system-ui,-apple-system,sans-serif' font-size='80' text-anchor='middle' dominant-baseline='middle'%3E${displayEmoji}%3C/text%3E%3Ctext x='50%25' y='85%25' font-family='system-ui,-apple-system,sans-serif' font-size='16' fill='white' text-anchor='middle' opacity='0.8'%3E${firstLetter}${code.slice(1, 8)}%3C/text%3E%3C/svg%3E`
 }
@@ -478,10 +481,10 @@ const ISO_COUNTRY_CODES = new Set([
  */
 export const getServiceLogo = (serviceCode: string): string => {
   const code = serviceCode.toLowerCase().trim()
-  
+
   // Vérifier si c'est un code valide (pas de chiffres au début, pas de caractères bizarres)
   const isValidCode = /^[a-z][a-z0-9-_]*$/i.test(code)
-  
+
   if (!isValidCode) {
     return generateFallbackLogo(code)
   }
@@ -490,19 +493,19 @@ export const getServiceLogo = (serviceCode: string): string => {
   if (code === 'afk' || code === 'astropay') {
     return '/logos/astropay.svg'
   }
-  
+
   // PRIORITÉ 1: Si le code est dans SERVICE_DOMAINS, utiliser le domaine mappé
   // Ceci résout le conflit tg=Telegram vs tg=Togo, am=Amazon vs am=Armenia, etc.
   if (SERVICE_DOMAINS[code]) {
     const domain = SERVICE_DOMAINS[code]
     return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
   }
-  
+
   // PRIORITÉ 2: Si c'est un code pays ISO (et PAS un service connu), retourner le fallback
   if (ISO_COUNTRY_CODES.has(code)) {
     return generateFallbackLogo(code)
   }
-  
+
   // PRIORITÉ 3: Essayer avec le domaine .com par défaut
   const domain = `${code}.com`
   return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
@@ -576,7 +579,7 @@ export const getServiceIcon = (serviceCode: string): string => {
     'ew': '👟',       // Nike
     'rr': '🍕',       // Wolt
     'uu': '🛍️',       // Wildberries
-    'sg': '🛒',       // OZON (PAS Signal!)
+    'sg': '🔒',       // Signal (CORRECTED)
     'vm': '💗',       // OkCupid
     'uk': '🏠',       // Airbnb (PAS ukr.net!)
     'ep': '🛍️',       // Temu
@@ -596,7 +599,7 @@ export const getServiceIcon = (serviceCode: string): string => {
     'vz': '💖',       // Hinge
     'afk': '💳',      // AstroPay
     'astropay': '💳', // AstroPay (nom complet)
-    
+
     // Noms complets (fallback)
     'whatsapp': '💬',
     'telegram': '✈️',
@@ -628,6 +631,19 @@ export const getServiceIcon = (serviceCode: string): string => {
     'yahoo': '📧',
     'coinbase': '🪙',
     'binance': '🔶',
+    // 'ln', 'kk', 'sg', 'mb', 'pm', 'ok', 'zm', 'sk', 'sl' managed via consolidated list below or above
+    'hw': '🛍️',       // Alipay/Alibaba (hw)
+    'nv': '🇰🇷',      // Naver (nv)
+    'yw': '🔍',       // Yandex (yw)
+    'qq': '🐧',       // QQ (qq)
+    'bd': '🔍',       // Baidu (bd)
+    'dz': '🎵',       // Douyin (dz)
+    'xhs': '📕',      // Xiaohongshu (xhs)
+    'jd': '🛒',       // JD.com (jd)
+    'pdd': '🛒',      // Pinduoduo (pdd)
+    'meituan': '🥡',  // Meituan
+    'weibo': '📱',    // Weibo
+    'taobao': '🛍️',   // Taobao
     'tinder': '❤️',
     'badoo': '💙',
     'bumble': '💛',
@@ -648,15 +664,15 @@ export const getServiceIcon = (serviceCode: string): string => {
  */
 const toFlagEmoji = (countryCode: string): string => {
   const code = countryCode.toUpperCase()
-  
+
   // Convertir code ISO-2 en emoji Unicode
   // Chaque lettre devient Regional Indicator Symbol (A=🇦, B=🇧, etc.)
   if (code.length !== 2) return '🌍'
-  
-  const codePoints = [...code].map(char => 
+
+  const codePoints = [...code].map(char =>
     0x1F1E6 + char.charCodeAt(0) - 65 // 0x1F1E6 = 🇦
   )
-  
+
   return String.fromCodePoint(...codePoints)
 }
 
@@ -700,9 +716,28 @@ const COUNTRY_TO_ISO: Record<string, string> = {
   'switzerland': 'ch', 'syria': 'sy', 'taiwan': 'tw', 'tajikistan': 'tj',
   'tanzania': 'tz', 'thailand': 'th', 'togo': 'tg', 'trinidad': 'tt', 'trinidadandtobago': 'tt', 'tunisia': 'tn',
   'turkey': 'tr', 'turkmenistan': 'tm', 'uae': 'ae', 'uganda': 'ug', 'ukraine': 'ua',
-  'unitedarabemirates': 'ae', 'unitedkingdom': 'gb', 'usa': 'us',
+  'unitedarabemirates': 'ae', 'unitedkingdom': 'gb', 'uk': 'gb', 'united kingdom': 'gb', 'greatbritain': 'gb', 'usa': 'us',
   'uruguay': 'uy', 'uzbekistan': 'uz', 'venezuela': 've', 'vietnam': 'vn',
   'yemen': 'ye', 'zambia': 'zm', 'zimbabwe': 'zw',
+
+  // Aliases & Variations (Spaces stripped automatically by resolveToIso)
+  'unitedstates': 'us', 'unitedstatesofamerica': 'us', 'us': 'us',
+  'russianfederation': 'ru',
+  'korea': 'kr', 'republicofkorea': 'kr',
+  'moldovarepublicof': 'md',
+  'tanzaniaunitedrepublicof': 'tz',
+  'congodemocraticrepublic': 'cd', 'democraticrepublicofthecongo': 'cd', 'drcongo': 'cd',
+  'bosniaandherzegovina': 'ba',
+  'papuanewguinea': 'pg',
+  'cotedivoire': 'ci', // ivorycoast already defined above on line 698
+  'laopeoplesdemocraticrepublic': 'la',
+  'syrianarabrepublic': 'sy',
+  'bolivaringrepublicofvenezuela': 've',
+  // 'vietnam' already defined above
+  'burma': 'mm',
+  'macao': 'mo',
+  'timorleste': 'tl', 'easttimor': 'tl',
+  'bruneidarussalam': 'bn',
 }
 
 // Liste des codes ISO valides pour validation
@@ -727,110 +762,49 @@ const VALID_ISO_CODES = new Set([
 // Mapping SMS-Activate ID numérique → code ISO-2
 // Les country_code stockés dans la DB peuvent être des IDs numériques (ex: "187" pour USA)
 const SMS_ACTIVATE_ID_TO_ISO: Record<string, string> = {
+  // Basé sur sms-activate-data.ts (Homepage 2025)
   '0': 'ru',    // Russia
   '1': 'ua',    // Ukraine
   '2': 'kz',    // Kazakhstan
   '3': 'cn',    // China
   '4': 'ph',    // Philippines
-  '5': 'mm',    // Myanmar
   '6': 'id',    // Indonesia
   '7': 'my',    // Malaysia
-  '8': 'ke',    // Kenya
-  '9': 'tz',    // Tanzania
   '10': 'vn',   // Vietnam
   '11': 'kg',   // Kyrgyzstan
-  '12': 'gb',   // UK/England
+  '12': 'gb',   // England
   '13': 'il',   // Israel
   '14': 'hk',   // Hong Kong
   '15': 'pl',   // Poland
-  '16': 'eg',   // Egypt
-  '17': 'ng',   // Nigeria
-  '18': 'mo',   // Macau
+  '16': 'gb',   // United Kingdom
   '19': 'ma',   // Morocco
-  '20': 'gh',   // Ghana
-  '21': 'ar',   // Argentina
   '22': 'in',   // India
-  '23': 'uz',   // Uzbekistan
-  '24': 'kh',   // Cambodia
-  '25': 'cm',   // Cameroon
-  '26': 'td',   // Chad
-  '27': 'de',   // Germany
-  '28': 'lt',   // Lithuania
-  '29': 'hr',   // Croatia
-  '30': 'se',   // Sweden
-  '31': 'iq',   // Iraq
   '32': 'ro',   // Romania
   '33': 'co',   // Colombia
-  '34': 'at',   // Austria
-  '35': 'by',   // Belarus
   '36': 'ca',   // Canada
-  '37': 'sa',   // Saudi Arabia
-  '38': 'mx',   // Mexico
-  '39': 'za',   // South Africa
-  '40': 'es',   // Spain
-  '41': 'ir',   // Iran
-  '42': 'dz',   // Algeria
-  '43': 'nl',   // Netherlands
-  '44': 'bd',   // Bangladesh
-  '45': 'br',   // Brazil
-  '46': 'tr',   // Turkey
-  '47': 'jp',   // Japan
-  '48': 'kr',   // South Korea
-  '49': 'tw',   // Taiwan
-  '50': 'sg',   // Singapore
-  '51': 'ae',   // UAE
+  '39': 'ar',   // Argentina
+  '43': 'de',   // Germany
   '52': 'th',   // Thailand
-  '53': 'pk',   // Pakistan
-  '54': 'np',   // Nepal
-  '55': 'lk',   // Sri Lanka
-  '56': 'pt',   // Portugal
-  '57': 'nz',   // New Zealand
+  '56': 'es',   // Spain
   '58': 'it',   // Italy
-  '59': 'be',   // Belgium
-  '60': 'ch',   // Switzerland
-  '61': 'gr',   // Greece
-  '62': 'cz',   // Czech Republic
-  '63': 'hu',   // Hungary
-  '64': 'dk',   // Denmark
-  '65': 'no',   // Norway
-  '66': 'fi',   // Finland
-  '67': 'ie',   // Ireland
-  '68': 'sk',   // Slovakia
-  '69': 'bg',   // Bulgaria
-  '70': 'rs',   // Serbia
-  '71': 'si',   // Slovenia
-  '72': 'mk',   // North Macedonia
-  '73': 'pe',   // Peru
-  '74': 'cl',   // Chile
-  '75': 'ec',   // Ecuador
-  '76': 've',   // Venezuela
-  '77': 'bo',   // Bolivia
+  '73': 'br',   // Brazil
   '78': 'fr',   // France
-  '79': 'py',   // Paraguay
-  '80': 'uy',   // Uruguay
-  '81': 'cr',   // Costa Rica
-  '82': 'pa',   // Panama
-  '83': 'do',   // Dominican Republic
-  '84': 'sv',   // El Salvador
-  '85': 'gt',   // Guatemala
-  '86': 'hn',   // Honduras
-  '87': 'ni',   // Nicaragua
-  '88': 'cu',   // Cuba
-  '89': 'ht',   // Haiti
-  '90': 'jm',   // Jamaica
-  '91': 'tt',   // Trinidad & Tobago
-  '92': 'pr',   // Puerto Rico
-  '93': 'bb',   // Barbados
-  '94': 'bs',   // Bahamas
-  '108': 'af',  // Afghanistan
-  '117': 'la',  // Laos
-  '129': 'sd',  // Sudan
-  '141': 'jo',  // Jordan
-  '163': 'ps',  // Palestine
-  '165': 'bh',  // Bahrain
-  '172': 'et',  // Ethiopia
+  '82': 'mx',   // Mexico
+  '86': 'it',   // Italy (Alternative)
+  '117': 'pt',  // Portugal
+  '128': 'ge',  // Georgia
+  '129': 'gr',  // Greece
+  '148': 'am',  // Armenia
+  '151': 'cl',  // Chile
+  '155': 'al',  // Albania
+  '163': 'fi',  // Finland
+  '172': 'dk',  // Denmark
+  '173': 'ch',  // Switzerland
+  '174': 'no',  // Norway
   '175': 'au',  // Australia
+  '182': 'jp',  // Japan
   '187': 'us',  // USA
+  '196': 'sg',  // Singapore
 }
 
 /**
@@ -839,28 +813,29 @@ const SMS_ACTIVATE_ID_TO_ISO: Record<string, string> = {
  */
 const resolveToIso = (countryCode: string): string => {
   if (!countryCode) return ''
-  let code = countryCode.toLowerCase().replace(/\s+/g, '')
-  
+  // Normalize: lowercase, remove spaces, hyphens, AND underscores (handles "Hong-Kong", "South Africa", "hong_kong")
+  let code = countryCode.toLowerCase().replace(/[\s\-_]+/g, '')
+
   // 0. Gérer le préfixe "rent-" (legacy bug: parfois stocké comme "rent-6" au lieu de "6")
   if (code.startsWith('rent-')) {
     code = code.replace('rent-', '')
   }
-  
+
   // 1. D'abord vérifier si c'est un ID numérique SMS-Activate
   if (SMS_ACTIVATE_ID_TO_ISO[code]) {
     return SMS_ACTIVATE_ID_TO_ISO[code]
   }
-  
+
   // 2. Ensuite vérifier si c'est un nom de pays
   if (COUNTRY_TO_ISO[code]) {
     return COUNTRY_TO_ISO[code]
   }
-  
+
   // 3. Si c'est déjà un code ISO de 2 lettres valide, l'utiliser
   if (code.length === 2 && VALID_ISO_CODES.has(code)) {
     return code
   }
-  
+
   // 4. Fallback: essayer les 2 premiers caractères (seulement si pas numérique)
   if (!/^\d+$/.test(code)) {
     const twoChars = code.substring(0, 2)
@@ -868,7 +843,7 @@ const resolveToIso = (countryCode: string): string => {
       return twoChars
     }
   }
-  
+
   return ''
 }
 
@@ -877,12 +852,12 @@ const resolveToIso = (countryCode: string): string => {
  */
 export const getCountryFlag = (countryCode: string): string => {
   const isoCode = resolveToIso(countryCode)
-  
+
   // Validate ISO code - return empty string for invalid codes to prevent 404s
   if (!isoCode || !VALID_ISO_CODES.has(isoCode)) {
     return ''
   }
-  
+
   return `https://flagcdn.com/w80/${isoCode}.png`
 }
 
@@ -891,8 +866,8 @@ export const getCountryFlag = (countryCode: string): string => {
  */
 export const getFlagEmoji = (countryCode: string): string => {
   const isoCode = resolveToIso(countryCode)
-  
+
   if (!isoCode) return '🌍'
-  
+
   return toFlagEmoji(isoCode)
 }

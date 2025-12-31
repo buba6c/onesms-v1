@@ -41,11 +41,11 @@ export function useRentPolling({
   const userIdRef = useRef<string | null>(null);
   const [messagesCache, setMessagesCache] = useState<RentMessagesCache>({});
 
-  // Get user ID on mount
+  // Get user ID on mount (use getSession to avoid network call)
   useEffect(() => {
     const getUserId = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      userIdRef.current = user?.id || null;
+      const { data: { session } } = await supabase.auth.getSession();
+      userIdRef.current = session?.user?.id || null;
     };
     getUserId();
   }, []);
@@ -63,10 +63,16 @@ export function useRentPolling({
     // Fonction de polling
     const checkRentalMessages = async () => {
       try {
-        // Get current user ID if not cached
+        // Get current user ID if not cached (use getSession - local read, no network)
         if (!userIdRef.current) {
-          const { data: { user } } = await supabase.auth.getUser();
-          userIdRef.current = user?.id || null;
+          const { data: { session } } = await supabase.auth.getSession();
+          userIdRef.current = session?.user?.id || null;
+          
+          // Si pas de session, ne pas faire de polling
+          if (!userIdRef.current) {
+            console.log('[RENT_POLLING] No session, skipping poll');
+            return;
+          }
         }
 
         // Vérifier chaque rental et collecter les messages

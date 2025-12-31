@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -165,7 +165,23 @@ serve(async (req) => {
     // }
 
     if (continueData.status === 'success' && continueData.phone) {
-      const { endDate } = continueData.phone
+      const { endDate: rawEndDate } = continueData.phone
+      
+      // Parse endDate - SMS-Activate returns Unix timestamp in seconds or ISO string
+      const parseEndDate = (val: unknown): string => {
+        if (typeof val === 'number') {
+          return new Date(val < 1e10 ? val * 1000 : val).toISOString()
+        }
+        if (typeof val === 'string') {
+          const num = Number(val)
+          if (!isNaN(num)) {
+            return new Date(num < 1e10 ? num * 1000 : num).toISOString()
+          }
+          return new Date(val).toISOString()
+        }
+        return new Date(Date.now() + parseInt(hours) * 3600 * 1000).toISOString()
+      }
+      const endDate = parseEndDate(rawEndDate)
 
       // Déduire le solde avec log
       const newBalance = profile.balance - price
@@ -187,11 +203,12 @@ serve(async (req) => {
         .update({ balance: newBalance })
         .eq('id', user.id)
 
-      // Mettre à jour le rental
+      // Mettre à jour le rental (avec expires_at pour cohérence)
       await supabase
         .from('rentals')
         .update({
           end_date: endDate,
+          expires_at: endDate,
           rent_hours: rental.rent_hours + parseInt(hours),
           total_cost: rental.total_cost + price,
           updated_at: new Date().toISOString()

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { signUp, signInWithGoogle } from '@/lib/supabase'
+import { signUp, signInWithGoogle, checkEmailExists } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
 
 export default function RegisterPage() {
@@ -63,6 +63,29 @@ export default function RegisterPage() {
 
     setLoading(true)
 
+    // Vérifier d'abord si l'email existe déjà
+    const emailExists = await checkEmailExists(email)
+    
+    if (emailExists) {
+      toast({
+        title: t('auth.accountExistsTitle'),
+        description: t('auth.accountExistsDescription'),
+        variant: 'destructive',
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate('/login')}
+            className="ml-auto"
+          >
+            {t('nav.login')}
+          </Button>
+        ),
+      })
+      setLoading(false)
+      return
+    }
+
     const { data, error } = await signUp(email, password, { full_name: fullName, referral_code: referralCode || undefined })
 
     if (referralCode) {
@@ -70,11 +93,33 @@ export default function RegisterPage() {
     }
 
     if (error) {
-      toast({
-        title: t('common.error'),
-        description: error.message,
-        variant: 'destructive',
-      })
+      // Vérifier si l'erreur est due à un utilisateur existant
+      if (error.message.includes('User already registered') || 
+          error.message.includes('already been registered') ||
+          error.message.includes('Email already exists') ||
+          error.message.includes('duplicate key')) {
+        toast({
+          title: t('auth.accountExistsTitle'),
+          description: t('auth.accountExistsDescription'),
+          variant: 'destructive',
+          action: (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/login')}
+              className="ml-auto"
+            >
+              {t('nav.login')}
+            </Button>
+          ),
+        })
+      } else {
+        toast({
+          title: t('common.error'),
+          description: error.message,
+          variant: 'destructive',
+        })
+      }
       setLoading(false)
       return
     }

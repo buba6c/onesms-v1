@@ -28,17 +28,26 @@ export const SMS_ACTIVATE_COUNTRIES = {
   "10": { id: 10, code: "vietnam", name: "Vietnam", priority: 150 },
   "11": { id: 11, code: "kyrgyzstan", name: "Kyrgyzstan", priority: 50 },
   "12": { id: 12, code: "england", name: "England", priority: 600, popular: true },
+  "13": { id: 13, code: "israel", name: "Israel", priority: 120 },
+  "14": { id: 14, code: "hongkong", name: "Hong Kong", priority: 200 },
   "15": { id: 15, code: "poland", name: "Poland", priority: 100 },
   "16": { id: 16, code: "unitedkingdom", name: "United Kingdom", priority: 550 },
+  "19": { id: 19, code: "morocco", name: "Morocco", priority: 100 },
   "22": { id: 22, code: "india", name: "India", priority: 700, popular: true },
+  "27": { id: 27, code: "ivorycoast", name: "Ivory Coast", priority: 50 },
+  "31": { id: 31, code: "southafrica", name: "South Africa", priority: 150 },
   "32": { id: 32, code: "romania", name: "Romania", priority: 100 },
   "33": { id: 33, code: "colombia", name: "Colombia", priority: 120 },
+  "34": { id: 34, code: "estonia", name: "Estonia", priority: 50 },
   "36": { id: 36, code: "canada", name: "Canada", priority: 400, popular: true },
   "39": { id: 39, code: "argentina", name: "Argentina", priority: 120 },
   "43": { id: 43, code: "germany", name: "Germany", priority: 200, popular: true },
+  "47": { id: 47, code: "moldova", name: "Moldova", priority: 50 },
+  "49": { id: 49, code: "latvia", name: "Latvia", priority: 50 },
   "52": { id: 52, code: "thailand", name: "Thailand", priority: 180 },
   "56": { id: 56, code: "spain", name: "Spain", priority: 150 },
   "58": { id: 58, code: "italy", name: "Italy", priority: 150 },
+  "63": { id: 63, code: "czechia", name: "Czech Republic", priority: 50 },
   "73": { id: 73, code: "brazil", name: "Brazil", priority: 180 },
   "78": { id: 78, code: "france", name: "France", priority: 300, popular: true },
   "82": { id: 82, code: "mexico", name: "Mexico", priority: 150 },
@@ -56,7 +65,11 @@ export const SMS_ACTIVATE_COUNTRIES = {
   "175": { id: 175, code: "australia", name: "Australia", priority: 250 },
   "182": { id: 182, code: "japan", name: "Japan", priority: 200 },
   "187": { id: 187, code: "usa", name: "USA", priority: 1000, popular: true },
-  "196": { id: 196, code: "singapore", name: "Singapore", priority: 200 }
+  "196": { id: 196, code: "singapore", name: "Singapore", priority: 200 },
+  "189": { id: 189, code: "drcongo", name: "DR Congo", priority: 50 },
+  "183": { id: 183, code: "nigeria", name: "Nigeria", priority: 50 },
+  "184": { id: 184, code: "hungary", name: "Hungary", priority: 50 },
+  "185": { id: 185, code: "bulgaria", name: "Bulgaria", priority: 50 },
 } as const
 
 /**
@@ -66,8 +79,8 @@ export const SMS_ACTIVATE_COUNTRIES = {
  */
 export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   // TOP 1-10 (Homepage Order - Row 1)
-  { code: "fu", name: "Snapchat", category: "social", popularity: 1000 },      // #1
-  { code: "wb", name: "WeChat", category: "messaging", popularity: 990 },      // #2
+  { code: "wa", name: "WhatsApp", category: "messaging", popularity: 1000 },   // #1 (CUSTOM)
+  { code: "fu", name: "Snapchat", category: "social", popularity: 995 },       // #2 (moved down)
   { code: "go", name: "Google", category: "tech", popularity: 980 },           // #3
   { code: "lf", name: "TikTok", category: "social", popularity: 970 },         // #4
   { code: "fb", name: "Facebook", category: "social", popularity: 960 },       // #5
@@ -75,8 +88,8 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   { code: "vk", name: "VKontakte", category: "social", popularity: 940 },      // #7
   { code: "ig", name: "Instagram", category: "social", popularity: 930 },      // #8
   { code: "vi", name: "Viber", category: "messaging", popularity: 920 },       // #9
-  { code: "wa", name: "WhatsApp", category: "messaging", popularity: 910 },    // #10
-  
+  { code: "wb", name: "WeChat", category: "messaging", popularity: 910 },      // #10 (swapped with WhatsApp)
+
   // TOP 11-20 (Homepage Order - Row 2)
   { code: "am", name: "Amazon", category: "shopping", popularity: 900 },       // #11
   { code: "nf", name: "Netflix", category: "entertainment", popularity: 890 }, // #12
@@ -88,7 +101,7 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   { code: "oi", name: "Tinder", category: "dating", popularity: 830 },         // #18
   { code: "ub", name: "Uber", category: "delivery", popularity: 820 },         // #19
   { code: "wx", name: "Apple", category: "tech", popularity: 810 },            // #20
-  
+
   // TOP 21-30
   { code: "mm", name: "Microsoft", category: "tech", popularity: 800 },        // #21
   { code: "mt", name: "Steam", category: "gaming", popularity: 790 },          // #22
@@ -100,7 +113,7 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   { code: "hb", name: "Twitch", category: "entertainment", popularity: 730 },  // #28
   { code: "ep", name: "Temu", category: "shopping", popularity: 720 },         // #29
   { code: "hx", name: "AliExpress", category: "shopping", popularity: 710 },   // #30
-  
+
   // TOP 31-40
   { code: "ka", name: "Shopee", category: "shopping", popularity: 700 },       // #31
   { code: "aez", name: "Shein", category: "shopping", popularity: 690 },       // #32
@@ -112,7 +125,7 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   { code: "qv", name: "Badoo", category: "dating", popularity: 630 },          // #38
   { code: "vz", name: "Hinge", category: "dating", popularity: 620 },          // #39
   { code: "df", name: "Happn", category: "dating", popularity: 610 },          // #40
-  
+
   // TOP 41-50
   { code: "jg", name: "Grab", category: "delivery", popularity: 600 },         // #41
   { code: "ac", name: "DoorDash", category: "delivery", popularity: 590 },     // #42
@@ -124,7 +137,7 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   { code: "blm", name: "Epic Games", category: "gaming", popularity: 530 },    // #48
   { code: "bz", name: "Blizzard", category: "gaming", popularity: 520 },       // #49
   { code: "ah", name: "Escape From Tarkov", category: "gaming", popularity: 510 }, // #50
-  
+
   // Additional popular services (51-60)
   { code: "bnl", name: "Reddit", category: "social", popularity: 500 },        // #51
   { code: "mb", name: "Yahoo", category: "tech", popularity: 490 },            // #52
@@ -136,7 +149,7 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
   { code: "zm", name: "Zoom", category: "tech", popularity: 430 },             // #58
   { code: "sk", name: "Skype", category: "messaging", popularity: 420 },       // #59
   { code: "sl", name: "Slack", category: "tech", popularity: 410 },            // #60
-  
+
   // Additional services for RENT (SMS-Activate rent services)
   { code: "hw", name: "Alipay/Alibaba/1688", category: "finance", popularity: 400 }, // Alipay, Alibaba, 1688
   { code: "full", name: "Full Rent (Any Service)", category: "other", popularity: 395 }, // Full Rent
@@ -158,28 +171,28 @@ export const SMS_ACTIVATE_TOP_SERVICES: SMSActivateService[] = [
 export const SMS_ACTIVATE_SERVICES = {
   // Social Media
   social: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "social"),
-  
+
   // Messaging
   messaging: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "messaging"),
-  
+
   // Shopping & E-commerce
   shopping: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "shopping"),
-  
+
   // Finance & Payment
   finance: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "finance"),
-  
+
   // Food & Delivery
   delivery: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "delivery"),
-  
+
   // Tech & Services
   tech: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "tech"),
-  
+
   // Dating
   dating: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "dating"),
-  
+
   // Gaming
   gaming: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "gaming"),
-  
+
   // Entertainment
   entertainment: SMS_ACTIVATE_TOP_SERVICES.filter(s => s.category === "entertainment"),
 } as const

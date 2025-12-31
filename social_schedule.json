@@ -1,0 +1,242 @@
+[
+  {
+    "date": "2025-12-16T12:00:00.000Z",
+    "day": "16/12/2025",
+    "time": "12:00",
+    "platform": "twitter",
+    "service": "whatsapp",
+    "posted": false
+  },
+  {
+    "date": "2025-12-17T14:00:00.000Z",
+    "day": "17/12/2025",
+    "time": "14:00",
+    "platform": "facebook",
+    "service": "telegram",
+    "posted": false
+  },
+  {
+    "date": "2025-12-18T09:00:00.000Z",
+    "day": "18/12/2025",
+    "time": "09:00",
+    "platform": "linkedin",
+    "service": "instagram",
+    "posted": false
+  },
+  {
+    "date": "2025-12-19T19:00:00.000Z",
+    "day": "19/12/2025",
+    "time": "19:00",
+    "platform": "instagram",
+    "service": "discord",
+    "posted": false
+  },
+  {
+    "date": "2025-12-20T20:00:00.000Z",
+    "day": "20/12/2025",
+    "time": "20:00",
+    "platform": "tiktok",
+    "service": "google",
+    "posted": false
+  },
+  {
+    "date": "2025-12-21T12:00:00.000Z",
+    "day": "21/12/2025",
+    "time": "12:00",
+    "platform": "twitter",
+    "service": "whatsapp",
+    "posted": false
+  },
+  {
+    "date": "2025-12-22T14:00:00.000Z",
+    "day": "22/12/2025",
+    "time": "14:00",
+    "platform": "facebook",
+    "service": "telegram",
+    "posted": false
+  },
+  {
+    "date": "2025-12-23T09:00:00.000Z",
+    "day": "23/12/2025",
+    "time": "09:00",
+    "platform": "linkedin",
+    "service": "instagram",
+    "posted": false
+  },
+  {
+    "date": "2025-12-24T19:00:00.000Z",
+    "day": "24/12/2025",
+    "time": "19:00",
+    "platform": "instagram",
+    "service": "discord",
+    "posted": false
+  },
+  {
+    "date": "2025-12-25T20:00:00.000Z",
+    "day": "25/12/2025",
+    "time": "20:00",
+    "platform": "tiktok",
+    "service": "google",
+    "posted": false
+  },
+  {
+    "date": "2025-12-26T12:00:00.000Z",
+    "day": "26/12/2025",
+    "time": "12:00",
+    "platform": "twitter",
+    "service": "whatsapp",
+    "posted": false
+  },
+  {
+    "date": "2025-12-27T14:00:00.000Z",
+    "day": "27/12/2025",
+    "time": "14:00",
+    "platform": "facebook",
+    "service": "telegram",
+    "posted": false
+  },
+  {
+    "date": "2025-12-28T09:00:00.000Z",
+    "day": "28/12/2025",
+    "time": "09:00",
+    "platform": "linkedin",
+    "service": "instagram",
+    "posted": false
+  },
+  {
+    "date": "2025-12-29T19:00:00.000Z",
+    "day": "29/12/2025",
+    "time": "19:00",
+    "platform": "instagram",
+    "service": "discord",
+    "posted": false
+  },
+  {
+    "date": "2025-12-30T20:00:00.000Z",
+    "day": "30/12/2025",
+    "time": "20:00",
+    "platform": "tiktok",
+    "service": "google",
+    "posted": false
+  },
+  {
+    "date": "2025-12-31T12:00:00.000Z",
+    "day": "31/12/2025",
+    "time": "12:00",
+    "platform": "twitter",
+    "service": "whatsapp",
+    "posted": false
+  },
+  {
+    "date": "2026-01-01T14:00:00.000Z",
+    "day": "01/01/2026",
+    "time": "14:00",
+    "platform": "facebook",
+    "service": "telegram",
+    "posted": false
+  },
+  {
+    "date": "2026-01-02T09:00:00.000Z",
+    "day": "02/01/2026",
+    "time": "09:00",
+    "platform": "linkedin",
+    "service": "instagram",
+    "posted": false
+  },
+  {
+    "date": "2026-01-03T19:00:00.000Z",
+    "day": "03/01/2026",
+    "time": "19:00",
+    "platform": "instagram",
+    "service": "discord",
+    "posted": false
+  },
+  {
+    "date": "2026-01-04T20:00:00.000Z",
+    "day": "04/01/2026",
+    "time": "20:00",
+    "platform": "tiktok",
+    "service": "google",
+    "posted": false
+  },
+  {
+    "date": "2026-01-05T12:00:00.000Z",
+    "day": "05/01/2026",
+    "time": "12:00",
+    "platform": "twitter",
+    "service": "whatsapp",
+    "posted": false
+  },
+  {
+    "date": "2026-01-06T14:00:00.000Z",
+    "day": "06/01/2026",
+    "time": "14:00",
+    "platform": "facebook",
+    "service": "telegram",
+    "posted": false
+  },
+  {
+    "date": "2026-01-07T09:00:00.000Z",
+    "day": "07/01/2026",
+    "time": "09:00",
+    "platform": "linkedin",
+    "service": "instagram",
+    "posted": false
+  },
+  {
+    "date": "2026-01-08T19:00:00.000Z",
+    "day": "08/01/2026",
+    "time": "19:00",
+    "platform": "instagram",
+    "service": "discord",
+    "posted": false
+  },
+  {
+    "date": "2026-01-09T20:00:00.000Z",
+    "day": "09/01/2026",
+    "time": "20:00",
+    "platform": "tiktok",
+    "service": "google",
+    "posted": false
+  },
+  {
+    "date": "2026-01-10T12:00:00.000Z",
+    "day": "10/01/2026",
+    "time": "12:00",
+    "platform": "twitter",
+    "service": "whatsapp",
+    "posted": false
+  },
+  {
+    "date": "2026-01-11T14:00:00.000Z",
+    "day": "11/01/2026",
+    "time": "14:00",
+    "platform": "facebook",
+    "service": "telegram",
+    "posted": false
+  },
+  {
+    "date": "2026-01-12T09:00:00.000Z",
+    "day": "12/01/2026",
+    "time": "09:00",
+    "platform": "linkedin",
+    "service": "instagram",
+    "posted": false
+  },
+  {
+    "date": "2026-01-13T19:00:00.000Z",
+    "day": "13/01/2026",
+    "time": "19:00",
+    "platform": "instagram",
+    "service": "discord",
+    "posted": false
+  },
+  {
+    "date": "2026-01-14T20:00:00.000Z",
+    "day": "14/01/2026",
+    "time": "20:00",
+    "platform": "tiktok",
+    "service": "google",
+    "posted": false
+  }
+]

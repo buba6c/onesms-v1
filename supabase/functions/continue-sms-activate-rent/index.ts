@@ -3,7 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,22 +15,25 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let supabaseClient: any = null
+  let rentalId: string | null = null
+  let userId: string | null = null
+  let extensionLocked = false
+
   try {
-    // Use SERVICE_ROLE_KEY to bypass RLS for database operations
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { rentalId, userId } = await req.json()
+    const body = await req.json()
+    rentalId = body.rentalId
+    userId = body.userId
+    // Allow user to choose extension duration (default: same as original, min 4h)
+    const requestedHours = body.hours || null
 
-    console.log('⏰ [CONTINUE-RENT] Request:', { rentalId, userId })
+    console.log('⏰ [CONTINUE-RENT] Request:', { rentalId, userId, requestedHours })
 
     // 1. Get rental from database
     const { data: rental, error: rentalError } = await supabaseClient
@@ -45,25 +48,65 @@ serve(async (req) => {
     }
 
     // 2. Check if rental can be extended
-    if (rental.status !== 'active') {
-      throw new Error(`Cannot extend rental with status: ${rental.status}`)
+    const extendableStatuses = ['active', 'completed']
+    if (!extendableStatuses.includes(rental.status)) {
+      throw new Error(`Cannot extend rental with status: ${rental.status}. Only active or completed rentals can be extended.`)
     }
 
-    // 3. Guard against concurrent extension/freeze already present
-    if ((rental.frozen_amount || 0) > 0) {
-      throw new Error('Extension already en cours (fonds gelés). Réessayez plus tard ou contactez le support.')
+    // 3. Check if extension is already in progress
+    if (rental.metadata?.extension_in_progress) {
+      throw new Error('Extension already en cours. Réessayez plus tard ou contactez le support.')
     }
 
-    // 4. Calculate extension parameters and price (same duration as current rent_hours)
-    const rentTimeHours = rental.rent_hours || 4 // Default 4 hours extension
-    const basePrice = 0.50
-    const dailyMultiplier = rentTimeHours / 24
-    const extensionPrice = basePrice * dailyMultiplier
+    // 4. Determine extension duration
+    // Use requested hours, or default to original rental duration, minimum 4h
+    const rentTimeHours = requestedHours || rental.rent_hours || 4
+    if (rentTimeHours < 4) {
+      throw new Error('Minimum extension duration is 4 hours')
+    }
+    
+    const smsActivateRentId = rental.order_id || rental.rent_id || rental.rental_id
+    
+    // 5. Get extension price from SMS-Activate API
+    const infoUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=continueRentInfo&id=${smsActivateRentId}&hours=${rentTimeHours}`
+    console.log('💰 [CONTINUE-RENT] Getting extension price for', rentTimeHours, 'hours...')
+    
+    const infoResponse = await fetch(infoUrl)
+    const infoData = await infoResponse.json()
+    
+    console.log('💰 [CONTINUE-RENT] Price info:', infoData)
+    
+    if (infoData.status === 'error') {
+      throw new Error(`SMS-Activate: ${infoData.message || 'Cannot get extension price'}`)
+    }
+    
+    const apiPrice = parseFloat(infoData.price) || 0
+    if (apiPrice <= 0) {
+      throw new Error('Failed to get extension price from SMS-Activate')
+    }
+    
+    // Get margin from settings
+    const { data: marginSetting } = await supabaseClient
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pricing_margin_percentage')
+      .single()
+    
+    const marginPercentage = marginSetting?.value ? parseFloat(marginSetting.value) : 30
+    const USD_TO_FCFA = 600
+    const FCFA_TO_COINS = 100
+    const MIN_PRICE_COINS = 5
+    
+    const priceFCFA = apiPrice * USD_TO_FCFA
+    const priceCoins = priceFCFA / FCFA_TO_COINS
+    const extensionPrice = Math.max(MIN_PRICE_COINS, Math.ceil(priceCoins * (1 + marginPercentage / 100)))
+    
+    console.log(`💰 [CONTINUE-RENT] Price: API=${apiPrice}$ → ${extensionPrice}Ⓐ for ${rentTimeHours}h (margin: ${marginPercentage}%)`)
 
-    // 5. Check user balance
+    // 6. Check user balance (available = balance - frozen)
     const { data: userProfile, error: profileError } = await supabaseClient
       .from('users')
-      .select('balance')
+      .select('balance, frozen_balance')
       .eq('id', userId)
       .single()
 
@@ -71,31 +114,26 @@ serve(async (req) => {
       throw new Error('User profile not found')
     }
 
-    if (userProfile.balance < extensionPrice) {
-      throw new Error(`Insufficient balance. Required: $${extensionPrice.toFixed(2)}, Available: $${userProfile.balance}`)
+    const availableBalance = userProfile.balance - (userProfile.frozen_balance || 0)
+    if (availableBalance < extensionPrice) {
+      throw new Error(`INSUFFICIENT_BALANCE:${extensionPrice}:${availableBalance}`)
     }
 
-    // 6. Freeze atomique avant l'appel provider
-    let froze = false
-    let committed = false
-
-    const { data: freezeResult, error: freezeError } = await supabaseClient.rpc('secure_freeze_balance', {
-      p_user_id: userId,
-      p_amount: extensionPrice,
-      p_rental_id: rental.id,
-      p_reason: `Freeze extension rent ${rental.id} (+${rentTimeHours}h)`
-    })
-
-    if (freezeError || !freezeResult?.success) {
-      throw new Error(`Failed to freeze for extension: ${freezeError?.message || 'unknown error'}`)
-    }
-    froze = true
-
-    // 7. Extend rental on SMS-Activate
-    // Support multiple column names for SMS-Activate rent ID
-    const smsActivateRentId = rental.order_id || rental.rent_id || rental.rental_id
+    // 7. Mark extension in progress (lock)
+    const { error: lockError } = await supabaseClient
+      .from('rentals')
+      .update({ 
+        metadata: { ...rental.metadata, extension_in_progress: true },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', rentalId)
     
-    // ✅ Correct API action: continueRentNumber (not continueRent)
+    if (lockError) {
+      throw new Error(`Failed to lock rental: ${lockError.message}`)
+    }
+    extensionLocked = true
+
+    // 8. Extend rental on SMS-Activate FIRST (before charging)
     const apiUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=continueRentNumber&id=${smsActivateRentId}&rent_time=${rentTimeHours}`
     console.log('🌐 [CONTINUE-RENT] API Call:', apiUrl.replace(SMS_ACTIVATE_API_KEY!, 'KEY_HIDDEN'))
 
@@ -104,80 +142,93 @@ serve(async (req) => {
 
     console.log('📥 [CONTINUE-RENT] API Response:', responseText)
 
-    // Parse JSON response
     let apiData: any
     try {
       apiData = JSON.parse(responseText)
     } catch {
-      // If not JSON, check for error string
-      if (responseText.startsWith('BAD_') || responseText.includes('ERROR')) {
-        throw new Error(`SMS-Activate error: ${responseText}`)
+      if (responseText.startsWith('BAD_') || responseText.includes('ERROR') || responseText.includes('RENT_DIE')) {
+        throw new Error(`SMS-Activate: ${responseText}`)
       }
       throw new Error(`Invalid API response: ${responseText}`)
     }
 
-    // Check for error response
     if (apiData.status === 'error') {
-      throw new Error(`SMS-Activate error: ${apiData.message || apiData.info || 'Unknown error'}`)
+      throw new Error(`SMS-Activate: ${apiData.message || apiData.info || 'Unknown error'}`)
     }
 
-    // Get new end date from response or calculate it
     let newEndDate: Date
     if (apiData.phone?.endDate) {
-      newEndDate = new Date(apiData.phone.endDate)
+      // endDate from SMS-Activate is a Unix timestamp in seconds
+      const endDateValue = apiData.phone.endDate
+      // Check if it's seconds (small number) or milliseconds (large number)
+      const timestamp = endDateValue < 10000000000 ? endDateValue * 1000 : endDateValue
+      newEndDate = new Date(timestamp)
+      console.log('📅 [CONTINUE-RENT] Parsed endDate:', endDateValue, '→', newEndDate.toISOString())
     } else {
       newEndDate = new Date(new Date(rental.end_date).getTime() + rentTimeHours * 3600 * 1000)
+      console.log('📅 [CONTINUE-RENT] Using fallback calculation:', newEndDate.toISOString())
     }
 
-    // Note: If rental was completed, a new ID might be provided
     const newRentId = apiData.phone?.id || smsActivateRentId
 
-    // 8. Commit le freeze (débit effectif) et mettre à jour la location
-    const { data: commitResult, error: commitError } = await supabaseClient.rpc('secure_unfreeze_balance', {
-      p_user_id: userId,
-      p_rental_id: rental.id,
-      p_refund_to_balance: false,
-      p_refund_reason: `Commit extension rent ${smsActivateRentId} (+${rentTimeHours}h)`
-    })
-
-    if (commitError || !commitResult?.success) {
-      // Tentative de rollback du gel en cas d'échec du commit
-      await supabaseClient.rpc('secure_unfreeze_balance', {
-        p_user_id: userId,
-        p_rental_id: rental.id,
-        p_refund_to_balance: true,
-        p_refund_reason: `Rollback extension commit ${smsActivateRentId}`
+    // 9. IMPORTANT: Insert balance_operations BEFORE updating users (trigger requirement)
+    // Valid types: 'freeze', 'refund', 'credit_admin', 'commit', 'debit_admin'
+    const newBalance = userProfile.balance - extensionPrice
+    const { error: logError } = await supabaseClient
+      .from('balance_operations')
+      .insert({
+        user_id: userId,
+        operation_type: 'commit',
+        amount: extensionPrice,
+        balance_before: userProfile.balance,
+        balance_after: newBalance,
+        frozen_before: userProfile.frozen_balance || 0,
+        frozen_after: userProfile.frozen_balance || 0,
+        reason: `Extension location ${smsActivateRentId} (+${rentTimeHours}h)`
       })
-      throw new Error(`Failed to commit extension: ${commitError?.message || 'unknown error'}`)
+    
+    if (logError) {
+      console.error('❌ [CONTINUE-RENT] Failed to log operation:', logError)
+      throw new Error(`Failed to log operation: ${logError.message}`)
     }
-    committed = true
 
+    // 10. Now deduct balance (after balance_operations insert)
+    const { error: deductError } = await supabaseClient
+      .from('users')
+      .update({
+        balance: newBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId)
+    
+    if (deductError) {
+      console.error('❌ [CONTINUE-RENT] Failed to deduct balance:', deductError)
+      throw new Error(`Failed to deduct balance: ${deductError.message}`)
+    }
+
+    // 11. Update rental
     const updatedRentId = newRentId.toString()
     const { error: rentalUpdateError } = await supabaseClient
       .from('rentals')
       .update({
         end_date: newEndDate.toISOString(),
+        expires_at: newEndDate.toISOString(), // Also update expires_at for consistency
         rent_id: updatedRentId,
         rental_id: updatedRentId,
         rent_hours: rental.rent_hours + rentTimeHours,
         total_cost: (rental.total_cost || 0) + extensionPrice,
         status: 'active',
-        frozen_amount: 0,
+        metadata: { ...rental.metadata, extension_in_progress: false },
         charged: true,
         updated_at: new Date().toISOString()
       })
       .eq('id', rentalId)
 
     if (rentalUpdateError) {
-      throw new Error(`Failed to update rental after extension: ${rentalUpdateError.message}`)
+      throw new Error(`Failed to update rental: ${rentalUpdateError.message}`)
     }
 
-    console.log('✅ [CONTINUE-RENT] Successfully extended with atomic freeze/commit:', {
-      rentalId,
-      price: extensionPrice,
-      newEndDate: newEndDate.toISOString(),
-      rent_id: updatedRentId
-    })
+    console.log('✅ [CONTINUE-RENT] Extended:', { rentalId, hours: rentTimeHours, price: extensionPrice, newEndDate: newEndDate.toISOString() })
 
     return new Response(
       JSON.stringify({
@@ -186,39 +237,30 @@ serve(async (req) => {
           rental_id: rentalId,
           rent_id: updatedRentId,
           end_date: newEndDate.toISOString(),
+          hours: rentTimeHours,
           price: extensionPrice
         }
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error: any) {
-    // Best-effort rollback of freeze if commit not done
-    try {
-      if (typeof froze !== 'undefined' && froze && typeof committed !== 'undefined' && !committed) {
-        await supabaseClient.rpc('secure_unfreeze_balance', {
-          p_user_id: userId,
-          p_rental_id: rental?.id,
-          p_refund_to_balance: true,
-          p_refund_reason: 'Rollback extension failure'
-        })
+    // Release extension lock if set
+    if (extensionLocked && supabaseClient && rentalId) {
+      try {
+        await supabaseClient
+          .from('rentals')
+          .update({ metadata: { extension_in_progress: false }, updated_at: new Date().toISOString() })
+          .eq('id', rentalId)
+        console.log('🔓 [CONTINUE-RENT] Released lock')
+      } catch (e) {
+        console.error('⚠️ [CONTINUE-RENT] Failed to release lock:', (e as Error).message)
       }
-    } catch (e) {
-      console.error('⚠️ rollback unfreeze failed:', (e as Error).message)
     }
 
     console.error('❌ [CONTINUE-RENT] Error:', error)
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
 })

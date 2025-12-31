@@ -44,7 +44,7 @@ serve(async (req) => {
       
       try {
         // Cancel on SMS-Activate
-        const cancelUrl = `https://api.sms-activate.ae/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`
+        const cancelUrl = `https://hero-sms.com/stubs/handler_api.php?api_key=${SMS_ACTIVATE_API_KEY}&action=setStatus&id=${activation.order_id}&status=8`
         
         console.log(`📞 [CLEANUP-EXPIRED] Cancelling on SMS-Activate: ${activation.order_id}`)
         const cancelResponse = await fetch(cancelUrl)

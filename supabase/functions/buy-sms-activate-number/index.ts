@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +65,12 @@ const mapServiceCode = (code: string): string => {
 }
 
 const mapCountryCode = (country: string): number => {
+  // If it's already a numeric ID, return it directly
+  const numericId = parseInt(country, 10)
+  if (!isNaN(numericId) && numericId > 0) {
+    return numericId
+  }
+  // Otherwise look up by name
   return COUNTRY_CODE_MAP[country.toLowerCase()] || 0
 }
 
@@ -84,27 +90,26 @@ serve(async (req) => {
       hasAuth: !!req.headers.get('Authorization')
     })
     
-    // Use SERVICE_ROLE_KEY to bypass RLS for inserting activation records
+    // Admin client with SERVICE_ROLE_KEY for all operations (bypasses RLS)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-
-    console.log('🔐 [BUY-SMS-ACTIVATE] Checking user authentication...')
     
-    // Get user
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser()
+    // Extract user from JWT token in Authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new Error('Unauthorized - No token provided')
+    }
+    
+    const token = authHeader.replace('Bearer ', '')
+    
+    // Verify token and get user using SERVICE_ROLE_KEY
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token)
 
-    console.log('👤 [BUY-SMS-ACTIVATE] User:', user ? `${user.id}` : 'null')
+    console.log('👤 [BUY-SMS-ACTIVATE] User:', user ? `${user.id}` : 'null', authError ? `Error: ${authError.message}` : '')
 
-    if (!user) {
+    if (authError || !user) {
       throw new Error('Unauthorized')
     }
 
@@ -227,7 +232,30 @@ serve(async (req) => {
     const transactionId = pendingTransaction.id
     console.log('📝 [BUY-SMS-ACTIVATE] Transaction created:', transactionId)
 
-    // 3.2. FREEZE credits BEFORE API call (prevents double-purchase)
+    // 3.2. CREATE balance_operations entry FIRST (required by users_balance_guard trigger)
+    const { error: ledgerError } = await supabaseClient
+      .from('balance_operations')
+      .insert({
+        user_id: userId,
+        operation_type: 'freeze',
+        amount: price,
+        balance_before: currentBalance,
+        balance_after: currentBalance, // Balance unchanged (Model A)
+        frozen_before: frozenBalance,
+        frozen_after: frozenBalance + price,
+        reason: 'Freeze credits for SMS activation purchase',
+        created_at: new Date().toISOString()
+      })
+
+    if (ledgerError) {
+      console.error('❌ [BUY-SMS-ACTIVATE] Failed to create ledger entry:', ledgerError)
+      await supabaseClient.from('transactions').update({ status: 'failed' }).eq('id', transactionId)
+      throw new Error('Failed to create ledger entry')
+    }
+
+    console.log('📊 [BUY-SMS-ACTIVATE] Ledger entry created')
+
+    // 3.3. FREEZE credits BEFORE API call (prevents double-purchase)
     const { error: freezeError } = await supabaseClient
       .from('users')
       .update({
@@ -278,12 +306,40 @@ serve(async (req) => {
         const [, activationId, phone] = responseText.split(':')
         data = { activationId, phoneNumber: phone }
       } else {
-        // ❌ API ERROR - ROLLBACK frozen credits
+        // ❌ API ERROR - ROLLBACK frozen credits using ATOMIC operation
         console.error('❌ [BUY-SMS-ACTIVATE] API Error, rolling back frozen credits...')
+        
+        // Re-read current frozen to get actual value (not stale)
+        const { data: currentUser } = await supabaseClient
+          .from('users')
+          .select('frozen_balance')
+          .eq('id', userId)
+          .single()
+        
+        const actualFrozen = currentUser?.frozen_balance || 0
+        const newFrozen = Math.max(0, actualFrozen - price)
+        
+        // Create ledger entry for unfreeze
+        await supabaseClient
+          .from('balance_operations')
+          .insert({
+            user_id: userId,
+            operation_type: 'refund',
+            amount: price,
+            balance_before: currentBalance,
+            balance_after: currentBalance,
+            frozen_before: actualFrozen,
+            frozen_after: newFrozen,
+            reason: `API error refund: ${responseText}`,
+            created_at: new Date().toISOString()
+          })
+        
+        // Unfreeze credits with CURRENT value
         await supabaseClient
           .from('users')
-          .update({ frozen_balance: Math.max(0, frozenBalance) })
+          .update({ frozen_balance: newFrozen })
           .eq('id', userId)
+        
         await supabaseClient
           .from('transactions')
           .update({ status: 'failed', description: `SMS-Activate error: ${responseText}` })
@@ -294,12 +350,40 @@ serve(async (req) => {
 
     // Check for error in JSON response
     if (data.status === 'error' || data.error) {
-      // ❌ API ERROR - ROLLBACK frozen credits
+      // ❌ API ERROR - ROLLBACK frozen credits using ATOMIC operation
       console.error('❌ [BUY-SMS-ACTIVATE] API Error response, rolling back frozen credits...')
+      
+      // Re-read current frozen to get actual value (not stale)
+      const { data: currentUser } = await supabaseClient
+        .from('users')
+        .select('frozen_balance')
+        .eq('id', userId)
+        .single()
+      
+      const actualFrozen = currentUser?.frozen_balance || 0
+      const newFrozen = Math.max(0, actualFrozen - price)
+      
+      // Create ledger entry for unfreeze
+      await supabaseClient
+        .from('balance_operations')
+        .insert({
+          user_id: userId,
+          operation_type: 'refund',
+          amount: price,
+          balance_before: currentBalance,
+          balance_after: currentBalance,
+          frozen_before: actualFrozen,
+          frozen_after: newFrozen,
+          reason: `API error refund: ${data.message || data.error}`,
+          created_at: new Date().toISOString()
+        })
+      
+      // Unfreeze credits with CURRENT value
       await supabaseClient
         .from('users')
-        .update({ frozen_balance: Math.max(0, frozenBalance) })
+        .update({ frozen_balance: newFrozen })
         .eq('id', userId)
+      
       await supabaseClient
         .from('transactions')
         .update({ status: 'failed', description: `SMS-Activate error: ${data.message || data.error}` })
@@ -340,6 +424,7 @@ serve(async (req) => {
         country_code: country,
         operator: operator || 'any',
         price: price,
+        frozen_amount: price,  // ✅ CRITICAL: Track frozen amount for reconciliation
         status: 'pending',
         expires_at: expiresAt.toISOString(),
         provider: 'sms-activate'
@@ -351,10 +436,34 @@ serve(async (req) => {
       console.error('❌ [BUY-SMS-ACTIVATE] Failed to create activation:', activationError)
       console.error('❌ [BUY-SMS-ACTIVATE] Activation error details:', JSON.stringify(activationError, null, 2))
       
-      // ROLLBACK: Unfreeze credits and cancel transaction
+      // Re-read current frozen to get actual value (not stale)
+      const { data: currentUser } = await supabaseClient
+        .from('users')
+        .select('frozen_balance')
+        .eq('id', userId)
+        .single()
+      
+      const actualFrozen = currentUser?.frozen_balance || 0
+      const newFrozen = Math.max(0, actualFrozen - price)
+      
+      // ROLLBACK: Create ledger entry FIRST, then unfreeze credits
+      await supabaseClient
+        .from('balance_operations')
+        .insert({
+          user_id: userId,
+          operation_type: 'refund',
+          amount: price,
+          balance_before: currentBalance,
+          balance_after: currentBalance,
+          frozen_before: actualFrozen,
+          frozen_after: newFrozen,
+          reason: `Activation creation failed: ${activationError.message}`,
+          created_at: new Date().toISOString()
+        })
+      
       await supabaseClient
         .from('users')
-        .update({ frozen_balance: Math.max(0, frozenBalance) })
+        .update({ frozen_balance: newFrozen })
         .eq('id', userId)
       
       await supabaseClient

@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
-import { 
-  RefreshCw, 
-  Download, 
-  Eye, 
-  Search, 
-  ChevronLeft, 
+import {
+  RefreshCw,
+  Download,
+  Eye,
+  Search,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -74,7 +74,7 @@ export default function AdminTransactions() {
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const userIdFromUrl = searchParams.get('user')
-  
+
   const [statusFilter, setStatusFilter] = useState('all')
   const [methodFilter, setMethodFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
@@ -94,9 +94,31 @@ export default function AdminTransactions() {
     }
   }, [userIdFromUrl])
 
-  // Fetch ONLY recharges (topup/recharge/credit types)
+  // 1. Query for STATS (Unlimited, lightweight) - Fixes "Revenue Decreasing" issue
+  const { data: statsRecharges = [] } = useQuery<Recharge[]>({
+    queryKey: ['admin-recharges-stats'],
+    queryFn: async () => {
+      // Fetch ONLY necessary columns for stats to keep payload small
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, user_id, type, amount, status, created_at, metadata, payment_method')
+        .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit', 'referral_bonus'])
+        // No limit or very high limit to ensure total accuracy
+        .limit(50000)
+
+      if (error) {
+        console.error('Error fetching stats:', error)
+        return []
+      }
+      return (data as Recharge[]) || []
+    },
+    refetchInterval: 60000,
+    staleTime: 60000 // Cache for 1 minute
+  })
+
+  // 2. Query for LIST (Limited, Detailed)
   const { data: recharges = [], isLoading, refetch } = useQuery<Recharge[]>({
-    queryKey: ['admin-recharges', statusFilter, methodFilter],
+    queryKey: ['admin-recharges-list', statusFilter, methodFilter],
     queryFn: async () => {
       let query = supabase
         .from('transactions')
@@ -104,36 +126,30 @@ export default function AdminTransactions() {
           *,
           user:users(id, email, name)
         `)
-        .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit', 'referral_bonus']) // Tous les types de crédit entrant
+        .in('type', ['recharge', 'topup', 'credit', 'payment', 'deposit', 'referral_bonus'])
         .order('created_at', { ascending: false })
-        .limit(2000) // Augmenté pour inclure plus de transactions
+        .limit(1000) // Lower limit for the list view to stay fast
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter)
-      }
-      if (methodFilter !== 'all') {
-        query = query.eq('payment_method', methodFilter)
-      }
+      if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+      if (methodFilter !== 'all') query = query.eq('payment_method', methodFilter)
 
       const { data, error } = await query
       if (error) {
-        console.error('Error fetching recharges:', error)
-        toast({ title: 'Erreur', description: error?.message || 'Chargement transactions échoué', variant: 'destructive' })
+        toast({ title: 'Erreur', description: error?.message || 'Erreur chargement', variant: 'destructive' })
         return []
       }
       return (data as Recharge[]) || []
     },
     refetchInterval: 30000,
-    initialData: []
   })
 
   // Filter by date
   const getDateFilteredRecharges = useCallback((rechargesList: Recharge[]) => {
     if (dateFilter === 'all') return rechargesList;
-    
+
     const now = new Date();
     const filterDate = new Date();
-    
+
     switch (dateFilter) {
       case 'today':
         filterDate.setHours(0, 0, 0, 0);
@@ -150,18 +166,18 @@ export default function AdminTransactions() {
       default:
         return rechargesList;
     }
-    
+
     return rechargesList.filter(r => new Date(r.created_at) >= filterDate);
   }, [dateFilter]);
 
   // Filter by search term
   const filteredRecharges = useMemo(() => {
     const filtered = getDateFilteredRecharges(recharges);
-    
+
     if (!searchTerm) return filtered;
-    
+
     const searchLower = searchTerm.toLowerCase();
-    return filtered.filter(r => 
+    return filtered.filter(r =>
       r.id?.toLowerCase().includes(searchLower) ||
       r.user?.email?.toLowerCase().includes(searchLower) ||
       r.user?.name?.toLowerCase().includes(searchLower) ||
@@ -170,16 +186,52 @@ export default function AdminTransactions() {
     );
   }, [recharges, searchTerm, getDateFilteredRecharges]);
 
-  // Helper pour extraire le montant XOF depuis metadata ou amount
-  const getAmountXOF = useCallback((r: Recharge) => {
+  // Helper pour extraire le montant XOF depuis metadata ou amount (TOUJOURS retourner un nombre!)
+  const getAmountXOF = useCallback((r: Recharge): number => {
     // Les bonus de parrainage n'ont pas de valeur monétaire réelle (crédits gratuits)
     if (r.type === 'referral_bonus') return 0;
-    return r.metadata?.amount_xof || (r.amount * 100) || 0; // 1 crédit = 100 FCFA par défaut
+
+    // Priorité 1: montant XOF explicite dans metadata
+    if (r.metadata?.amount_xof) {
+      return Number(r.metadata.amount_xof) || 0;
+    }
+
+    // Priorité 2: Pour PayDunya, le montant est déjà correct
+    if (r.metadata?.payment_provider === 'paydunya') {
+      return Number(r.amount) || 0;
+    }
+
+    // Priorité 3: Pour les anciennes transactions MoneyFusion où amount = activations
+    // Si amount est petit (< 1000) et qu'on a des activations similaires, c'est probablement le nombre d'activations
+    if (r.metadata?.payment_provider === 'moneyfusion' && r.amount && r.amount < 1000) {
+      // Utiliser le ratio standard: 100 FCFA par activation
+      return Number(r.amount) * 100;
+    }
+
+    // Par défaut: utiliser le montant tel quel
+    return Number(r.amount) || 0;
   }, []);
 
-  // Helper pour extraire le nombre de crédits
-  const getCredits = useCallback((r: Recharge) => {
-    return r.metadata?.activations || r.amount || 0;
+  // Helper pour extraire le nombre de crédits (TOUJOURS retourner un nombre!)
+  const getCredits = useCallback((r: Recharge): number => {
+    // Priorité 1: activations explicites dans metadata
+    if (r.metadata?.activations) {
+      // IMPORTANT: Convertir en nombre car metadata peut stocker des strings
+      return parseInt(String(r.metadata.activations), 10) || 0;
+    }
+
+    // Priorité 2: Pour les anciennes transactions MoneyFusion où amount = activations
+    if (r.metadata?.payment_provider === 'moneyfusion' && r.amount && r.amount < 1000) {
+      return Number(r.amount) || 0;
+    }
+
+    // Priorité 3: Calculer depuis amount_xof (1 activation = 100 FCFA)
+    if (r.metadata?.amount_xof) {
+      return Math.round(Number(r.metadata.amount_xof) / 100) || 0;
+    }
+
+    // Par défaut
+    return Number(r.amount) || 0;
   }, []);
 
   // Helper pour vérifier si c'est un bonus (crédit gratuit)
@@ -195,13 +247,13 @@ export default function AdminTransactions() {
   // Group recharges by period
   const groupedRecharges = useMemo((): GroupedRecharges[] => {
     if (viewMode === 'list') return [];
-    
+
     const groups: Map<string, Recharge[]> = new Map();
-    
+
     filteredRecharges.forEach(r => {
       const date = new Date(r.created_at);
       let key: string;
-      
+
       switch (viewMode) {
         case 'day':
           key = date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -225,28 +277,28 @@ export default function AdminTransactions() {
         default:
           key = date.toISOString().split('T')[0];
       }
-      
+
       if (!groups.has(key)) {
         groups.set(key, []);
       }
       groups.get(key)!.push(r);
     });
-    
+
     // Convert to array and sort descending
     const result: GroupedRecharges[] = Array.from(groups.entries())
       .sort((a, b) => b[0].localeCompare(a[0]))
       .map(([key, groupRecharges]) => {
         // Sort recharges within each group by date descending
-        const sortedRecharges = [...groupRecharges].sort((a, b) => 
+        const sortedRecharges = [...groupRecharges].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         const completed = sortedRecharges.filter(r => r.status === 'completed');
         const pending = sortedRecharges.filter(r => r.status === 'pending');
         const failed = sortedRecharges.filter(r => r.status === 'failed');
-        
+
         let label: string;
         let sublabel: string | undefined;
-        
+
         switch (viewMode) {
           case 'day': {
             // Parse YYYY-MM-DD correctly in local timezone
@@ -256,7 +308,7 @@ export default function AdminTransactions() {
             today.setHours(0, 0, 0, 0);
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
-            
+
             if (dayDate.getTime() === today.getTime()) {
               label = "Aujourd'hui";
             } else if (dayDate.getTime() === yesterday.getTime()) {
@@ -285,10 +337,10 @@ export default function AdminTransactions() {
           default:
             label = key;
         }
-        
+
         // Exclure les bonus des totaux XOF (crédits gratuits)
         const realCompleted = completed.filter(r => r.type !== 'referral_bonus');
-        
+
         return {
           key,
           label: label.charAt(0).toUpperCase() + label.slice(1),
@@ -302,7 +354,7 @@ export default function AdminTransactions() {
           bonusCount: completed.length - realCompleted.length
         };
       });
-    
+
     return result;
   }, [filteredRecharges, viewMode, getAmountXOF, getCredits]);
 
@@ -329,27 +381,53 @@ export default function AdminTransactions() {
     setExpandedGroups(new Set());
   };
 
-  // Stats calculations - EXCLUT les bonus de parrainage des revenus
+  // Stats calculations - Uses the UNLIMITED 'statsRecharges'
   const stats = useMemo(() => {
-    const completed = filteredRecharges.filter(r => r.status === 'completed');
-    const pending = filteredRecharges.filter(r => r.status === 'pending');
-    const failed = filteredRecharges.filter(r => r.status === 'failed');
-    
-    // Séparer les vraies recharges des bonus
+    // 1. Apply Filters to the Stats Dataset
+    let filteredStats = statsRecharges;
+
+    // Filter by Date
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const filterDate = new Date();
+      switch (dateFilter) {
+        case 'today': filterDate.setHours(0, 0, 0, 0); break;
+        case 'week': filterDate.setDate(now.getDate() - 7); break;
+        case 'month': filterDate.setMonth(now.getMonth() - 1); break;
+        case 'year': filterDate.setFullYear(now.getFullYear() - 1); break;
+      }
+      filteredStats = filteredStats.filter(r => new Date(r.created_at) >= filterDate);
+    }
+
+    // Filter by Method (if applied)
+    if (methodFilter !== 'all') {
+      filteredStats = filteredStats.filter(r => r.payment_method === methodFilter);
+    }
+
+    // Filter by Status (if applied)
+    if (statusFilter !== 'all') {
+      filteredStats = filteredStats.filter(r => r.status === statusFilter);
+    }
+
+    const completed = filteredStats.filter(r => r.status === 'completed');
+    const pending = filteredStats.filter(r => r.status === 'pending');
+    const failed = filteredStats.filter(r => r.status === 'failed');
+
+    // Create subsets
     const realRecharges = completed.filter(r => !isBonus(r));
     const bonusRecharges = completed.filter(r => isBonus(r));
-    
-    // Montants en XOF - UNIQUEMENT les vraies recharges (argent réel reçu)
+
+    // Revenue Calculation
     const totalCompletedXOF = realRecharges.reduce((sum, r) => sum + getAmountXOF(r), 0);
     const totalPendingXOF = pending.filter(r => !isBonus(r)).reduce((sum, r) => sum + getAmountXOF(r), 0);
-    
-    // Total crédits (inclut les bonus pour info)
+
+    // Credits Calculation
     const totalCreditsReal = realRecharges.reduce((sum, r) => sum + getCredits(r), 0);
     const totalCreditsBonus = bonusRecharges.reduce((sum, r) => sum + getCredits(r), 0);
-    
+
     const uniqueUsers = new Set(realRecharges.map(r => r.user_id)).size;
     const avgAmountXOF = realRecharges.length > 0 ? totalCompletedXOF / realRecharges.length : 0;
-    
+
     return {
       totalRevenueXOF: totalCompletedXOF,
       pendingAmountXOF: totalPendingXOF,
@@ -361,11 +439,11 @@ export default function AdminTransactions() {
       failedCount: failed.length,
       uniqueUsers,
       avgAmountXOF,
-      successRate: filteredRecharges.length > 0 
-        ? ((completed.length / filteredRecharges.length) * 100).toFixed(1) 
+      successRate: filteredStats.length > 0
+        ? ((completed.length / filteredStats.length) * 100).toFixed(1)
         : '0'
     };
-  }, [filteredRecharges, getAmountXOF, getCredits, isBonus]);
+  }, [statsRecharges, dateFilter, methodFilter, statusFilter, getAmountXOF, getCredits, isBonus]);
 
   // Pagination
   const totalPages = Math.ceil(filteredRecharges.length / ITEMS_PER_PAGE)
@@ -425,32 +503,32 @@ export default function AdminTransactions() {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'completed':
-        return { 
-          label: 'Complété', 
+        return {
+          label: 'Complété',
           color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
           icon: <CheckCircle2 className="w-3.5 h-3.5" />
         };
       case 'pending':
-        return { 
-          label: 'En attente', 
+        return {
+          label: 'En attente',
           color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
           icon: <Clock className="w-3.5 h-3.5" />
         };
       case 'failed':
-        return { 
-          label: 'Échoué', 
+        return {
+          label: 'Échoué',
           color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
           icon: <XCircle className="w-3.5 h-3.5" />
         };
       case 'cancelled':
-        return { 
-          label: 'Annulé', 
+        return {
+          label: 'Annulé',
           color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
           icon: <AlertCircle className="w-3.5 h-3.5" />
         };
       default:
-        return { 
-          label: status, 
+        return {
+          label: status,
           color: 'bg-gray-100 text-gray-700',
           icon: <AlertCircle className="w-3.5 h-3.5" />
         };
@@ -653,7 +731,7 @@ export default function AdminTransactions() {
               Par Année
             </Button>
           </div>
-          
+
           <div className="flex flex-col lg:flex-row gap-3">
             {/* Search */}
             <div className="flex-1 relative">
@@ -665,7 +743,7 @@ export default function AdminTransactions() {
                 className="pl-10"
               />
             </div>
-            
+
             {/* Date Filter */}
             <select
               value={dateFilter}
@@ -678,7 +756,7 @@ export default function AdminTransactions() {
               <option value="month">30 derniers jours</option>
               <option value="year">Cette année</option>
             </select>
-            
+
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -691,7 +769,7 @@ export default function AdminTransactions() {
               <option value="failed">❌ Échoué</option>
               <option value="cancelled">🚫 Annulé</option>
             </select>
-            
+
             {/* Method Filter */}
             <select
               value={methodFilter}
@@ -705,7 +783,7 @@ export default function AdminTransactions() {
               <option value="card">Carte bancaire</option>
             </select>
           </div>
-          
+
           {/* Active filters summary */}
           <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
             <span>{filteredRecharges.length} recharges affichées</span>
@@ -713,9 +791,9 @@ export default function AdminTransactions() {
               <span className="text-muted-foreground/60">• {groupedRecharges.length} {viewMode === 'day' ? 'jours' : viewMode === 'week' ? 'semaines' : viewMode === 'month' ? 'mois' : 'années'}</span>
             )}
             {(statusFilter !== 'all' || methodFilter !== 'all' || dateFilter !== 'all' || searchTerm) && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setStatusFilter('all');
                   setMethodFilter('all');
@@ -766,7 +844,7 @@ export default function AdminTransactions() {
           ) : (
             groupedRecharges.map((group) => {
               const isExpanded = expandedGroups.has(group.key);
-              
+
               return (
                 <Card key={group.key} className="overflow-hidden">
                   {/* Group Header - Clickable */}
@@ -775,12 +853,11 @@ export default function AdminTransactions() {
                     onClick={() => toggleGroup(group.key)}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        viewMode === 'day' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${viewMode === 'day' ? 'bg-blue-100 dark:bg-blue-900/30' :
                         viewMode === 'week' ? 'bg-purple-100 dark:bg-purple-900/30' :
-                        viewMode === 'month' ? 'bg-orange-100 dark:bg-orange-900/30' :
-                        'bg-green-100 dark:bg-green-900/30'
-                      }`}>
+                          viewMode === 'month' ? 'bg-orange-100 dark:bg-orange-900/30' :
+                            'bg-green-100 dark:bg-green-900/30'
+                        }`}>
                         {viewMode === 'day' && <Calendar className="w-5 h-5 text-blue-600" />}
                         {viewMode === 'week' && <CalendarDays className="w-5 h-5 text-purple-600" />}
                         {viewMode === 'month' && <CalendarRange className="w-5 h-5 text-orange-600" />}
@@ -793,7 +870,7 @@ export default function AdminTransactions() {
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Stats summary */}
                     <div className="flex items-center gap-6">
                       <div className="text-right hidden sm:block">
@@ -823,7 +900,7 @@ export default function AdminTransactions() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Expanded Content */}
                   {isExpanded && (
                     <div className="overflow-x-auto">
@@ -860,7 +937,7 @@ export default function AdminTransactions() {
                                   )}
                                 </td>
                                 <td className="px-4 py-2">
-                                  <Link 
+                                  <Link
                                     to={`/admin/users?search=${recharge.user?.email || ''}`}
                                     className="hover:text-primary transition-colors"
                                   >
@@ -932,221 +1009,221 @@ export default function AdminTransactions() {
 
       {/* Recharges Table (List View) */}
       {viewMode === 'list' && (
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Utilisateur</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Montant / Crédits</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Provider</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statut</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Référence</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50 border-b">
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                    <p className="text-muted-foreground mt-2">Chargement...</p>
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Utilisateur</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Montant / Crédits</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Provider</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Statut</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Référence</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
                 </tr>
-              ) : paginatedRecharges.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <Wallet className="w-12 h-12 mx-auto text-muted-foreground/50" />
-                    <p className="text-muted-foreground mt-2">Aucune recharge trouvée</p>
-                    <p className="text-xs text-muted-foreground">Modifiez vos filtres pour voir plus de résultats</p>
-                  </td>
-                </tr>
-              ) : (
-                paginatedRecharges.map((recharge) => {
-                  const statusConfig = getStatusConfig(recharge.status);
-                  
-                  return (
-                    <tr key={recharge.id} className="hover:bg-muted/30 transition-colors">
-                      {/* Date */}
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium">
-                          {new Date(recharge.created_at).toLocaleDateString('fr-FR', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(recharge.created_at).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </td>
-                      
-                      {/* User */}
-                      <td className="px-4 py-3">
-                        <Link 
-                          to={`/admin/users?search=${recharge.user?.email || ''}`}
-                          className="hover:text-primary transition-colors"
-                        >
-                          <div className="font-medium text-sm truncate max-w-[180px]">
-                            {recharge.user?.name || 'Utilisateur'}
+              </thead>
+              <tbody className="divide-y divide-border">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center">
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                      <p className="text-muted-foreground mt-2">Chargement...</p>
+                    </td>
+                  </tr>
+                ) : paginatedRecharges.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center">
+                      <Wallet className="w-12 h-12 mx-auto text-muted-foreground/50" />
+                      <p className="text-muted-foreground mt-2">Aucune recharge trouvée</p>
+                      <p className="text-xs text-muted-foreground">Modifiez vos filtres pour voir plus de résultats</p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedRecharges.map((recharge) => {
+                    const statusConfig = getStatusConfig(recharge.status);
+
+                    return (
+                      <tr key={recharge.id} className="hover:bg-muted/30 transition-colors">
+                        {/* Date */}
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium">
+                            {new Date(recharge.created_at).toLocaleDateString('fr-FR', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
                           </div>
-                          <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                            {recharge.user?.email || 'N/A'}
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(recharge.created_at).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
-                        </Link>
-                      </td>
-                      
-                      {/* Amount XOF */}
-                      <td className="px-4 py-3">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1">
-                            <span className="text-lg font-bold text-green-600">
-                              {formatAmount(getAmountXOF(recharge))}
+                        </td>
+
+                        {/* User */}
+                        <td className="px-4 py-3">
+                          <Link
+                            to={`/admin/users?search=${recharge.user?.email || ''}`}
+                            className="hover:text-primary transition-colors"
+                          >
+                            <div className="font-medium text-sm truncate max-w-[180px]">
+                              {recharge.user?.name || 'Utilisateur'}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                              {recharge.user?.email || 'N/A'}
+                            </div>
+                          </Link>
+                        </td>
+
+                        {/* Amount XOF */}
+                        <td className="px-4 py-3">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className="text-lg font-bold text-green-600">
+                                {formatAmount(getAmountXOF(recharge))}
+                              </span>
+                              <span className="text-xs text-muted-foreground">FCFA</span>
+                            </div>
+                            <div className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                              {getCredits(recharge)} crédit{getCredits(recharge) > 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Provider */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center">
+                              {getMethodIcon(getProvider(recharge))}
+                            </div>
+                            <span className="text-sm capitalize">
+                              {getProvider(recharge).replace('_', ' ')}
                             </span>
-                            <span className="text-xs text-muted-foreground">FCFA</span>
                           </div>
-                          <div className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                            {getCredits(recharge)} crédit{getCredits(recharge) > 1 ? 's' : ''}
-                          </div>
-                        </div>
-                      </td>
-                      
-                      {/* Provider */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center">
-                            {getMethodIcon(getProvider(recharge))}
-                          </div>
-                          <span className="text-sm capitalize">
-                            {getProvider(recharge).replace('_', ' ')}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                            {statusConfig.icon}
+                            {statusConfig.label}
                           </span>
-                        </div>
-                      </td>
-                      
-                      {/* Status */}
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-                          {statusConfig.icon}
-                          {statusConfig.label}
-                        </span>
-                      </td>
-                      
-                      {/* Reference */}
-                      <td className="px-4 py-3">
-                        {(recharge.payment_ref || recharge.metadata?.moneyfusion_token) ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono text-xs bg-muted px-2 py-1 rounded truncate max-w-[120px]">
-                              {recharge.payment_ref || recharge.metadata?.moneyfusion_token}
-                            </span>
-                            <button
-                              onClick={() => copyToClipboard(recharge.payment_ref || recharge.metadata?.moneyfusion_token)}
-                              className="p-1 hover:bg-muted rounded transition-colors"
-                            >
-                              <Copy className="w-3 h-3 text-muted-foreground" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      
-                      {/* Actions */}
-                      <td className="px-4 py-3 text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedRecharge(recharge)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <div className="text-sm text-muted-foreground">
-              Page {currentPage} sur {totalPages}
-            </div>
-            <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="h-8 px-2"
-              >
-                ««
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              
-              {/* Page numbers */}
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className="h-8 w-8 p-0"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="h-8 px-2"
-              >
-                »»
-              </Button>
-            </div>
+                        </td>
+
+                        {/* Reference */}
+                        <td className="px-4 py-3">
+                          {(recharge.payment_ref || recharge.metadata?.moneyfusion_token) ? (
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-xs bg-muted px-2 py-1 rounded truncate max-w-[120px]">
+                                {recharge.payment_ref || recharge.metadata?.moneyfusion_token}
+                              </span>
+                              <button
+                                onClick={() => copyToClipboard(recharge.payment_ref || recharge.metadata?.moneyfusion_token)}
+                                className="p-1 hover:bg-muted rounded transition-colors"
+                              >
+                                <Copy className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedRecharge(recharge)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </Card>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} sur {totalPages}
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 px-2"
+                >
+                  ««
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+
+                {/* Page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-2"
+                >
+                  »»
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* Recharge Details Modal */}
@@ -1177,7 +1254,7 @@ export default function AdminTransactions() {
                   </span>
                 </div>
               </div>
-              
+
               {/* Details grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1194,7 +1271,7 @@ export default function AdminTransactions() {
                     })()}
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase">Provider</label>
                   <div className="mt-1 flex items-center gap-2">
@@ -1202,7 +1279,7 @@ export default function AdminTransactions() {
                     <span className="capitalize">{getProvider(selectedRecharge).replace('_', ' ')}</span>
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase">Date</label>
                   <p className="mt-1 text-sm">
@@ -1212,7 +1289,7 @@ export default function AdminTransactions() {
                     })}
                   </p>
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase">ID Transaction</label>
                   <div className="mt-1 flex items-center gap-1">
@@ -1228,7 +1305,7 @@ export default function AdminTransactions() {
                   </div>
                 </div>
               </div>
-              
+
               {/* User info */}
               <div className="pt-4 border-t">
                 <label className="text-xs font-medium text-muted-foreground uppercase">Utilisateur</label>
@@ -1245,7 +1322,7 @@ export default function AdminTransactions() {
                   </Link>
                 </div>
               </div>
-              
+
               {/* Payment reference */}
               {selectedRecharge.payment_ref && (
                 <div>
@@ -1261,7 +1338,7 @@ export default function AdminTransactions() {
                   </div>
                 </div>
               )}
-              
+
               {/* Description */}
               {selectedRecharge.description && (
                 <div>
@@ -1269,7 +1346,7 @@ export default function AdminTransactions() {
                   <p className="mt-1 text-sm p-3 bg-muted/50 rounded-lg">{selectedRecharge.description}</p>
                 </div>
               )}
-              
+
               {/* Metadata */}
               {selectedRecharge.metadata && Object.keys(selectedRecharge.metadata).length > 0 && (
                 <div>
@@ -1279,7 +1356,7 @@ export default function AdminTransactions() {
                   </pre>
                 </div>
               )}
-              
+
               {/* Close button */}
               <Button
                 variant="outline"

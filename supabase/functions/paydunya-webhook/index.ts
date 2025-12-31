@@ -18,9 +18,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const webhookData = await req.json()
-    
-    console.log('🔔 PayDunya Webhook received:', JSON.stringify(webhookData, null, 2))
+    // Support pour X-WWW-FORM-URLENCODED et JSON
+    const contentType = req.headers.get('content-type') || ''
+    let webhookData: any
+
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Parser le format form-urlencoded
+      const body = await req.text()
+      const params = new URLSearchParams(body)
+      webhookData = Object.fromEntries(params.entries())
+      console.log('🔔 PayDunya Webhook received (form-urlencoded):', webhookData)
+    } else {
+      // Fallback: parser comme JSON
+      webhookData = await req.json()
+      console.log('🔔 PayDunya Webhook received (JSON):', JSON.stringify(webhookData, null, 2))
+    }
 
     // Récupérer config PayDunya pour vérifier la signature
     const { data: paydunyaConfig } = await supabase
@@ -35,12 +47,11 @@ serve(async (req) => {
 
     const { master_key } = paydunyaConfig.config
 
-    // Vérifier la signature (hash SHA-512)
+    // Vérifier la signature (hash SHA-512) - optionnel si PayDunya l'envoie
     const receivedHash = webhookData.hash || webhookData.signature
     
     if (receivedHash) {
-      // Construire la string à hasher selon la doc PayDunya
-      const dataToHash = `${webhookData.invoice.token}${master_key}`
+      const dataToHash = `${webhookData.invoice?.token}${master_key}`
       const calculatedHash = createHash('sha512').update(dataToHash).digest('hex')
       
       if (calculatedHash !== receivedHash) {
@@ -89,13 +100,13 @@ serve(async (req) => {
 
     // Mapper le statut
     let newStatus = transaction.status
-    let shouldCreditWallet = false
+    let shouldCreditUser = false
 
     switch (status) {
       case 'completed':
       case 'success':
         newStatus = 'completed'
-        shouldCreditWallet = true
+        shouldCreditUser = true
         break
       case 'pending':
         newStatus = 'pending'
@@ -124,88 +135,56 @@ serve(async (req) => {
       })
       .eq('id', transaction.id)
 
-    // Si payment completed, créditer le wallet (atomic avec double-check)
-    if (shouldCreditWallet) {
-      console.log(`💰 Crediting wallet for user ${transaction.user_id}`)
+    // Si payment completed, créditer users.balance
+    if (shouldCreditUser) {
+      // Get activations from transaction metadata (set during paydunya-create-payment)
+      const creditsToAdd = transaction.metadata?.activations || 0
+      const token = transaction.metadata?.paydunya_token || webhookData.invoice?.token
+      
+      console.log(`💰 Crediting ${creditsToAdd} activations for user ${transaction.user_id}`)
 
-      // Double check que la transaction n'a pas déjà été traitée
-      const { data: recheck } = await supabase
-        .from('transactions')
-        .select('status')
-        .eq('id', transaction.id)
+      if (creditsToAdd === 0) {
+        console.error('⚠️ No activations in metadata! Transaction:', transaction.id)
+        console.log('📋 Transaction metadata:', JSON.stringify(transaction.metadata))
+      }
+
+      // Credit via SECURITY DEFINER RPC (idempotent) - same as MoneyFusion
+      const { data: creditResult, error: balanceError } = await supabase
+        .rpc('secure_moneyfusion_credit_v2', {
+          p_transaction_id: transaction.id,
+          p_token: token,
+          p_reference: transaction.reference || token
+        })
+
+      if (balanceError) {
+        console.error('❌ Failed to credit via secure_moneyfusion_credit:', balanceError)
+        
+        // Update transaction with error
+        await supabase
+          .from('transactions')
+          .update({ 
+            status: 'pending_credit_error', 
+            metadata: { 
+              ...transaction.metadata, 
+              error: 'Failed to credit balance', 
+              error_detail: balanceError.message 
+            } 
+          })
+          .eq('id', transaction.id)
+        
+        throw new Error(`Erreur credit: ${balanceError.message}`)
+      }
+
+      console.log(`✅ Credited via secure_moneyfusion_credit`, creditResult)
+
+      // Get updated balance for logging
+      const { data: updatedUser } = await supabase
+        .from('users')
+        .select('balance')
+        .eq('id', transaction.user_id)
         .single()
 
-      if (recheck && recheck.status === 'completed') {
-        console.log('⚠️ Transaction already completed during processing, skip crediting')
-        return new Response(
-          JSON.stringify({ success: true, message: 'Already credited' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('id, balance, user_id')
-        .eq('user_id', transaction.user_id)
-        .single()
-
-      if (walletError || !wallet) {
-        console.error('❌ Wallet not found:', walletError)
-        throw new Error('Wallet introuvable')
-      }
-
-      // Update wallet balance
-      const { error: updateError } = await supabase
-        .from('wallets')
-        .update({
-          balance: wallet.balance + transaction.amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', wallet.id)
-
-      if (updateError) {
-        console.error('❌ Error updating wallet:', updateError)
-        throw new Error('Erreur mise à jour wallet')
-      }
-
-      // Créer transaction wallet
-      const { error: wtError } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          wallet_id: wallet.id,
-          user_id: transaction.user_id,
-          type: 'credit',
-          amount: transaction.amount,
-          description: `Recharge PayDunya - ${transaction.amount} FCFA`,
-          reference: transaction.id,
-          metadata: {
-            payment_method: 'paydunya',
-            token: token
-          }
-        })
-
-      if (wtError) {
-        console.error('❌ Error creating wallet transaction:', wtError)
-      }
-
-      console.log(`✅ Wallet crédité: +${transaction.amount} FCFA (user: ${transaction.user_id})`)
-
-      // Envoyer notification email (optionnel)
-      try {
-        await supabase.functions.invoke('send-email', {
-          body: {
-            to: transaction.metadata?.email,
-            subject: 'Recharge réussie - ONE SMS',
-            html: `
-              <h2>Recharge réussie !</h2>
-              <p>Votre wallet a été crédité de <strong>${transaction.amount} FCFA</strong>.</p>
-              <p>Merci d'utiliser ONE SMS.</p>
-            `
-          }
-        })
-      } catch (emailError) {
-        console.error('Email error (non-blocking):', emailError)
-      }
+      console.log(`✅ User balance credited: +${creditsToAdd} activations (user: ${transaction.user_id}, new balance: ${updatedUser?.balance})`)
     }
 
     console.log('✅ Webhook processed successfully')
@@ -220,7 +199,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Webhook Error:', error)
     
     // Retourner 200 même en cas d'erreur pour éviter les retry PayDunya

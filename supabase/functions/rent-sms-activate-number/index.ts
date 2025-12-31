@@ -3,7 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +34,7 @@ const SERVICE_CODE_MAP: Record<string, string> = {
 }
 
 // Complete country code mapping to SMS-Activate IDs
-// From: https://api.sms-activate.ae/stubs/handler_api.php?action=getCountries
+// From: https://hero-sms.com/stubs/handler_api.php?action=getCountries
 const COUNTRY_CODE_MAP: Record<string, number> = {
   // By name (lowercase)
   'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
@@ -229,7 +229,26 @@ serve(async (req) => {
     const { id: rentalId, number: phone, endDate } = responseData.phone
 
     // 4. Create rental record - use endDate from API instead of calculating
-    const apiEndDate = new Date(endDate)
+    // endDate from SMS-Activate can be Unix timestamp (seconds) or ISO string
+    const parseEndDate = (val: unknown): Date => {
+      if (typeof val === 'number') {
+        // Unix timestamp in seconds (< 10 billion) or milliseconds
+        return new Date(val < 1e10 ? val * 1000 : val)
+      }
+      if (typeof val === 'string') {
+        // Try as number first (timestamp as string)
+        const num = Number(val)
+        if (!isNaN(num)) {
+          return new Date(num < 1e10 ? num * 1000 : num)
+        }
+        // Otherwise parse as date string
+        return new Date(val)
+      }
+      // Fallback
+      return new Date(Date.now() + rentHours * 3600 * 1000)
+    }
+    const apiEndDate = parseEndDate(endDate)
+    const endDateISO = apiEndDate.toISOString()
 
     const { data: rental, error: rentalError } = await supabaseClient
       .from('rentals')
@@ -242,7 +261,8 @@ serve(async (req) => {
         price: realPrice,
         rent_hours: rentHours,
         status: 'active',
-        end_date: apiEndDate.toISOString()
+        end_date: endDateISO,
+        expires_at: endDateISO
       })
       .select()
       .single()

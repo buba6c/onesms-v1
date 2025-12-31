@@ -20,6 +20,7 @@ interface ActiveNumber {
   price: number;
   charged: boolean;
   type?: 'activation' | 'rental';
+  provider?: 'sms-activate' | '5sim' | 'smspva' | 'onlinesim' | 'herosms'; // All providers
 }
 
 interface UseSmsPollingOptions {
@@ -29,7 +30,26 @@ interface UseSmsPollingOptions {
   onBalanceUpdate?: () => void;
 }
 
+import { useTranslation } from 'react-i18next';
+
+// Provider to status checker function mapping
+const getStatusCheckerFunction = (provider?: string): string => {
+  switch (provider?.toLowerCase()) {
+    case '5sim':
+      return 'check-5sim-status';
+    case 'smspva':
+      return 'check-smspva-status';
+    case 'onlinesim':
+      return 'check-onlinesim-status';
+    case 'sms-activate':
+    case 'herosms':
+    default:
+      return 'check-sms-activate-status';
+  }
+};
+
 export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate }: UseSmsPollingOptions) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const intervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
   const processedOrdersRef = useRef<Set<string>>(new Set());
@@ -56,8 +76,11 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
         // console.log('🔍 [CHECK] Vérification SMS...', num.orderId);
 
         try {
-          // 1. Vérification normale avec getStatusV2
-          const { data: checkData, error: checkError } = await cloudFunctions.invoke('check-sms-activate-status', {
+          // Use provider-specific status checker
+          const statusCheckerFunction = getStatusCheckerFunction(num.provider);
+
+          // 1. Vérification avec la fonction appropriée
+          const { data: checkData, error: checkError } = await cloudFunctions.invoke(statusCheckerFunction, {
             body: {
               activationId: num.activationId || num.id,
               userId: userId
@@ -74,7 +97,7 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
           // SMS reçu et facturé
           if (checkData?.data?.status === 'received' && checkData.data?.charged) {
             // console.log('✅ [CHECK] SMS reçu et facturé !');
-            
+
             // Arrêter le polling pour ce numéro
             if (intervalsRef.current[num.orderId]) {
               clearInterval(intervalsRef.current[num.orderId]);
@@ -83,33 +106,50 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
             processedOrdersRef.current.add(num.orderId);
 
             // Mettre à jour le numéro
+            const smsContent = checkData.data.sms && checkData.data.sms.length > 0 ? checkData.data.sms[0] : null;
+
             const updatedNumber: ActiveNumber = {
               ...num,
               status: 'received',
-              smsCode: checkData.data.sms[0]?.code,
-              smsText: checkData.data.sms[0]?.text,
+              smsCode: smsContent?.code || '------',
+              smsText: smsContent?.text || t('dashboard.messageReceived'),
               charged: true
             };
 
             onUpdate(updatedNumber);
 
+            // 🎵 JOUER LE SON (comme dans useRealtimeSms)
+            import('@/lib/sound-manager').then(({ SoundManager }) => {
+              SoundManager.play(); // Use default/saved preference
+            });
+
             toast({
               title: '✅ SMS Reçu !',
-              description: `Code: ${checkData.data.sms[0]?.code} - ${num.phone}`,
+              description: `Code: ${smsContent?.code || 'N/A'} - ${num.phone}`,
+            });
+
+            // 🔔 BROWSER NOTIFICATION
+            import('@/lib/notification-manager').then(({ NotificationManager }) => {
+              if (NotificationManager.getPermission() === 'granted') {
+                NotificationManager.send('Nouveau SMS Reçu !', {
+                  body: `Code: ${smsContent?.code || 'N/A'} pour ${num.service || 'Service'}`,
+                  tag: `sms-${num.orderId}`, // Prevent duplicates
+                });
+              }
             });
 
             // Rafraîchir le solde
             if (onBalanceUpdate) {
               onBalanceUpdate();
             }
-            
+
             return true;
           }
 
           // Timeout ou Cancelled - la récupération automatique a déjà été tentée par check-sms-activate-status
           if (checkData?.data?.status === 'timeout' || checkData?.data?.status === 'cancelled') {
             // console.log('⏰ [CHECK] Timeout/Cancelled - Aucun SMS trouvé après récupération automatique');
-            
+
             if (intervalsRef.current[num.orderId]) {
               clearInterval(intervalsRef.current[num.orderId]);
               delete intervalsRef.current[num.orderId];
@@ -133,13 +173,13 @@ export function useSmsPolling({ activeNumbers, userId, onUpdate, onBalanceUpdate
             if (onBalanceUpdate) {
               onBalanceUpdate();
             }
-            
+
             return true;
           }
         } catch (error) {
           console.error('❌ [CHECK] Exception:', error);
         }
-        
+
         return false;
       };
 

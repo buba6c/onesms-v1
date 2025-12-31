@@ -1,11 +1,10 @@
- 
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
-import { Search, RefreshCw, UserPlus, Eye, Mail, Ban, Trash2, CheckCircle, Coins, ShieldOff, Shield } from 'lucide-react'
+import { Search, RefreshCw, UserPlus, Eye, Mail, Ban, Trash2, CheckCircle, Coins, ShieldOff, Shield, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -21,17 +20,24 @@ export default function AdminUsers() {
   const { t } = useTranslation();
   const { toast } = useToast()
   const [users, setUsers] = useState([])
-  const [filteredUsers, setFilteredUsers] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [balanceFilter, setBalanceFilter] = useState('all') // 'all', 'positive', 'frozen'
   const [loading, setLoading] = useState(true)
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const PAGE_SIZE = 50
+
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     banned: 0,
     admins: 0
   })
-  
+  const [statsLoading, setStatsLoading] = useState(true)
+
   // Dialog states
   const [creditDialogOpen, setCreditDialogOpen] = useState(false)
   const [banDialogOpen, setBanDialogOpen] = useState(false)
@@ -43,60 +49,111 @@ export default function AdminUsers() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
+  // Debounce search
   useEffect(() => {
-    fetchUsers()
+    const timer = setTimeout(() => {
+      setPage(1)
+      fetchUsers(1)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm, statusFilter, balanceFilter])
+
+  // Initial load
+  useEffect(() => {
+    fetchStats()
   }, [])
 
-  useEffect(() => {
-    filterUsers()
-  }, [searchTerm, statusFilter, users])
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > Math.ceil(totalUsers / PAGE_SIZE)) return
+    setPage(newPage)
+    fetchUsers(newPage)
+  }
 
-  const fetchUsers = async () => {
+  const fetchStats = async () => {
+    setStatsLoading(true)
+    try {
+      // Run counts in parallel for better performance since we just need numbers
+      const [totalRes, activeRes, bannedRes, adminRes] = await Promise.all([
+        supabase.from('users').select('*', { count: 'exact', head: true }),
+        supabase.from('users').select('*', { count: 'exact', head: true }).neq('role', 'banned'),
+        supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'banned'),
+        supabase.from('users').select('*', { count: 'exact', head: true }).eq('role', 'admin')
+      ])
+
+      setStats({
+        total: totalRes.count || 0,
+        active: activeRes.count || 0,
+        banned: bannedRes.count || 0,
+        admins: adminRes.count || 0
+      })
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    }
+    setStatsLoading(false)
+  }
+
+  const fetchUsers = async (currentPage = page) => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
+    try {
+      let query = supabase
+        .from('users')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
 
-    if (!error && data) {
-      setUsers(data)
-      calculateStats(data)
-    }
-    setLoading(false)
-  }
-
-  const calculateStats = (data) => {
-    setStats({
-      total: data.length,
-      active: data.filter(u => u.role !== 'banned').length,
-      banned: data.filter(u => u.role === 'banned').length,
-      admins: data.filter(u => u.role === 'admin').length
-    })
-  }
-
-  const filterUsers = () => {
-    let filtered = users
-
-    if (searchTerm) {
-      filtered = filtered.filter(u => 
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.name?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'banned') {
-        filtered = filtered.filter(u => u.role === 'banned')
-      } else if (statusFilter === 'active') {
-        filtered = filtered.filter(u => u.role !== 'banned')
-      } else if (statusFilter === 'admin') {
-        filtered = filtered.filter(u => u.role === 'admin')
+      // Apply Search
+      if (searchTerm) {
+        // Search by email or name
+        query = query.or(`email.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
       }
-    }
 
-    setFilteredUsers(filtered)
-    // reset selection when filtering to avoid inconsistent view
-    setSelectedIds([])
+      // Apply Filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'banned') {
+          query = query.eq('role', 'banned')
+        } else if (statusFilter === 'active') {
+          query = query.neq('role', 'banned')
+        } else if (statusFilter === 'admin') {
+          query = query.eq('role', 'admin')
+        }
+      }
+
+      // Apply Balance Filter
+      if (balanceFilter !== 'all') {
+        if (balanceFilter === 'positive') {
+          query = query.gt('balance', 0)
+        } else if (balanceFilter === 'frozen') {
+          query = query.gt('frozen_balance', 0)
+        }
+      }
+
+      // Pagination
+      const from = (currentPage - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+
+      const { data, count, error } = await query.range(from, to)
+
+      if (error) throw error
+
+      if (data) {
+        setUsers(data)
+        setTotalUsers(count || 0)
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: "Impossible de charger les utilisateurs",
+        variant: 'destructive'
+      })
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const refreshAll = () => {
+    fetchUsers(page)
+    fetchStats()
   }
 
   const toggleSelect = (userId: string) => {
@@ -106,8 +163,8 @@ export default function AdminUsers() {
   }
 
   const toggleSelectAll = () => {
-    if (filteredUsers.length === 0) return
-    const allIds = filteredUsers.map((u: any) => u.id)
+    if (users.length === 0) return
+    const allIds = users.map((u: any) => u.id)
     const allSelected = allIds.every(id => selectedIds.includes(id))
     setSelectedIds(allSelected ? [] : allIds)
   }
@@ -130,7 +187,7 @@ export default function AdminUsers() {
 
       setBulkDeleteOpen(false)
       setSelectedIds([])
-      fetchUsers()
+      refreshAll()
     } catch (error: any) {
       toast({
         title: 'Erreur',
@@ -154,7 +211,7 @@ export default function AdminUsers() {
       })
       return
     }
-    
+
     setActionLoading(true)
     try {
       const { data, error } = await supabase.rpc('admin_add_credit', {
@@ -173,7 +230,13 @@ export default function AdminUsers() {
       setCreditDialogOpen(false)
       setCreditAmount('')
       setCreditNote('')
-      fetchUsers()
+      // Update specific user in list to avoid full reload flicker if possible, or just fetch
+      setUsers(users.map((u: any) =>
+        u.id === selectedUser.id
+          ? { ...u, balance: (u.balance || 0) + amount }
+          : u
+      ))
+
     } catch (error: any) {
       toast({
         title: 'Erreur',
@@ -187,7 +250,7 @@ export default function AdminUsers() {
 
   const handleBanUser = async () => {
     if (!selectedUser) return
-    
+
     setActionLoading(true)
     try {
       const isBanned = selectedUser.role === 'banned'
@@ -202,14 +265,22 @@ export default function AdminUsers() {
 
       toast({
         title: 'Succès',
-        description: isBanned 
+        description: isBanned
           ? `${selectedUser.email} a été débanni`
           : `${selectedUser.email} a été banni`
       })
 
       setBanDialogOpen(false)
-      fetchUsers()
-    } catch (error) {
+
+      // Optimistic update
+      setUsers(users.map((u: any) =>
+        u.id === selectedUser.id
+          ? { ...u, role: newRole }
+          : u
+      ))
+      fetchStats() // Update stats as active/banned counts changed
+
+    } catch (error: any) {
       toast({
         title: 'Erreur',
         description: error.message,
@@ -222,7 +293,7 @@ export default function AdminUsers() {
 
   const handleDeleteUser = async () => {
     if (!selectedUser) return
-    
+
     setActionLoading(true)
     try {
       const { error } = await supabase
@@ -238,8 +309,8 @@ export default function AdminUsers() {
       })
 
       setDeleteDialogOpen(false)
-      fetchUsers()
-    } catch (error) {
+      refreshAll()
+    } catch (error: any) {
       toast({
         title: 'Erreur',
         description: error.message,
@@ -274,17 +345,21 @@ export default function AdminUsers() {
     { title: 'Admins', value: stats.admins, icon: Mail, color: 'text-purple-500' }
   ]
 
+  const totalPages = Math.ceil(totalUsers / PAGE_SIZE)
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Users Management</h1>
-          <p className="text-gray-500">Total: {stats.total} users ({stats.active} active, {stats.banned} banned)</p>
+          <p className="text-gray-500">
+            {statsLoading ? 'Chargement des stats...' : `Total: ${stats.total} users`}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchUsers} variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button onClick={refreshAll} variant="outline" disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Rafraîchir
           </Button>
           <Button
@@ -293,7 +368,7 @@ export default function AdminUsers() {
             onClick={() => setBulkDeleteOpen(true)}
           >
             <Trash2 className="w-4 h-4 mr-2" />
-            Supprimer sélection ({selectedIds.length})
+            Supprimer ({selectedIds.length})
           </Button>
           <Button>
             <UserPlus className="w-4 h-4 mr-2" />
@@ -310,7 +385,11 @@ export default function AdminUsers() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-500">{stat.title}</p>
-                  <h3 className="text-3xl font-bold mt-1">{stat.value}</h3>
+                  {statsLoading ? (
+                    <div className="h-9 w-16 bg-gray-200 animate-pulse rounded mt-1"></div>
+                  ) : (
+                    <h3 className="text-3xl font-bold mt-1">{stat.value}</h3>
+                  )}
                 </div>
                 <stat.icon className={`w-8 h-8 ${stat.color}`} />
               </div>
@@ -342,6 +421,15 @@ export default function AdminUsers() {
               <option value="banned">Banned</option>
               <option value="admin">Admin</option>
             </select>
+            <select
+              value={balanceFilter}
+              onChange={(e) => setBalanceFilter(e.target.value)}
+              className="px-4 py-2 border rounded-lg"
+            >
+              <option value="all">Tous les soldes</option>
+              <option value="positive">Avec Solde (Positif)</option>
+              <option value="frozen">Avec Solde Gelé</option>
+            </select>
           </div>
         </CardContent>
       </Card>
@@ -356,7 +444,7 @@ export default function AdminUsers() {
                   <input
                     type="checkbox"
                     aria-label="Sélectionner tout"
-                    checked={filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedIds.includes(u.id))}
+                    checked={users.length > 0 && users.every((u: any) => selectedIds.includes(u.id))}
                     onChange={toggleSelectAll}
                   />
                 </th>
@@ -364,6 +452,7 @@ export default function AdminUsers() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coins</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frozen</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -372,14 +461,19 @@ export default function AdminUsers() {
             <tbody className="divide-y">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Chargement...</td>
+                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center justify-center">
+                      <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mb-2" />
+                      <p>Chargement des utilisateurs...</p>
+                    </div>
+                  </td>
                 </tr>
-              ) : filteredUsers.length === 0 ? (
+              ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">Aucun utilisateur trouvé</td>
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">Aucun utilisateur trouvé</td>
                 </tr>
               ) : (
-                filteredUsers.map(user => (
+                users.map(user => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <input
@@ -405,7 +499,16 @@ export default function AdminUsers() {
                         {user.role === 'banned' ? 'banned' : 'active'}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 font-medium">{Math.floor(user.balance || 0)}</td>
+                    <td className="px-6 py-4 font-medium text-blue-600">{Math.floor(user.balance || 0)} Ⓐ</td>
+                    <td className="px-6 py-4 font-medium text-orange-500">
+                      {user.frozen_balance > 0 ? (
+                        <span className="flex items-center gap-1">
+                          🔒 {Math.floor(user.frozen_balance)} Ⓐ
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {user.updated_at ? new Date(user.updated_at).toLocaleDateString('fr-FR') : '-'}
                     </td>
@@ -414,14 +517,14 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => openCreditDialog(user)}
                           className="p-1 hover:bg-gray-100 rounded"
                           title="Ajouter du crédit"
                         >
                           <Coins className="w-4 h-4 text-green-500" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => openBanDialog(user)}
                           className="p-1 hover:bg-gray-100 rounded"
                           title={user.role === 'banned' ? 'Débannir' : 'Bannir'}
@@ -432,7 +535,7 @@ export default function AdminUsers() {
                             <Ban className="w-4 h-4 text-orange-500" />
                           )}
                         </button>
-                        <button 
+                        <button
                           onClick={() => openDeleteDialog(user)}
                           className="p-1 hover:bg-gray-100 rounded"
                           title="Supprimer"
@@ -446,6 +549,36 @@ export default function AdminUsers() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="px-6 py-4 border-t flex items-center justify-between">
+          <div className="text-sm text-gray-500">
+            Affichage de {(page - 1) * PAGE_SIZE + 1} à {Math.min(page * PAGE_SIZE, totalUsers)} sur {totalUsers} utilisateurs
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || loading}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Précédent
+            </Button>
+            <div className="text-sm font-medium">
+              Page {page} sur {totalPages || 1}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page >= totalPages || loading}
+            >
+              Suivant
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -539,7 +672,7 @@ export default function AdminUsers() {
               {selectedUser?.role === 'banned' ? 'Débannir l\'utilisateur' : 'Bannir l\'utilisateur'}
             </DialogTitle>
             <DialogDescription>
-              {selectedUser?.role === 'banned' 
+              {selectedUser?.role === 'banned'
                 ? `Êtes-vous sûr de vouloir débannir ${selectedUser?.email} ? L'utilisateur pourra à nouveau accéder à la plateforme.`
                 : `Êtes-vous sûr de vouloir bannir ${selectedUser?.email} ? L'utilisateur ne pourra plus accéder à la plateforme.`
               }

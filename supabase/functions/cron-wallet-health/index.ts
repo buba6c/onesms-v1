@@ -92,7 +92,24 @@ Deno.serve(async (req) => {
           (activations?.reduce((sum, a) => sum + (a.frozen_amount || 0), 0) || 0) +
           (rentals?.reduce((sum, r) => sum + (r.frozen_amount || 0), 0) || 0)
 
-        // Corriger
+        // ⚠️ LEDGER-FIRST: Insert balance_operations BEFORE updating users
+        // Required by users_balance_guard trigger
+        const { error: ledgerError } = await supabase.from('balance_operations').insert({
+          user_id: issue.user_id,
+          operation_type: 'correction',
+          amount: Math.abs(issue.frozen_diff),
+          balance_before: issue.balance,
+          balance_after: issue.balance,
+          frozen_before: issue.frozen_balance,
+          frozen_after: correctFrozen,
+          reason: `Auto-correction by cron-wallet-health: frozen mismatch detected (${issue.frozen_diff})`
+        })
+
+        if (ledgerError) {
+          throw new Error(`Ledger insert failed: ${ledgerError.message}`)
+        }
+
+        // NOW update users (trigger will find the ledger entry)
         const { error: updateError } = await supabase
           .from('users')
           .update({ 
@@ -114,22 +131,6 @@ Deno.serve(async (req) => {
           new_frozen: correctFrozen,
           diff: issue.frozen_diff
         })
-
-        // Log correction dans balance_operations (optionnel)
-        try {
-          await supabase.from('balance_operations').insert({
-            user_id: issue.user_id,
-            operation_type: 'refund', // Type générique pour correction
-            amount: Math.abs(issue.frozen_diff),
-            balance_before: issue.balance,
-            balance_after: issue.balance,
-            frozen_before: issue.frozen_balance,
-            frozen_after: correctFrozen,
-            reason: `Auto-correction by cron-wallet-health: frozen mismatch detected (${issue.frozen_diff})`
-          })
-        } catch (logError) {
-          console.warn('⚠️ [CRON-WALLET-HEALTH] Could not log correction:', logError)
-        }
 
       } catch (error) {
         console.error(`❌ [CRON-WALLET-HEALTH] Failed to correct user ${issue.user_id}:`, error)

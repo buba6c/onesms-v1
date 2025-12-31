@@ -3,7 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.ae/stubs/handler_api.php'
+const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
 
 if (!SMS_ACTIVATE_API_KEY) {
   console.error('❌ [CHECK-SMS-ACTIVATE] SMS_ACTIVATE_API_KEY environment variable is missing')
@@ -24,7 +24,7 @@ serve(async (req) => {
     if (!authHeader) {
       console.error('❌ [CHECK-SMS-ACTIVATE] Missing Authorization header')
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing authorization header' }), 
+        JSON.stringify({ success: false, error: 'Missing authorization header' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -47,7 +47,7 @@ serve(async (req) => {
     } catch (e) {
       console.error('❌ [CHECK-SMS-ACTIVATE] Invalid JSON body:', e)
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid JSON body' }), 
+        JSON.stringify({ success: false, error: 'Invalid JSON body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -56,7 +56,7 @@ serve(async (req) => {
     if (!activationId) {
       console.error('❌ [CHECK-SMS-ACTIVATE] Missing activationId')
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing activationId' }), 
+        JSON.stringify({ success: false, error: 'Missing activationId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -66,7 +66,7 @@ serve(async (req) => {
     if (!SMS_ACTIVATE_API_KEY) {
       console.error('❌ [CHECK-SMS-ACTIVATE] SMS-Activate API key not configured')
       return new Response(
-        JSON.stringify({ success: false, error: 'SMS-Activate API key not configured' }), 
+        JSON.stringify({ success: false, error: 'SMS-Activate API key not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -76,7 +76,7 @@ serve(async (req) => {
       .from('activations')
       .select('*')
       .eq('id', activationId)
-      .single()
+      .maybeSingle()
 
     if (activationError) {
       console.error('❌ [CHECK-SMS-ACTIVATE] Database error:', activationError)
@@ -114,7 +114,7 @@ serve(async (req) => {
         .select('id')
         .eq('related_activation_id', activationId)
         .eq('status', 'pending')
-        .single()
+        .maybeSingle()
 
       // If no freeze remains (refunded ou jamais gelé), regeler avant commit pour éviter un service gratuit
       if (!activation.charged && (activation.frozen_amount ?? 0) <= 0) {
@@ -192,12 +192,12 @@ serve(async (req) => {
       console.log(`🔄 [CHECK-SMS-ACTIVATE] ${responseText} - trying V1 getStatus as fallback...`)
       const v1Url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.order_id}`
       console.log('🌐 [CHECK-SMS-ACTIVATE] V1 API Call:', v1Url.replace(SMS_ACTIVATE_API_KEY!, 'KEY_HIDDEN'))
-      
+
       try {
         const v1Response = await fetch(v1Url)
         const v1Text = await v1Response.text()
         console.log('📥 [CHECK-SMS-ACTIVATE] V1 Response:', v1Text)
-        
+
         // Check if V1 has different info
         if (v1Text.startsWith('STATUS_OK:')) {
           smsCode = v1Text.split(':')[1]?.trim()
@@ -215,12 +215,12 @@ serve(async (req) => {
     // First try to parse as JSON in case it's getStatusV2 format even with STATUS_CANCEL
     let isStatusCancel = responseText === 'STATUS_CANCEL' || responseText.startsWith('STATUS_CANCEL')
     let isWrongActivationId = responseText === 'WRONG_ACTIVATION_ID'
-    
+
     if (!isStatusCancel && !isWrongActivationId) {
       try {
         const jsonResponse = JSON.parse(responseText)
         console.log('📊 [CHECK-SMS-ACTIVATE] V2 JSON Response:', JSON.stringify(jsonResponse).substring(0, 200))
-        
+
         // Check if we have SMS data in V2 format
         if (jsonResponse.sms && jsonResponse.sms.code) {
           smsCode = jsonResponse.sms.code
@@ -247,11 +247,11 @@ serve(async (req) => {
       // STEP 1: Try getActiveActivations (for recently cancelled but still in system)
       const activeUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getActiveActivations`
       console.log('🌐 [CHECK-SMS-ACTIVATE] Active API Call:', activeUrl.replace(SMS_ACTIVATE_API_KEY!, 'KEY_HIDDEN'))
-      
+
       const activeResponse = await fetch(activeUrl)
       const activeText = await activeResponse.text()
       console.log('📥 [CHECK-SMS-ACTIVATE] Active Raw Response:', activeText.substring(0, 500))
-      
+
       let activeData
       try {
         activeData = JSON.parse(activeText)
@@ -259,12 +259,12 @@ serve(async (req) => {
         console.error('❌ [CHECK-SMS-ACTIVATE] Failed to parse active JSON')
         activeData = { status: 'error', activeActivations: [] }
       }
-      
+
       if (activeData.status === 'success' && Array.isArray(activeData.activeActivations)) {
         console.log('📊 [CHECK-SMS-ACTIVATE] Found', activeData.activeActivations.length, 'active activations')
-        
+
         const activeItem = activeData.activeActivations.find((item: any) => item.activationId.toString() === activation.order_id)
-        
+
         if (activeItem && activeItem.smsCode && Array.isArray(activeItem.smsCode) && activeItem.smsCode.length > 0) {
           smsCode = activeItem.smsCode[0]
           smsText = activeItem.smsText || `Your verification code is: ${smsCode}`
@@ -282,19 +282,19 @@ serve(async (req) => {
         // Calculate date range for history API (SMS-Activate requires Unix timestamps)
         const now = new Date()
         const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
-        
+
         // Convert to Unix timestamps (seconds since epoch) as required by SMS-Activate API
         const startTimestamp = Math.floor(thirtyDaysAgo.getTime() / 1000)
         const endTimestamp = Math.floor(now.getTime() / 1000)
-        
+
         const historyUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getHistory&start=${startTimestamp}&end=${endTimestamp}&limit=100`
         console.log('🌐 [CHECK-SMS-ACTIVATE] History API Call with dates:', historyUrl.replace(SMS_ACTIVATE_API_KEY!, 'KEY_HIDDEN'))
-      
+
         const historyResponse = await fetch(historyUrl)
         const historyText = await historyResponse.text()
-        
+
         console.log('📥 [CHECK-SMS-ACTIVATE] History Raw Response:', historyText.substring(0, 500))
-        
+
         let historyData
         try {
           historyData = JSON.parse(historyText)
@@ -303,31 +303,31 @@ serve(async (req) => {
           newStatus = 'cancelled'
           historyData = []
         }
-        
+
         console.log('📥 [CHECK-SMS-ACTIVATE] History Parsed:', JSON.stringify(historyData).substring(0, 500))
         console.log('📥 [CHECK-SMS-ACTIVATE] Is Array?', Array.isArray(historyData), 'Type:', typeof historyData)
         console.log('🔍 [CHECK-SMS-ACTIVATE] Looking for order_id:', activation.order_id)
 
         if (Array.isArray(historyData)) {
           console.log('📊 [CHECK-SMS-ACTIVATE] History items count:', historyData.length)
-          
+
           // Find ALL entries for this order_id (there might be multiple)
           const allHistoryItems = historyData.filter((item: any) => item.id.toString() === activation.order_id)
-          
+
           if (allHistoryItems.length > 0) {
             console.log('✅ [CHECK-SMS-ACTIVATE] Found', allHistoryItems.length, 'entries in history for order:', activation.order_id)
-            
+
             // Log all entries to see different states
             allHistoryItems.forEach((item: any, index: number) => {
               console.log(`📋 [CHECK-SMS-ACTIVATE] Entry ${index + 1}:`, JSON.stringify(item))
             })
-            
+
             // Look for an entry with SMS (prioritize entries with sms over null)
             const itemWithSms = allHistoryItems.find((item: any) => item.sms !== null && item.sms !== undefined)
             const historyItem = itemWithSms || allHistoryItems[0] // Fallback to first entry
-            
+
             console.log('🎯 [CHECK-SMS-ACTIVATE] Using entry:', JSON.stringify(historyItem))
-            
+
             if (historyItem.sms && Array.isArray(historyItem.sms) && historyItem.sms.length > 0) {
               smsText = historyItem.sms[0]
               const codeMatch = smsText.match(/\b\d{4,8}\b/)
@@ -456,7 +456,7 @@ serve(async (req) => {
     // Try parsing as JSON (V2 format for active activations)
     try {
       const jsonResponse = JSON.parse(responseText)
-      
+
       if (jsonResponse.sms && (jsonResponse.sms.code || jsonResponse.sms.text)) {
         // SMS received in V2 format
         smsCode = jsonResponse.sms.code
@@ -507,7 +507,7 @@ serve(async (req) => {
       }
     } else {
       // No SMS yet - check if still waiting or cancelled
-      
+
       // Check for STATUS_CANCEL (plain text from V1)
       if (responseText === 'STATUS_CANCEL' || responseText.startsWith('STATUS_CANCEL')) {
         console.log('❌ [CHECK-SMS-ACTIVATE] Activation cancelled')
