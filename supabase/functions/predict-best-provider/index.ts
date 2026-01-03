@@ -7,7 +7,9 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const PROVIDER_CYCLE = ['sms-activate', 'smspva', '5sim', 'onlinesim']
+// Provider cycle - UPDATED: 5sim first, then fallback chain
+// TextVerified handled separately (US-only, in buy-number-intelligent)
+const PROVIDER_CYCLE = ['5sim', 'sms-activate', 'grizzly', 'onlinesim']
 
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -53,36 +55,35 @@ serve(async (req) => {
         let preferredProvider = null
         let reasoning = 'Default'
 
-        // 3. DECISION STRATEGIQUE
-        if (globalStats && globalStats.length > 0) {
-            // On a des stats !
-            // Filtrer: Enlever le provider vetoed (si existe)
-            const candidates = globalStats.filter(p => p.provider !== personalVetoProvider);
-
-            if (candidates.length > 0) {
-                // Le meilleur est le candidat n°1
-                const winner = candidates[0];
-                preferredProvider = winner.provider;
-                reasoning = `Global Best (${Number(winner.score).toFixed(0)}% success) ` + (personalVetoProvider ? `[Avoided ${personalVetoProvider}]` : '');
+        // 3. DECISION STRATEGIQUE - FORCE SMSPOOL FIRST
+        // Always prefer SMSPool UNLESS it failed recently for this user
+        if (personalVetoProvider === 'smspool') {
+            // SMSPool failed recently, use next best from global stats
+            if (globalStats && globalStats.length > 0) {
+                const candidates = globalStats.filter(p => p.provider !== 'smspool');
+                if (candidates.length > 0) {
+                    const winner = candidates[0];
+                    preferredProvider = winner.provider;
+                    reasoning = `SMSPool vetoed → Next Best: ${winner.provider} (${Number(winner.score).toFixed(0)}% success)`;
+                } else {
+                    // Fallback to rotation
+                    const index = PROVIDER_CYCLE.indexOf('smspool');
+                    const nextIndex = (index + 1) % PROVIDER_CYCLE.length;
+                    preferredProvider = PROVIDER_CYCLE[nextIndex];
+                    reasoning = 'SMSPool vetoed → Rotating to next in cycle';
+                }
             } else {
-                // Tous les bons sont vetoed (ex: le seul bon provider a échoué pour moi)
-                // Fallback: On essaie quand même le 2ème meilleur global s'il existe (non, candidates est vide)
-                // Donc on essaie la rotation classique
-                reasoning = "Global best blocked by personal veto. Rotate mode.";
+                // No stats, rotate
+                const index = PROVIDER_CYCLE.indexOf('smspool');
+                const nextIndex = (index + 1) % PROVIDER_CYCLE.length;
+                preferredProvider = PROVIDER_CYCLE[nextIndex];
+                reasoning = 'SMSPool vetoed → Rotating to next in cycle';
             }
+        } else {
+            // SMSPool is good or unknown → ALWAYS USE IT
+            preferredProvider = 'smspool';
+            reasoning = 'SMSPool (Priority Provider)';
         }
-
-        // Fallback: Si pas de preferredProvider via Global Stats (ou vetoed), utiliser Rotation
-        if (!preferredProvider && personalVetoProvider) {
-            const index = PROVIDER_CYCLE.indexOf(personalVetoProvider)
-            if (index !== -1) {
-                const nextIndex = (index + 1) % PROVIDER_CYCLE.length
-                preferredProvider = PROVIDER_CYCLE[nextIndex]
-                reasoning += ` -> Rotating away from ${personalVetoProvider}`
-            }
-        }
-
-        // Si toujours rien, on laisse null (le frontend utilisera l'ordre par défaut setting)
 
         console.log(`🧠 [PREDICT] User: ${userId}, Service: ${serviceCode} -> Suggestion: ${preferredProvider} (${reasoning})`)
 

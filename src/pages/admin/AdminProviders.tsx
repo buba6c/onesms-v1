@@ -154,22 +154,58 @@ export default function AdminProviders() {
   const [configOpen, setConfigOpen] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<ProviderStatus | null>(null)
   const [newApiKey, setNewApiKey] = useState('')
+  const [newApiUsername, setNewApiUsername] = useState('') // For TextVerified email
 
   const openConfig = (provider: ProviderStatus) => {
     setSelectedProvider(provider)
     setNewApiKey('') // Reset formatting, user must enter new key or we could fetch existing if needed but better security to just set new
+    setNewApiUsername('') // Reset email field
     setConfigOpen(true)
   }
 
   const handleSaveApiKey = async () => {
     if (!selectedProvider || !newApiKey) return
 
+    // TextVerified needs 2 credentials
+    if (selectedProvider.name === 'TextVerified') {
+      if (!newApiUsername) {
+        toast({
+          title: '❌ Erreur',
+          description: 'Veuillez entrer l\'email de votre compte TextVerified',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      // Save both API key and username
+      const keySuccess = await updateSetting('textverified_api_key', newApiKey)
+      const usernameSuccess = await updateSetting('textverified_api_username', newApiUsername)
+
+      if (keySuccess && usernameSuccess) {
+        toast({
+          title: '✅ Credentials TextVerified mis à jour',
+          description: 'API Key et email configurés avec succès'
+        })
+        setConfigOpen(false)
+        refetch()
+      } else {
+        toast({
+          title: '❌ Erreur',
+          description: 'Impossible de sauvegarder les credentials',
+          variant: 'destructive'
+        })
+      }
+      return
+    }
+
     // Map provider name to setting key
     const keyNameMap: Record<string, string> = {
       'SMS-Activate': 'sms_activate_api_key',
       '5sim': '5sim_api_key',
       'SMSPVA': 'smspva_api_key',
-      'OnlineSIM': 'onlinesim_api_key'
+      'OnlineSIM': 'onlinesim_api_key',
+      'Grizzly SMS': 'grizzly_api_key',
+      'SMSPool': 'smspool_api_key'
     }
     const keyName = keyNameMap[selectedProvider.name] || 'sms_activate_api_key'
 
@@ -292,6 +328,8 @@ export default function AdminProviders() {
                 {[
                   { id: 'sms-activate', label: 'SMS Activate Only', desc: 'Force all purchases via SMS Activate' },
                   { id: '5sim', label: '5sim Only', desc: 'Force all purchases via 5sim' },
+                  { id: 'grizzly', label: 'Grizzly SMS Only', desc: 'Force all purchases via Grizzly SMS (Reliable)' },
+                  { id: 'textverified', label: 'TextVerified Only', desc: 'Force all purchases via TextVerified (Premium USA/UK)' },
                   { id: 'smspva', label: 'SMSPVA Only', desc: 'Force all purchases via SMSPVA' },
                   { id: 'onlinesim', label: 'OnlineSIM Only', desc: 'Force all purchases via OnlineSIM' },
                   { id: 'smart', label: 'Smart Selection (Auto)', desc: 'Automatically choose best provider per purchase' }
@@ -549,6 +587,127 @@ export default function AdminProviders() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Grizzly SMS Card */}
+        <Card className="border-l-4 border-purple-500">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <span className="text-xl">🐻</span>
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Grizzly SMS</CardTitle>
+                  <p className="text-sm text-gray-500">grizzlysms.com</p>
+                </div>
+              </div>
+              {providers.find(p => p.name === 'Grizzly SMS')?.status === 'active' ? (
+                <Badge className="bg-green-100 text-green-800">Connecté</Badge>
+              ) : (
+                <Badge className="bg-gray-100 text-gray-800">Non configuré</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Provider fiable pour activation, meilleur que 5sim. Remplace 5sim comme workhorse principal.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => {
+                setSelectedProvider({ name: 'Grizzly SMS', status: 'inactive', balance: 0, currency: 'USD', apiUrl: 'https://api.grizzlysms.com', lastCheck: '' })
+                setNewApiKey('')
+                setConfigOpen(true)
+              }}
+            >
+              <Key className="w-4 h-4" />
+              Configurer la clé API
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* SMSPool Card - High Quality */}
+        <Card className="border-l-4 border-indigo-500">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <span className="text-xl">🏊</span>
+                </div>
+                <div>
+                  <CardTitle className="text-lg">SMSPool</CardTitle>
+                  <p className="text-sm text-gray-500">smspool.net</p>
+                </div>
+              </div>
+              {providers.find(p => p.name === 'SMSPool')?.status === 'active' ? (
+                <Badge className="bg-green-100 text-green-800">Connecté</Badge>
+              ) : providers.find(p => p.name === 'SMSPool')?.status === 'error' ? (
+                <Badge className="bg-red-100 text-red-800">Erreur</Badge>
+              ) : (
+                <Badge className="bg-gray-100 text-gray-800">Non configuré</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Provider "Premium" pour les services US/EU difficiles (WhatsApp, Tinder, Google). Très haute qualité.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => {
+                setSelectedProvider({ name: 'SMSPool', status: 'inactive', balance: 0, currency: 'USD', apiUrl: 'https://smspool.net', lastCheck: '' })
+                setNewApiKey('')
+                setConfigOpen(true)
+              }}
+            >
+              <Key className="w-4 h-4" />
+              Configurer la clé API
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* TextVerified Card */}
+        <Card className="border-l-4 border-pink-500">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                  <span className="text-xl">💎</span>
+                </div>
+                <div>
+                  <CardTitle className="text-lg">TextVerified</CardTitle>
+                  <p className="text-sm text-gray-500">textverified.com</p>
+                </div>
+              </div>
+              {providers.find(p => p.name === 'TextVerified')?.status === 'active' ? (
+                <Badge className="bg-green-100 text-green-800">Connecté</Badge>
+              ) : providers.find(p => p.name === 'TextVerified')?.status === 'error' ? (
+                <Badge className="bg-red-100 text-red-800">Erreur</Badge>
+              ) : (
+                <Badge className="bg-gray-100 text-gray-800">Non configuré</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Provider Premium USA/UK. Non-VoIP pour WhatsApp/TikTok. Très fiable mais cher (1-2.5 Ⓐ).
+            </p>
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => {
+                setSelectedProvider({ name: 'TextVerified', status: 'inactive', balance: 0, currency: 'USD', apiUrl: 'https://www.textverified.com', lastCheck: '' })
+                setNewApiKey('')
+                setConfigOpen(true)
+              }}
+            >
+              <Key className="w-4 h-4" />
+              Configurer les credentials
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Providers List */}
@@ -698,19 +857,23 @@ export default function AdminProviders() {
           <DialogHeader>
             <DialogTitle>Configurer {selectedProvider?.name}</DialogTitle>
             <DialogDescription>
-              Entrez la clé API pour {selectedProvider?.name}. Cette clé sera stockée de manière sécurisée.
+              {selectedProvider?.name === 'TextVerified' ? (
+                'Entrez votre API Key et l\'email de votre compte TextVerified. Ces informations seront stockées de manière sécurisée.'
+              ) : (
+                `Entrez la clé API pour ${selectedProvider?.name}. Cette clé sera stockée de manière sécurisée.`
+              )}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Clé API</Label>
+              <Label>{selectedProvider?.name === 'TextVerified' ? 'API Key' : 'Clé API'}</Label>
               <div className="relative">
                 <Input
                   type="password"
                   value={newApiKey}
                   onChange={(e) => setNewApiKey(e.target.value)}
-                  placeholder="Entrez la nouvelle clé API..."
+                  placeholder={selectedProvider?.name === 'TextVerified' ? 'Entrez votre API Key...' : 'Entrez la nouvelle clé API...'}
                   className="pr-10"
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
@@ -718,9 +881,31 @@ export default function AdminProviders() {
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Laissez vide pour annuler. La clé actuelle n'est pas affichée pour des raisons de sécurité.
+                {selectedProvider?.name === 'TextVerified' ? 'Obtenue depuis votre dashboard TextVerified' : 'Laissez vide pour annuler. La clé actuelle n\'est pas affichée pour des raisons de sécurité.'}
               </p>
             </div>
+
+            {/* Second field for TextVerified (Email) */}
+            {selectedProvider?.name === 'TextVerified' && (
+              <div className="space-y-2">
+                <Label>Account Email (Username)</Label>
+                <div className="relative">
+                  <Input
+                    type="email"
+                    value={newApiUsername}
+                    onChange={(e) => setNewApiUsername(e.target.value)}
+                    placeholder="votre-email@example.com"
+                    className="pr-10"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                    <span className="text-lg">📧</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  L'email de votre compte TextVerified (utilisé comme username pour l'authentification)
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

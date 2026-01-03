@@ -92,8 +92,82 @@ serve(async (req) => {
       id: activation.id,
       order_id: activation.order_id,
       phone: activation.phone,
-      status: activation.status
+      status: activation.status,
+      provider: activation.provider
     })
+
+    // --- SMSPOOL HANDLING ---
+    if (activation.provider === 'smspool') {
+      const { SMSPoolClient } = await import('../_shared/smspool.ts')
+
+      const { data: spSettings } = await supabaseClient.from('system_settings').select('value').eq('key', 'smspool_api_key').single()
+      const SMSPOOL_API_KEY = spSettings?.value
+
+      if (!SMSPOOL_API_KEY) throw new Error('SMSPool API Key missing')
+
+      const client = new SMSPoolClient(SMSPOOL_API_KEY)
+      const check = await client.checkOrder(activation.order_id)
+
+      const statusNum = Number(check.status)
+
+      // CRITICAL: SMSPool may return status=3 (Expired) but STILL provide the SMS!
+      // Check for SMS presence FIRST, regardless of status
+      if (check.sms && check.full_sms) {
+        const smsCode = check.sms
+        const smsText = check.full_sms
+
+        console.log(`✅ [CHECK-SMS] SMSPool SMS found (status=${statusNum}): ${smsCode}`)
+
+        await supabaseClient
+          .from('activations')
+          .update({
+            status: 'received',
+            sms_code: smsCode,
+            sms_text: smsText,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', activationId)
+
+        // Charge
+        const { data: commitResult, error: commitError } = await supabaseClient.rpc('atomic_commit', {
+          p_user_id: activation.user_id,
+          p_activation_id: activationId,
+          p_rental_id: null,
+          p_transaction_id: null,
+          p_reason: 'SMSPool SMS received - manual check'
+        })
+
+        if (commitError) throw commitError
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              status: 'received',
+              sms_code: smsCode,
+              sms_text: smsText,
+              charged: true
+            }
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        // No SMS yet - still pending or truly expired without SMS
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              status: statusNum === 1 ? 'pending' : statusNum === 3 ? 'expired' : activation.status,
+              sms_code: null,
+              sms_text: null,
+              charged: false
+            }
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+    // --- END SMSPOOL ---
 
     // Centralized, idempotent charge path using atomic_commit (ledger-first)
     const chargeWithAtomicCommit = async (smsCode: string, smsText: string) => {

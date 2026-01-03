@@ -2,9 +2,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { loggedFetch } from '../_shared/logged-fetch.ts'
+import { SMSPoolClient } from '../_shared/smspool.ts'
 
 const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
 const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
+// Note: SMSPool API Key will be fetched from DB
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,10 +26,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Fetch SMSPool API Key
+    const { data: spSettings } = await supabaseClient.from('system_settings').select('value').eq('key', 'smspool_api_key').single()
+    const SMSPOOL_API_KEY = spSettings?.value
+
     const { data: activations, error: fetchError } = await supabaseClient
       .from('activations')
       .select('*')
       .in('status', ['pending', 'waiting'])
+      .in('provider', ['sms-activate', '5sim', 'grizzly', 'onlinesim', 'smspool']) // 🔧 ADDED: smspool
       .order('created_at', { ascending: true })
       .limit(50)
 
@@ -91,6 +98,54 @@ serve(async (req) => {
 
           results.expired++
           continue
+        }
+
+        if (activation.provider === 'smspool') {
+          if (!SMSPOOL_API_KEY) {
+            console.error(`❌ [CRON-CHECK-SMS] SMSPool API Key missing for ${activation.order_id}`)
+            results.errors.push(`${activation.order_id}: Missing SMSPool Key`)
+            continue
+          }
+
+          try {
+            const client = new SMSPoolClient(SMSPOOL_API_KEY)
+            // Use robust timeout of 10s via client internal logic
+            const check = await client.checkOrder(activation.order_id)
+            const statusNum = Number(check.status)
+
+            // CRITICAL: SMSPool returns status=3 (Expired) BUT still includes the SMS code!
+            // So we MUST check for SMS presence FIRST, regardless of status
+            if (check.sms && check.full_sms) {
+              const smsCode = check.sms
+              const smsText = check.full_sms
+              console.log(`✅ [CRON-CHECK-SMS] SMSPool SMS RECEIVED (status=${statusNum}): ${smsCode}`)
+
+              const { data: processResult, error: processError } = await supabaseClient.rpc('process_sms_received', {
+                p_order_id: activation.order_id,
+                p_code: smsCode,
+                p_text: smsText,
+                p_source: 'cron_smspool'
+              })
+
+              if (processError) {
+                console.error(`❌ [CRON-CHECK-SMS] process_sms_received error: ${processError.message}`)
+              } else {
+                results.found++
+                console.log(`✅ [CRON-CHECK-SMS] process_sms_received SUCCESS (atomic)`)
+              }
+            } else if (statusNum === 3) {
+              console.log(`ℹ️ [CRON-CHECK-SMS] SMSPool reports 'expired/cancelled' for ${activation.order_id} with NO SMS. Waiting for local timeout expire.`)
+              // We DO NOT refund immediately here to correspond with the "disable refund" policy we adopted in the main function.
+              // We let the "local timeout" (20 min) handle the refund at the top of this loop.
+            } else {
+              // Status 1 = pending, no SMS yet
+              // console.log(`⏳ [CRON-CHECK-SMS] SMSPool Pending: ${statusNum}`)
+            }
+
+          } catch (err) {
+            console.error(`❌ [CRON-CHECK-SMS] SMSPool Check Error for ${activation.order_id}:`, err)
+          }
+          continue // SKIP SMS-ACTIVATE LOGIC
         }
 
         const v1Url = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getStatus&id=${activation.order_id}`

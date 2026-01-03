@@ -1,34 +1,16 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-/**
- * ============================================================================
- * get-real-time-prices - Récupération des prix en temps réel depuis SMS-Activate
- * ============================================================================
- * 
- * Cette fonction remplace pricing_rules en appelant directement l'API SMS-Activate
- * pour obtenir les prix actuels sans cache ni synchronisation.
- * 
- * ENDPOINTS:
- * - getPrices: Prix d'activation par service/pays
- * - getRentServicesAndCountries: Prix de location par durée
- * 
- * CONVERSION:
- * - API retourne USD
- * - Convertir en FCFA (1 USD = 600 FCFA)
- * - Convertir en Coins (1 Coin = 10 FCFA)
- * - Appliquer marge (10% par défaut)
- * ============================================================================
- */
-
-const SMS_ACTIVATE_API_KEY = Deno.env.get('SMS_ACTIVATE_API_KEY')
-const SMS_ACTIVATE_BASE_URL = 'https://hero-sms.com/stubs/handler_api.php'
+// Grizzly API (Grizzly compatible)
+const GRIZZLY_BASE_URL = 'https://api.grizzlysms.com/stubs/handler_api.php'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// COUNTRY_CODE_MAP: Convertir nom de pays en ID SMS-Activate
+// COUNTRY_CODE_MAP
 const COUNTRY_CODE_MAP: Record<string, number> = {
   'russia': 0, 'ukraine': 1, 'kazakhstan': 2, 'china': 3, 'philippines': 4,
   'myanmar': 5, 'indonesia': 6, 'malaysia': 7, 'kenya': 8, 'tanzania': 9,
@@ -56,21 +38,17 @@ const COUNTRY_CODE_MAP: Record<string, number> = {
   'usa': 187, 'united_states': 187
 }
 
-// Convertir nom pays -> ID numérique SMS-Activate
 function getCountryId(country: string): string {
-  // Si déjà numérique, utiliser tel quel
-  if (/^\d+$/.test(country)) {
-    return country
-  }
+  if (/^\d+$/.test(country)) return country
   const normalized = country.toLowerCase().replace(/[\s-]+/g, '_')
   const id = COUNTRY_CODE_MAP[normalized]
   return id !== undefined ? String(id) : country
 }
 
-// Constants de conversion
 const USD_TO_FCFA = 600
 const FCFA_TO_COINS = 10
-const MARGIN_PERCENTAGE = 10 // 10% de marge
+const MARGIN_PERCENTAGE = 10
+const MIN_PRICE_COINS = 5
 
 interface PriceResult {
   serviceCode: string
@@ -82,166 +60,197 @@ interface PriceResult {
   type: 'activation' | 'rental'
 }
 
-/**
- * Convertir prix USD → Coins avec marge
- * Prix minimum: 5 Ⓐ pour tous les services
- */
-const MIN_PRICE_COINS = 5
-
 function convertPrice(priceUSD: number): number {
   const priceFCFA = priceUSD * USD_TO_FCFA
   const priceCoins = priceFCFA / FCFA_TO_COINS
   const priceWithMargin = priceCoins * (1 + MARGIN_PERCENTAGE / 100)
-  // Appliquer le prix minimum de 5 Ⓐ
   return Math.max(MIN_PRICE_COINS, Math.ceil(priceWithMargin))
 }
 
 serve(async (req) => {
   console.log('💰 [GET-PRICES] Function called')
-  
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const url = new URL(req.url)
-    const type = url.searchParams.get('type') || 'activation' // activation | rental
-    const serviceCode = url.searchParams.get('service')
-    const countryCodeParam = url.searchParams.get('country')
-    
-    // Convertir nom pays en ID numérique SMS-Activate
+    // CRITICAL FIX: Support BOTH invocation methods
+    // 1. POST body (cloudFunctions.invoke): { type, service, country }
+    // 2. GET query params (direct HTTP): ?type=...&service=...
+
+    let type = 'activation'
+    let serviceCode: string | null = null
+    let countryCodeParam: string | null = null
+
+    // Try POST body first
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json()
+        type = body.type || 'activation'
+        serviceCode = body.service || null
+        countryCodeParam = body.country || null
+        console.log('📊 [GET-PRICES] POST body:', { type, serviceCode, countryCodeParam })
+      } catch (e) {
+        console.warn('⚠️ [GET-PRICES] Body parse failed')
+      }
+    }
+
+    // Fallback to URL params
+    if (!serviceCode && !countryCodeParam) {
+      const url = new URL(req.url)
+      type = url.searchParams.get('type') || 'activation'
+      serviceCode = url.searchParams.get('service')
+      countryCodeParam = url.searchParams.get('country')
+      console.log('📊 [GET-PRICES] URL params:', { type, serviceCode, countryCodeParam })
+    }
+
+    const countryCode = countryCodeParam
     const countryId = countryCodeParam ? getCountryId(countryCodeParam) : null
 
-    console.log('📊 [GET-PRICES] Request:', { type, serviceCode, countryCodeParam, countryId })
+    console.log('📊 [GET-PRICES] Final:', { type, serviceCode, countryId })
 
-    if (!SMS_ACTIVATE_API_KEY) {
-      throw new Error('SMS_ACTIVATE_API_KEY not configured')
+    // Get API key from DB
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Get Grizzly API key from DB (prioritized over Grizzly)
+    let GRIZZLY_API_KEY = Deno.env.get('GRIZZLY_API_KEY')
+    const { data: apiKeySetting } = await supabase.from('system_settings').select('value').eq('key', 'grizzly_api_key').single()
+    if (apiKeySetting?.value) GRIZZLY_API_KEY = apiKeySetting.value
+
+    if (!GRIZZLY_API_KEY) {
+      throw new Error('Grizzly API key not configured')
     }
 
     const results: PriceResult[] = []
 
-    // ========================================================================
     // ACTIVATION PRICES
-    // ========================================================================
     if (type === 'activation' || type === 'all') {
       console.log('📱 [GET-PRICES] Fetching activation prices...')
 
-      // Si service + country spécifiés, récupérer prix précis
+      // Service + Country specific
       if (serviceCode && countryId) {
-        const pricesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryId}`
-        
+        const url = `${GRIZZLY_BASE_URL}?api_key=${GRIZZLY_API_KEY}&action=getPrices&service=${serviceCode}&country=${countryId}`
         try {
-          const response = await fetch(pricesUrl)
+          const response = await fetch(url)
           const data = await response.json()
-
-          console.log('💰 [GET-PRICES] API Response for specific:', JSON.stringify(data).slice(0, 500))
-
-          // Format: { "0": { "wa": { "cost": "0.50", "count": 100 } } }
-          // OR: { "0": { "cost": "0.50", "count": 100 } }
           if (data && data[countryId]) {
             const countryData = data[countryId]
-            
-            // Si service spécifique
             if (countryData[serviceCode]) {
               const priceData = countryData[serviceCode]
               const priceUSD = parseFloat(priceData.cost || priceData.price || 0)
               const count = parseInt(priceData.count || 0)
-
-              results.push({
-                serviceCode,
-                countryCode: countryCodeParam || countryId,
-                priceUSD,
-                priceFCFA: priceUSD * USD_TO_FCFA,
-                priceCoins: convertPrice(priceUSD),
-                count,
-                type: 'activation'
-              })
-            }
-            // Si pas de service spécifique, prendre le premier
-            else if (countryData.cost) {
+              results.push({ serviceCode, countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD), count, type: 'activation' })
+            } else if (countryData.cost) {
               const priceUSD = parseFloat(countryData.cost)
               const count = parseInt(countryData.count || 0)
-
-              results.push({
-                serviceCode: serviceCode || 'unknown',
-                countryCode: countryCodeParam || countryId,
-                priceUSD,
-                priceFCFA: priceUSD * USD_TO_FCFA,
-                priceCoins: convertPrice(priceUSD),
-                count,
-                type: 'activation'
-              })
+              results.push({ serviceCode: serviceCode || 'unknown', countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD), count, type: 'activation' })
             }
           }
-        } catch (e) {
-          console.error('❌ [GET-PRICES] Failed to fetch activation price:', e)
+        } catch (e) { console.error('❌ [GET-PRICES] Grizzly error:', e) }
+      }
+
+      // Service only (fetch all countries for this service)
+      else if (serviceCode && !countryId) {
+        console.log('🌍 [GET-PRICES] Fetching ALL countries for service:', serviceCode)
+
+        // 5sim fallback
+        const FIVESIM_API_KEY = Deno.env.get('FIVESIM_API_KEY')
+        const { data: fivesimKeySetting } = await supabase.from('system_settings').select('value').eq('key', '5sim_api_key').single()
+        const final5simKey = fivesimKeySetting?.value || FIVESIM_API_KEY
+
+        if (final5simKey) {
+          try {
+            console.log('🔹 [GET-PRICES] Fetching 5sim prices...')
+            const response = await fetch(`https://5sim.net/v1/guest/prices?product=${serviceCode}`, {
+              headers: { 'Authorization': `Bearer ${final5simKey}` }
+            })
+            const data = await response.json()
+
+            if (data && !data.error) {
+              Object.entries(data).forEach(([country, products]: [string, any]) => {
+                if (products && products[serviceCode]) {
+                  const pData = products[serviceCode]
+                  let cost = 0
+                  let count = 0
+
+                  if (pData.cost) {
+                    cost = parseFloat(pData.cost)
+                    count = parseInt(pData.count || 0)
+                  } else {
+                    let minCost = 999
+                    let totalCount = 0
+                    Object.values(pData).forEach((prov: any) => {
+                      if (prov.cost) {
+                        minCost = Math.min(minCost, parseFloat(prov.cost))
+                        totalCount += parseInt(prov.count || 0)
+                      }
+                    })
+                    if (minCost < 999) {
+                      cost = minCost
+                      count = totalCount
+                    }
+                  }
+
+                  if (cost > 0 && count > 0) {
+                    const priceUSD = cost * 0.011 // RUB to USD
+                    results.push({
+                      serviceCode,
+                      countryCode: country,
+                      priceUSD,
+                      priceFCFA: priceUSD * USD_TO_FCFA,
+                      priceCoins: convertPrice(priceUSD),
+                      count,
+                      type: 'activation'
+                    })
+                  }
+                }
+              })
+            }
+          } catch (e) {
+            console.error('❌ [GET-PRICES] 5sim error:', e)
+          }
         }
       }
-      // Sinon, récupérer tous les prix d'un pays
+
+      // Country only (all services)
       else if (countryId) {
-        const pricesUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getPrices&country=${countryId}`
-        
-        console.log('📡 [GET-PRICES] Fetching all services for country:', countryId, 'URL:', pricesUrl.replace(SMS_ACTIVATE_API_KEY!, '***'))
-        
+        const url = `${GRIZZLY_BASE_URL}?api_key=${GRIZZLY_API_KEY}&action=getPrices&country=${countryId}`
         try {
-          const response = await fetch(pricesUrl)
+          const response = await fetch(url)
           const data = await response.json()
-
-          console.log('💰 [GET-PRICES] API Response for country:', JSON.stringify(data).slice(0, 500))
-
-          // Format: { "0": { "wa": { "cost": "0.50", "count": 100 }, "tg": {...} } }
           if (data && data[countryId]) {
             const services = data[countryId]
-            
             for (const [svc, svcData] of Object.entries(services)) {
               const priceData = svcData as any
               const priceUSD = parseFloat(priceData.cost || priceData.price || 0)
               const count = parseInt(priceData.count || 0)
-
               if (priceUSD > 0) {
-                results.push({
-                  serviceCode: svc,
-                  countryCode: countryCodeParam || countryId,
-                  priceUSD,
-                  priceFCFA: priceUSD * USD_TO_FCFA,
-                  priceCoins: convertPrice(priceUSD),
-                  count,
-                  type: 'activation'
-                })
+                results.push({ serviceCode: svc, countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD), count, type: 'activation' })
               }
             }
           }
-        } catch (e) {
-          console.error('❌ [GET-PRICES] Failed to fetch country prices:', e)
-        }
+        } catch (e) { console.error('❌ [GET-PRICES] Country prices error:', e) }
       }
     }
 
-    // ========================================================================
     // RENTAL PRICES
-    // ========================================================================
     if (type === 'rental' || type === 'all') {
       console.log('🏠 [GET-PRICES] Fetching rental prices...')
-
-      const rentUrl = `${SMS_ACTIVATE_BASE_URL}?api_key=${SMS_ACTIVATE_API_KEY}&action=getRentServicesAndCountries`
-      
-      // Ajouter paramètres optionnels
+      const rentUrl = `${GRIZZLY_BASE_URL}?api_key=${GRIZZLY_API_KEY}&action=getRentServicesAndCountries`
       const rentParams = new URLSearchParams()
       if (countryCode) rentParams.append('country', countryCode)
-      
+
       try {
         const response = await fetch(`${rentUrl}&${rentParams.toString()}`)
         const data = await response.json()
-
-        console.log('🏠 [GET-PRICES] Rent API Response:', data)
-
-        // Format: { "services": { "full": { "cost": 42.93, "quant": 20 }, "wa": {...} } }
         if (data && data.services) {
           for (const [svc, svcData] of Object.entries(data.services)) {
             const rentalData = svcData as any
             const priceUSD = parseFloat(rentalData.cost || 0)
             const count = parseInt(rentalData.quant || rentalData.count || 0)
-
             if (priceUSD > 0) {
               results.push({
                 serviceCode: svc,
@@ -255,9 +264,7 @@ serve(async (req) => {
             }
           }
         }
-      } catch (e) {
-        console.error('❌ [GET-PRICES] Failed to fetch rental prices:', e)
-      }
+      } catch (e) { console.error('❌ [GET-PRICES] Rental error:', e) }
     }
 
     console.log(`✅ [GET-PRICES] Returning ${results.length} prices`)
@@ -266,29 +273,15 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         data: results,
-        meta: {
-          usdToFcfa: USD_TO_FCFA,
-          fcfaToCoins: FCFA_TO_COINS,
-          marginPercentage: MARGIN_PERCENTAGE
-        }
+        meta: { usdToFcfa: USD_TO_FCFA, fcfaToCoins: FCFA_TO_COINS, marginPercentage: MARGIN_PERCENTAGE }
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error: any) {
     console.error('❌ [GET-PRICES] Error:', error)
-    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || String(error)
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
+      JSON.stringify({ success: false, error: error.message || String(error) }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
 })

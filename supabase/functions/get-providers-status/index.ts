@@ -359,8 +359,153 @@ serve(async (req) => {
         error: 'API Key not configured'
       })
     }
+    // Check Grizzly SMS
+    let grizzlyKey = Deno.env.get('GRIZZLY_API_KEY')
+    const { data: grizzlySetting } = await supabaseClient.from('system_settings').select('value').eq('key', 'grizzly_api_key').single()
+    if (grizzlySetting?.value) grizzlyKey = grizzlySetting.value
 
-    // Log the check
+    if (grizzlyKey) {
+      try {
+        const startTime = Date.now()
+        const response = await fetch(`https://api.grizzlysms.com/stubs/handler_api.php?api_key=${grizzlyKey}&action=getBalance`, { signal: AbortSignal.timeout(5000) })
+        const responseTime = Date.now() - startTime
+        const text = await response.text()
+
+        if (text.startsWith('ACCESS_BALANCE:')) {
+          const balance = parseFloat(text.split(':')[1])
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const { data: purchases } = await supabaseClient.from('activations').select('id').eq('provider', 'grizzly').gte('created_at', today.toISOString())
+
+          providers.push({
+            name: 'Grizzly SMS',
+            status: 'active',
+            balance,
+            currency: 'RUB',
+            apiUrl: 'https://grizzlysms.com',
+            lastCheck: new Date().toISOString(),
+            stats: { todayPurchases: purchases?.length || 0, totalAvailable: 0, avgResponseTime: responseTime }
+          })
+        } else {
+          throw new Error(text)
+        }
+      } catch (error: any) {
+        providers.push({ name: 'Grizzly SMS', status: 'error', balance: 0, currency: 'RUB', apiUrl: 'https://grizzlysms.com', lastCheck: new Date().toISOString(), error: error.message })
+      }
+    } else {
+      providers.push({ name: 'Grizzly SMS', status: 'inactive', balance: 0, currency: 'RUB', apiUrl: 'https://grizzlysms.com', lastCheck: new Date().toISOString(), error: 'API Key not configured' })
+    }
+
+    // Check TextVerified
+    let tvKey = Deno.env.get('TEXTVERIFIED_API_KEY')
+    let tvUser = Deno.env.get('TEXTVERIFIED_API_USERNAME')
+    const { data: tvKeySetting } = await supabaseClient.from('system_settings').select('value').eq('key', 'textverified_api_key').single()
+    if (tvKeySetting?.value) tvKey = tvKeySetting.value
+    const { data: tvUserSetting } = await supabaseClient.from('system_settings').select('value').eq('key', 'textverified_api_username').single()
+    if (tvUserSetting?.value) tvUser = tvUserSetting.value
+
+    if (tvKey && tvUser) {
+      try {
+        const startTime = Date.now()
+        // 1. Auth with HEADERS
+        const authRes = await fetch(`https://www.textverified.com/api/pub/v2/auth`, {
+          method: 'POST',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Content-Length': '0',
+            'X-API-KEY': tvKey,
+            'X-API-USERNAME': tvUser
+          },
+          signal: AbortSignal.timeout(5000)
+        })
+
+        if (!authRes.ok) {
+          const errText = await authRes.text()
+          throw new Error(`Auth failed (${authRes.status}): ${errText.substring(0, 100)} [KeyLen: ${tvKey?.length}, UserLen: ${tvUser?.length}]`)
+        }
+
+        const authData = await authRes.json()
+        const token = authData.token || authData.bearer_token //'token' is standard in V2 per curl output
+
+        if (!token) throw new Error('No token returned')
+
+        // 2. Get User Info (Balance)
+        const userRes = await fetch(`https://www.textverified.com/api/pub/v2/account/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          signal: AbortSignal.timeout(5000)
+        })
+        const responseTime = Date.now() - startTime
+
+        if (userRes.ok) {
+          const userData = await userRes.json()
+          const balance = userData.currentBalance || 0
+
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const { data: purchases } = await supabaseClient.from('activations').select('id').eq('provider', 'textverified').gte('created_at', today.toISOString())
+
+          providers.push({
+            name: 'TextVerified',
+            status: 'active',
+            balance,
+            currency: 'USD',
+            apiUrl: 'https://textverified.com',
+            lastCheck: new Date().toISOString(),
+            stats: { todayPurchases: purchases?.length || 0, totalAvailable: 0, avgResponseTime: responseTime }
+          })
+        } else {
+          throw new Error('User info failed: ' + userRes.status)
+        }
+
+      } catch (error: any) {
+        providers.push({ name: 'TextVerified', status: 'error', balance: 0, currency: 'USD', apiUrl: 'https://textverified.com', lastCheck: new Date().toISOString(), error: error.message })
+      }
+    } else {
+      providers.push({ name: 'TextVerified', status: 'inactive', balance: 0, currency: 'USD', apiUrl: 'https://textverified.com', lastCheck: new Date().toISOString(), error: 'Credentials not configured' })
+    }
+
+    // Check SMSPool
+    let smspoolKey = Deno.env.get('SMSPOOL_API_KEY')
+    const { data: smspoolSetting } = await supabaseClient.from('system_settings').select('value').eq('key', 'smspool_api_key').single()
+    if (smspoolSetting?.value) smspoolKey = smspoolSetting.value
+
+    if (smspoolKey) {
+      try {
+        const startTime = Date.now()
+        // SMSPool Balance API: GET https://api.smspool.net/request/balance?key=API_KEY
+        const response = await fetch(`https://api.smspool.net/request/balance?key=${smspoolKey}`, {
+          signal: AbortSignal.timeout(5000)
+        })
+        const responseTime = Date.now() - startTime
+
+        if (response.ok) {
+          const data = await response.json()
+          // Success: {"balance": "10.00", "success": 1} or similar
+          // Verify structure
+          const balance = parseFloat(data.balance) || 0
+
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const { data: purchases } = await supabaseClient.from('activations').select('id').eq('provider', 'smspool').gte('created_at', today.toISOString())
+
+          providers.push({
+            name: 'SMSPool',
+            status: 'active',
+            balance,
+            currency: 'USD',
+            apiUrl: 'https://smspool.net',
+            lastCheck: new Date().toISOString(),
+            stats: { todayPurchases: purchases?.length || 0, totalAvailable: 0, avgResponseTime: responseTime }
+          })
+        } else {
+          throw new Error(`HTTP ${response.status}`)
+        }
+      } catch (error: any) {
+        providers.push({ name: 'SMSPool', status: 'error', balance: 0, currency: 'USD', apiUrl: 'https://smspool.net', lastCheck: new Date().toISOString(), error: error.message })
+      }
+    } else {
+      providers.push({ name: 'SMSPool', status: 'inactive', balance: 0, currency: 'USD', apiUrl: 'https://smspool.net', lastCheck: new Date().toISOString(), error: 'API Key not configured' })
+    }
     await supabaseClient.rpc('log_event', {
       p_level: 'info',
       p_category: 'api',

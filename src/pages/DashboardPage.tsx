@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
@@ -381,7 +381,7 @@ interface ActiveNumber {
   messageCount?: number;
   createdAt?: string; // Pour calculer l'âge du rental
   frozenAmount?: number; // Pour afficher dans le dialog
-  provider?: 'sms-activate' | '5sim'; // Provider for multi-provider support
+  provider?: 'sms-activate' | '5sim' | 'grizzly' | 'textverified' | 'smspool' | 'onlinesim' | 'smspva'; // Provider for multi-provider support
 }
 
 // Types pour les données DB brutes
@@ -409,6 +409,7 @@ interface DBActivation {
   status: string;
   created_at: string;
   frozen_amount: number | null;
+  provider: string;
 }
 
 interface DBRental {
@@ -672,44 +673,46 @@ export default function DashboardPage() {
     const currentCount = activationNumbers.length;
     const prevCount = lastActiveCountRef.current;
 
-    // 🎯 SWITCH IMMÉDIAT: Si des numéros actifs existent, basculer vers la vue active
-    if (currentCount > 0 && currentStep === 'service') {
+    // 🎯 INITIAL AUTO-SWITCH: Only run once when data is first loaded for this session
+    if (currentCount > 0 && !hasAutoOpenedRef.current && currentStep === 'service') {
       setCurrentStep('active');
+      hasAutoOpenedRef.current = true;
     }
 
-    // Détecter un NOUVEAU numéro (passage de 0 → 1, ou de N → N+1)
-    if (currentCount > prevCount && currentCount > 0 && !hasAutoOpenedRef.current) {
-      // Trouver le numéro le plus récent (dernier ajouté)
-      const latestNumber = activationNumbers[0]; // Le plus récent est en premier
+    // 🎯 NEW NUMBER DETECTION: If count INCREASED (new purchase), force switch to active view
+    if (currentCount > prevCount && currentCount > 0) {
+      if (currentStep !== 'active') {
+        setCurrentStep('active');
+        // Mark as auto-opened so we don't loop
+        hasAutoOpenedRef.current = true;
+      }
 
-      if (latestNumber && latestNumber.status !== 'received') {
-        // Ouvrir automatiquement le modal avec un léger délai pour éviter le flash
+      // Find the latest number
+      const latestNumber = activationNumbers[0];
+
+      if (latestNumber && latestNumber.status !== 'received' && !hasAutoOpenedRef.current) {
         const timeout = setTimeout(() => {
           setSelectedActivation(latestNumber);
           setShowSmsWaitingModal(true);
-          setCurrentStep('active'); // Forcer la vue active
-          hasAutoOpenedRef.current = true;
-        }, 100); // 100ms = instantané pour l'utilisateur
-
+        }, 100);
         return () => clearTimeout(timeout);
       }
     }
 
-    // Réinitialiser le flag si les numéros sont tous reçus/terminés
-    if (currentCount === 0) {
+    // 🎯 AUTO-CLOSE: If no active numbers left, go back to service view
+    if (currentCount === 0 && currentStep === 'active') {
+      setCurrentStep('service');
       hasAutoOpenedRef.current = false;
-      // Reset to service view when no more active numbers
-      if (currentStep === 'active') {
-        setCurrentStep('service');
-      }
     }
 
-    // 💾 PERSIST: Save state to localStorage for instant load next time
+    // 💾 PERSIST
     try {
       localStorage.setItem('onesms_has_active_numbers', currentCount > 0 ? 'true' : 'false');
     } catch { }
 
+    // Update ref for next render
     lastActiveCountRef.current = currentCount;
+
   }, [activeNumbers, currentStep]);
 
   // Utility function to calculate minutes elapsed since rental creation
@@ -999,27 +1002,25 @@ export default function DashboardPage() {
 
       // console.log('✅ [LOAD] Activations brutes:', data?.length || 0);
 
-      // FILTRE SUPPLÉMENTAIRE: Éliminer les numéros expirés côté client immédiatement
-      const nowTime = Date.now();
-      const filteredData = (data || []).filter((act: DBActivation) => {
-        const expiresAtTime = new Date(act.expires_at).getTime();
-        const isExpired = expiresAtTime < nowTime;
-        const hasCode = !!act.sms_code;
-
-        // Garder seulement si: pas expiré OU a reçu un SMS
-        if (isExpired && !hasCode) {
-          return false;
-        }
-        return true;
-      }) || [];
-
-      // console.log('✅ [LOAD] Activations filtrées:', filteredData.length);
-
-      // Mapper les activations DB vers le format ActiveNumber
-      return filteredData.map(act => {
+      // map directly without client-side strict filtering
+      return (data || []).map(act => {
         const expiresAt = new Date(act.expires_at).getTime();
         const now = Date.now();
         const timeRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+
+        // Trust backend status primarily
+        // Only show timeout if backend says so OR if local time is significantly past expiry (tolerant)
+        // actually, if backend sends it in 'active-numbers', it is ACTIVE.
+        let displayStatus: 'received' | 'waiting' | 'timeout' = 'waiting';
+
+        if (act.sms_code) {
+          displayStatus = 'received';
+        } else if (act.status === 'timeout' || act.status === 'cancelled' || act.status === 'expired') {
+          displayStatus = 'timeout';
+        } else {
+          // Status is pending/waiting/active
+          displayStatus = 'waiting';
+        }
 
         return {
           id: act.id,
@@ -1029,15 +1030,15 @@ export default function DashboardPage() {
           service: act.service_code,
           country: act.country_code,
           timeRemaining,
-          expiresAt: act.expires_at, // Garder le timestamp pour recalcul dynamique
-          status: act.sms_code ? 'received' : (timeRemaining > 0 ? 'waiting' : 'timeout'),
+          expiresAt: act.expires_at,
+          status: displayStatus,
           smsCode: act.sms_code || undefined,
           smsText: act.sms_text || undefined,
           price: act.price,
           charged: act.charged || false,
           createdAt: act.created_at || '',
           frozenAmount: act.frozen_amount || 0,
-          provider: act.provider || 'sms-activate' // Include provider for polling
+          provider: act.provider || 'sms-activate'
         } as ActiveNumber;
       });
     },
@@ -1581,17 +1582,21 @@ export default function DashboardPage() {
   }, []);
 
   // Polling automatique pour vérifier les SMS reçus (backup)
+  // ⚡️ MEMOIZED CALLBACKS: Prevent polling restart on every render (component renders every 1s)
+  const handlePollingUpdate = useCallback((updatedNumber: any) => {
+    refetchActivations();
+  }, [refetchActivations]);
+
+  const handlePollingBalance = useCallback(() => {
+    // Balance refresh handled silently
+  }, []);
+
+  // Polling automatique pour vérifier les SMS reçus (backup)
   useSmsPolling({
     activeNumbers,
     userId: user?.id,
-    onUpdate: (updatedNumber) => {
-      // Ne pas modifier le state local, juste recharger depuis la DB
-      // Le useEffect va automatiquement synchroniser avec les données fraîches
-      refetchActivations();
-    },
-    onBalanceUpdate: () => {
-      // Balance refresh handled silently
-    }
+    onUpdate: handlePollingUpdate,
+    onBalanceUpdate: handlePollingBalance
   });
 
   // WebSocket temps réel pour détection instantanée des SMS
@@ -1947,8 +1952,11 @@ export default function DashboardPage() {
       // Cancel via Edge Function - use provider-specific function
       let cancelFunction = 'cancel-sms-activate-order';
       if (provider === '5sim') cancelFunction = 'cancel-5sim-order';
+      else if (provider === 'grizzly') cancelFunction = 'cancel-grizzly-order';
+      else if (provider === 'textverified') cancelFunction = 'cancel-textverified-order';
       else if (provider === 'onlinesim') cancelFunction = 'cancel-onlinesim-order';
       else if (provider === 'smspva') cancelFunction = 'cancel-smspva-order';
+      else if (provider === 'smspool') cancelFunction = 'cancel-smspool-order';
 
       const { data, error } = await cloudFunctions.invoke(cancelFunction, {
         body: {
@@ -2908,8 +2916,11 @@ export default function DashboardPage() {
                                       // Use provider-specific cancel function
                                       let cancelFunction = 'cancel-sms-activate-order';
                                       if (num.provider === '5sim') cancelFunction = 'cancel-5sim-order';
+                                      else if (num.provider === 'grizzly') cancelFunction = 'cancel-grizzly-order';
+                                      else if (num.provider === 'textverified') cancelFunction = 'cancel-textverified-order';
                                       else if (num.provider === 'onlinesim') cancelFunction = 'cancel-onlinesim-order';
                                       else if (num.provider === 'smspva') cancelFunction = 'cancel-smspva-order';
+                                      else if (num.provider === 'smspool') cancelFunction = 'cancel-smspool-order';
                                       const { data, error } = await cloudFunctions.invoke(cancelFunction, {
                                         body: { activationId: num.id, orderId: num.orderId, userId: user?.id }
                                       });

@@ -69,6 +69,7 @@ const MODERN_SETTINGS = {
     settings: [
       { key: 'sms_activate_api_key', label: 'Clé API SMS-Activate', secret: true, placeholder: 'Votre clé API SMS-Activate' },
       { key: '5sim_api_key', label: 'Clé API 5sim', secret: true, placeholder: 'Votre clé API 5sim' },
+      { key: 'smspool_api_key', label: 'Clé API SMSPool', secret: true, placeholder: 'Votre clé API SMSPool (32 caractères)' },
     ]
   }
 };
@@ -543,6 +544,39 @@ export default function AdminSettings() {
                       // Auto-save logic
                       updateSettingMutation.mutateAsync({
                         key: 'rentals_enabled',
+                        value: newValue,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-red-50 border-red-100">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-base text-red-900">Mode Maintenance</span>
+                    {editedValues['maintenance_mode'] === 'true' ? (
+                      <Badge variant="destructive" className="animate-pulse">ACTIF</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-gray-500 border-gray-300">Inactif</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-red-800">
+                    Bloque l'accès public au site (Page de maintenance).
+                    <br />
+                    <span className="text-xs font-bold">Uniquement accessible aux Administrateurs.</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    className="data-[state=checked]:bg-red-600"
+                    checked={editedValues['maintenance_mode'] === 'true'}
+                    onCheckedChange={(checked) => {
+                      const newValue = checked ? 'true' : 'false';
+                      setEditedValues({ ...editedValues, maintenance_mode: newValue });
+                      // Auto-save logic
+                      updateSettingMutation.mutateAsync({
+                        key: 'maintenance_mode',
                         value: newValue,
                       });
                     }}

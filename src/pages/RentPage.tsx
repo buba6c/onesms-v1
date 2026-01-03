@@ -62,7 +62,8 @@ const RentPage = () => {
       if (error || !data?.success) throw new Error(data?.error || 'Failed to fetch rent countries')
       return data.countries as Country[]
     },
-    staleTime: 300000 // Cache 5 minutes
+    staleTime: 300000, // Cache 5 minutes
+    retry: false // Prevent rate limit spam
   })
 
   // =========================================================================
@@ -82,7 +83,8 @@ const RentPage = () => {
       }
     },
     enabled: !!selectedCountry,
-    staleTime: 60000 // Cache 1 minute
+    staleTime: 60000, // Cache 1 minute
+    retry: false // Prevent rate limit spam
   })
 
   const { data: rentals = [], isLoading: rentalsLoading, refetch: refetchRentals } = useQuery({
@@ -180,7 +182,7 @@ const RentPage = () => {
     if (!selectedService || !selectedCountry || !selectedDuration) return
     setIsRenting(true)
     try {
-      const { data, error } = await cloudFunctions.invoke('rent-sms-activate-number', {
+      const { data, error } = await cloudFunctions.invoke('buy-onlinesim-rent', {
         body: { service: selectedService.code, country: selectedCountry.id.toString(), rentHours: selectedDuration.hours, userId: user?.id }
       })
       if (error || !data?.success) throw new Error(data?.error || 'Rental failed')

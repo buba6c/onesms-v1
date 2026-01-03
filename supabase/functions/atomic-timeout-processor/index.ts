@@ -8,7 +8,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   console.log('🚀 [ATOMIC-TIMEOUT] Starting 100% reliable timeout processing...')
-  
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -20,10 +20,12 @@ serve(async (req) => {
     )
 
     // ÉTAPE 1: Récupérer toutes les activations expirées avec frozen > 0
+    // 🔧 FIX: Exclude textverified - it has different expiration handling
     const { data: expiredActivations, error: fetchError } = await supabaseClient
       .from('activations')
-      .select('id, user_id, price, frozen_amount, service_code, order_id, expires_at')
+      .select('id, user_id, price, frozen_amount, service_code, order_id, expires_at, provider')
       .in('status', ['pending', 'waiting'])
+      .in('provider', ['sms-activate', '5sim', 'grizzly', 'onlinesim']) // Exclude textverified
       .lt('expires_at', new Date().toISOString())
       .gt('frozen_amount', 0)
       .order('expires_at', { ascending: true })
@@ -46,11 +48,11 @@ serve(async (req) => {
     for (const activation of expiredActivations || []) {
       try {
         console.log(`\n🔄 [ATOMIC-TIMEOUT] Processing ${activation.id} (${activation.service_code})...`)
-        
+
         // ÉTAPE 1: ATOMIC LOCK - Marquer status=timeout D'ABORD
         const { data: lockedActivation, error: lockError } = await supabaseClient
           .from('activations')
-          .update({ 
+          .update({
             status: 'timeout',
             charged: false,
             updated_at: new Date().toISOString()
@@ -67,17 +69,17 @@ serve(async (req) => {
         }
 
         console.log(`🔒 [ATOMIC-TIMEOUT] Locked as timeout: ${activation.id}`)
-        
+
         // ÉTAPE 2: ATOMIC REFUND - Utiliser atomic_refund qui récupère frozen_amount depuis DB
         const { data: refundResult, error: refundError } = await supabaseClient.rpc('atomic_refund', {
           p_user_id: activation.user_id,
           p_activation_id: activation.id,
           p_reason: 'Atomic timeout refund'
         })
-        
+
         if (refundError) {
           console.error(`⚠️ [ATOMIC-TIMEOUT] atomic_refund failed: ${refundError.message}`)
-          
+
           // Si atomic_refund échoue mais activation déjà timeout, compter quand même
           if (refundError.message?.includes('idempotent') || refundError.message?.includes('already')) {
             console.log(`⚠️ [ATOMIC-TIMEOUT] Already refunded (idempotent): ${activation.id}`)
@@ -86,7 +88,7 @@ serve(async (req) => {
           }
         } else {
           console.log(`✅ [ATOMIC-TIMEOUT] atomic_refund SUCCESS: ${refundResult?.amount_refunded || activation.frozen_amount}Ⓐ refunded`)
-          
+
           results.processed++
           results.refunded_total += refundResult?.amount_refunded || activation.frozen_amount
           results.details.push({
@@ -122,7 +124,7 @@ serve(async (req) => {
         ...results,
         timestamp: new Date().toISOString()
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       }
@@ -136,7 +138,7 @@ serve(async (req) => {
         error: error.message,
         timestamp: new Date().toISOString()
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }

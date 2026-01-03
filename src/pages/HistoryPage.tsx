@@ -376,7 +376,12 @@ export default function HistoryPage() {
       // console.log('🚫 [CANCEL] Starting cancellation for:', { activationId, orderId, provider });
 
       // 1. Cancel via Edge Function - use provider-specific function
-      const cancelFunction = provider === '5sim' ? 'cancel-5sim-order' : 'cancel-sms-activate-order';
+      let cancelFunction = 'cancel-sms-activate-order';
+      if (provider === '5sim') cancelFunction = 'cancel-5sim-order';
+      else if (provider === 'grizzly') cancelFunction = 'cancel-grizzly-order';
+      else if (provider === 'textverified') cancelFunction = 'cancel-textverified-order';
+      else if (provider === 'onlinesim') cancelFunction = 'cancel-onlinesim-order';
+      else if (provider === 'smspva') cancelFunction = 'cancel-smspva-order';
       const { data, error } = await cloudFunctions.invoke(cancelFunction, {
         body: { orderId: parseInt(orderId), activationId, userId: user?.id }
       });
@@ -973,8 +978,8 @@ export default function HistoryPage() {
             <button
               onClick={() => setActiveTab('orders')}
               className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'orders'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
               {t('history.orders')}
@@ -982,8 +987,8 @@ export default function HistoryPage() {
             <button
               onClick={() => setActiveTab('payments')}
               className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'payments'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
               {t('history.payments')}
@@ -1552,8 +1557,8 @@ export default function HistoryPage() {
                         key={page}
                         onClick={() => setOrdersPage(page)}
                         className={`w-10 h-10 rounded-lg font-semibold transition-all ${page === ordersPage
-                            ? 'bg-primary text-primary-foreground'
-                            : 'hover:bg-muted text-foreground'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted text-foreground'
                           }`}
                       >
                         {page}
@@ -1695,8 +1700,8 @@ export default function HistoryPage() {
                             </div>
                             {/* Montant en activations */}
                             <div className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold ${payment.amount > 0
-                                ? 'bg-green-50 text-green-600 dark:bg-green-900/20'
-                                : 'bg-red-50 text-red-600 dark:bg-red-900/20'
+                              ? 'bg-green-50 text-green-600 dark:bg-green-900/20'
+                              : 'bg-red-50 text-red-600 dark:bg-red-900/20'
                               }`}>
                               <span>{payment.amount > 0 ? '+' : '-'}{getTransactionActivations(payment)}</span>
                               <span className="text-xs">Ⓐ</span>
@@ -1752,8 +1757,8 @@ export default function HistoryPage() {
                         key={page}
                         onClick={() => setPaymentsPage(page)}
                         className={`w-10 h-10 rounded-lg font-semibold transition-all ${page === paymentsPage
-                            ? 'bg-primary text-primary-foreground'
-                            : 'hover:bg-muted text-foreground'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted text-foreground'
                           }`}
                       >
                         {page}

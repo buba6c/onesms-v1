@@ -134,6 +134,9 @@ serve(async (req) => {
 
                 if (tariffsData[product]) {
                     price = parseFloat(tariffsData[product].price || '0')
+                } else if (tariffsData['any']) {
+                    // Fallback to universal price
+                    price = parseFloat(tariffsData['any'].price || '0')
                 }
             } catch (e) {
                 console.warn('⚠️ [BUY-ONLINESIM-RENT] Could not fetch tariffs:', e)
@@ -141,7 +144,13 @@ serve(async (req) => {
         }
 
         if (!price || price <= 0) {
-            throw new Error(`Rent not available for ${serviceName} in ${country} for ${days} days`)
+            // If we still have expectedPrice (from frontend), trust it as last resort
+            if (expectedPrice && expectedPrice > 0) {
+                price = expectedPrice;
+                console.log('⚠️ [BUY-ONLINESIM-RENT] Using expectedPrice as fallback:', price);
+            } else {
+                throw new Error(`Rent not available for ${serviceName} in ${country} for ${days} days`)
+            }
         }
 
         console.log(`💰 [BUY-ONLINESIM-RENT] Final rent price: $${price} for ${days} days`)
@@ -161,8 +170,8 @@ serve(async (req) => {
             throw new Error(`Insufficient balance. Required: ${price}Ⓐ, Available: ${userProfile.balance}Ⓐ`)
         }
 
-        // Rent number from OnlineSIM
-        const rentUrl = `${ONLINESIM_BASE_URL}/rent.tar.php?apikey=${ONLINESIM_API_KEY}&service=${product}&country=${onlinesimCountry}&days=${days}`
+        // Rent number from OnlineSIM - CORRECT ENDPOINT
+        const rentUrl = `${ONLINESIM_BASE_URL}/rent/getRentNum.php?apikey=${ONLINESIM_API_KEY}&service=${product}&country=${onlinesimCountry}&days=${days}`
 
         console.log('🌐 [BUY-ONLINESIM-RENT] API Call:', rentUrl.replace(ONLINESIM_API_KEY, 'KEY_HIDDEN'))
 

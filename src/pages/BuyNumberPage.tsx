@@ -41,6 +41,7 @@ type Country = {
     price: number;
     successRate?: number;
     operator?: string;
+    isPremium?: boolean;
 };
 
 // --- PRIORITY LOGIC (COPIED FROM DASHBOARD) ---
@@ -154,17 +155,23 @@ export default function BuyNumberPage() {
                         const localRate = successRateMap.get(c.countryCode.toLowerCase());
                         const finalSuccessRate = localRate || c.successRate || null;
 
+                        // Detect Premium/High Quality
+                        const isPremium = c.countryCode.toLowerCase() === 'us' ||
+                            c.countryCode.toLowerCase() === 'gb' ||
+                            (c.price > 30); // Heuristic for premium routes
+
                         return {
                             id: c.countryId.toString(),
                             name: c.countryName,
                             code: c.countryCode,
                             flag: getFlagEmoji(c.countryCode) || '🌍',
-                            flagUrl: getCountryFlag(c.countryCode), // Premium flag image
+                            flagUrl: getCountryFlag(c.countryCode),
+                            isPremium: isPremium, // New field
                             successRate: finalSuccessRate ? Number(finalSuccessRate.toFixed(1)) : null,
                             count: c.count,
                             price: Number(c.price.toFixed(2)),
-                            operator: 'any', // SMS-Activate default
-                            _compositeScore: c.compositeScore // Keep for potential sorting override
+                            operator: 'any',
+                            _compositeScore: c.compositeScore
                         };
                     });
             }
@@ -201,8 +208,9 @@ export default function BuyNumberPage() {
                         name: c.name,
                         code: c.code,
                         flag: getFlagEmoji(c.code) || '🌍',
-                        flagUrl: getCountryFlag(c.code), // Premium flag image
-                        successRate: 85, // Default for rent
+                        flagUrl: getCountryFlag(c.code),
+                        isPremium: false, // Rent mode is typically standard pricing
+                        successRate: 85,
                         count: c.quantity || 0,
                         price: sellingPrice,
                         operator: 'any'
@@ -344,20 +352,44 @@ export default function BuyNumberPage() {
             let requestBody: any = {};
 
             if (isRent) {
-                // RENTAL: Force SMS Activate (5sim rent support pending)
-                functionName = 'buy-sms-activate-rent';
+                // RENTAL: Use OnlineSIM (Fixed)
+                functionName = 'buy-onlinesim-rent';
+
+                // Convert duration label to hours
+                const rentTimeMap: Record<string, string> = {
+                    '4hours': '4',
+                    '1day': '24',
+                    '1week': '168',
+                    '1month': '720'
+                };
+
                 requestBody = {
+                    product: productCode, // Backend expects 'product'
                     country: countryId,
-                    operator: 'any',
-                    product: productCode,
                     userId: user.id,
-                    expectedPrice: finalPrice,
-                    duration: rentDuration
+                    rentHours: parseInt(rentTimeMap[rentDuration] || '4'),
+                    // expectedPrice: finalPrice // Optional validation
                 };
             } else {
                 // ACTIVATION: Check Provider
                 // 🧠 ADAPTIVE OVERRIDE (Takes precedence if set)
-                const targetProvider = adaptiveProvider || providerMode;
+                let targetProvider = adaptiveProvider || providerMode;
+
+                // 🔧 SMART FALLBACK: TextVerified is US-ONLY
+                // If TextVerified is selected but country is NOT USA, fallback to sms-activate
+                const isUSA = ['usa', '12', 'united states', 'us'].includes(countryId.toLowerCase()) ||
+                    selectedCountry.name.toLowerCase().includes('united states') ||
+                    selectedCountry.name.toLowerCase() === 'usa';
+
+                if (targetProvider === 'textverified' && !isUSA) {
+                    console.log('⚠️ [BuyNumberPage] TextVerified is US-only, falling back to sms-activate for:', countryId);
+                    targetProvider = 'sms-activate';
+                    toast({
+                        title: "🔄 Provider Ajusté",
+                        description: `TextVerified (US uniquement) → SMS-Activate pour ${selectedCountry.name}`,
+                        duration: 4000
+                    });
+                }
 
                 if (targetProvider === '5sim') {
                     functionName = 'buy-5sim-number';
@@ -392,6 +424,37 @@ export default function BuyNumberPage() {
                         country: countryId,
                         operator: 'any',
                         product: productCode,
+                        userId: user.id,
+                        expectedPrice: finalPrice
+                    };
+                } else if (targetProvider === 'grizzly') {
+                    // 🐻 USE GRIZZLY SMS
+                    functionName = 'buy-grizzly-number';
+                    requestBody = {
+                        country: countryId,
+                        operator: 'any',
+                        product: productCode,
+                        service: productCode,  // Grizzly uses 'service' param
+                        userId: user.id,
+                        expectedPrice: finalPrice
+                    };
+                } else if (targetProvider === 'textverified') {
+                    // 💎 USE TEXTVERIFIED (Premium/Reliable)
+                    functionName = 'buy-textverified-number';
+                    requestBody = {
+                        country: countryId,
+                        product: productCode,
+                        service: productCode,
+                        userId: user.id,
+                        expectedPrice: finalPrice
+                    };
+                } else if (targetProvider === 'smspool') {
+                    // 🌊 USE SMSPOOL (Premium Global)
+                    functionName = 'buy-smspool-number';
+                    requestBody = {
+                        country: countryId,
+                        product: productCode,
+                        service: productCode,
                         userId: user.id,
                         expectedPrice: finalPrice
                     };
@@ -452,15 +515,26 @@ export default function BuyNumberPage() {
                 const isNoNumbers = errorMessage.toUpperCase().includes('NO_NUMBERS') ||
                     errorMessage.toUpperCase().includes('NO_BALANCE') ||
                     errorMessage.toUpperCase().includes('TOO MANY REQUESTS') ||
+                    errorMessage.toLowerCase().includes('not available') ||
+                    errorMessage.includes('SMSPool Error') ||
                     errorMessage.includes('not found') ||
                     errorMessage.includes('Price not found');
 
                 if (isSmartMode && isNoNumbers) {
-                    // console.log('🧠 Smart mode: Primary failed, starting fallback chain...');
+                    console.log('🧠 [FALLBACK START]', {
+                        provider: functionName,
+                        adaptiveVeto,
+                        isNoNumbers
+                    });
 
                     // Helper to try a provider and throw if fails
                     const tryProvider = async (providerName: string, funcName: string, body: any) => {
                         console.log(`🧠 Smart mode: Trying ${providerName}...`);
+                        toast({
+                            title: "🧠 Smart Routing",
+                            description: `Tentative via ${providerName}...`,
+                        });
+
                         const { data: pData, error: pError } = await cloudFunctions.invoke(funcName, { body });
 
                         // Check for error
@@ -474,28 +548,14 @@ export default function BuyNumberPage() {
 
                     let successData = null;
 
-                    // 1. Try SMSPVA (Backup 1 - High Quality / Real SIM)
-                    if (!successData && functionName !== 'buy-smspva-number' && adaptiveVeto !== 'smspva') {
-                        try {
-                            const body = {
-                                country: countryId, // SMSPVA uses numeric or ISO, smart mapping in function
-                                operator: 'any',
-                                product: productCode,
-                                userId: user?.id,
-                                expectedPrice: finalPrice
-                            };
-                            successData = await tryProvider('SMSPVA', 'buy-smspva-number', body);
-                            console.log('✅ SMSPVA fallback succeeded');
-                        } catch (e) {
-                            // Continue
-                        }
-                    }
-
-                    // 2. Try 5sim (Backup 2 - High Volume)
+                    // 1. Try 5sim (Backup 1 - High Volume & Cheap)
+                    console.log('check 5sim', { successData: !!successData, isCurrent: functionName === 'buy-5sim-number', veto: adaptiveVeto === '5sim' });
                     if (!successData && functionName !== 'buy-5sim-number' && adaptiveVeto !== '5sim') {
                         try {
                             let countryName = selectedCountry.name.toLowerCase();
                             if (countryName === 'united kingdom') countryName = 'england';
+                            if (countryName === 'united states' || countryName === 'usa') countryName = 'usa';
+                            if (countryName === 'russia') countryName = 'russia';
 
                             const body = {
                                 country: countryName,
@@ -507,15 +567,52 @@ export default function BuyNumberPage() {
                             successData = await tryProvider('5sim', 'buy-5sim-number', body);
                             console.log('✅ 5sim fallback succeeded');
                         } catch (e) {
-                            // Continue to next provider
+                            console.warn('⚠️ 5sim fallback failed:', e);
                         }
                     }
 
-                    // 3. Try OnlineSIM (Backup 3)
+                    // 2. Try SMS-Activate (Backup 2 - Huge Inventory)
+                    console.log('check activ', { successData: !!successData, isCurrent: functionName === 'buy-sms-activate-number' });
+                    if (!successData && functionName !== 'buy-sms-activate-number') {
+                        try {
+                            const body = {
+                                country: countryId, // SMS-Activate ID
+                                operator: 'any',
+                                product: productCode,
+                                userId: user?.id,
+                                expectedPrice: finalPrice
+                            };
+                            successData = await tryProvider('SMS-Activate', 'buy-sms-activate-number', body);
+                            console.log('✅ SMS-Activate fallback succeeded');
+                        } catch (e) {
+                            console.warn('⚠️ SMS-Activate fallback failed:', e);
+                        }
+                    }
+
+                    // 3. Try Grizzly SMS (Backup 3 - Reliable)
+                    console.log('check grizz', { successData: !!successData, isCurrent: functionName === 'buy-grizzly-number' });
+                    if (!successData && functionName !== 'buy-grizzly-number') {
+                        try {
+                            const body = {
+                                country: countryId, // Needs ISO or ID? Grizzly func handles mapping usually
+                                operator: 'any',
+                                product: productCode,
+                                service: productCode,
+                                userId: user?.id,
+                                expectedPrice: finalPrice
+                            };
+                            successData = await tryProvider('Grizzly SMS', 'buy-grizzly-number', body);
+                            console.log('✅ Grizzly fallback succeeded');
+                        } catch (e) {
+                            console.warn('⚠️ Grizzly fallback failed:', e);
+                        }
+                    }
+
+                    // 4. Try OnlineSIM (Backup 4)
                     if (!successData && functionName !== 'buy-onlinesim-number') {
                         try {
                             const body = {
-                                country: countryId, // OnlineSIM uses numeric
+                                country: countryId,
                                 operator: 'any',
                                 product: productCode,
                                 userId: user?.id,
@@ -524,7 +621,7 @@ export default function BuyNumberPage() {
                             successData = await tryProvider('OnlineSIM', 'buy-onlinesim-number', body);
                             console.log('✅ OnlineSIM fallback succeeded');
                         } catch (e) {
-                            // Continue
+                            console.warn('⚠️ OnlineSIM fallback failed:', e);
                         }
                     }
 
@@ -561,6 +658,12 @@ export default function BuyNumberPage() {
                     usedProvider = 'smspva';
                 } else if (functionName.includes('onlinesim')) {
                     usedProvider = 'onlinesim';
+                } else if (functionName.includes('grizzly')) {
+                    usedProvider = 'grizzly';
+                } else if (functionName.includes('textverified')) {
+                    usedProvider = 'textverified';
+                } else if (functionName.includes('smspool')) {
+                    usedProvider = 'smspool';
                 }
                 console.log('⚠️ Provider inferred from function:', usedProvider);
             }
@@ -583,6 +686,12 @@ export default function BuyNumberPage() {
                     statusCheckerFunction = 'check-onlinesim-status';
                 } else if (usedProvider === 'smspva') {
                     statusCheckerFunction = 'check-smspva-status';
+                } else if (usedProvider === 'grizzly') {
+                    statusCheckerFunction = 'check-grizzly-status';
+                } else if (usedProvider === 'textverified') {
+                    statusCheckerFunction = 'check-textverified-status';
+                } else if (usedProvider === 'smspool') {
+                    statusCheckerFunction = 'check-smspool-status';
                 }
 
                 console.log(`📞 Status check: ${statusCheckerFunction} for activation ${buyData.data.id}`);
@@ -808,6 +917,11 @@ export default function BuyNumberPage() {
                                         <div className="flex-1">
                                             <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors flex items-center gap-2">
                                                 {country.name}
+                                                {country.isPremium && (
+                                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-transparent border border-purple-200 text-purple-600 shadow-sm bg-gradient-to-r from-purple-50 to-white">
+                                                        Premium
+                                                    </span>
+                                                )}
                                                 {country.successRate && country.successRate > 80 && (
                                                     <span className="px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-wider">
                                                         {t('buyNumber.top', 'Top')}

@@ -632,12 +632,7 @@ export const getServiceIcon = (serviceCode: string): string => {
     'coinbase': '🪙',
     'binance': '🔶',
     // 'ln', 'kk', 'sg', 'mb', 'pm', 'ok', 'zm', 'sk', 'sl' managed via consolidated list below or above
-    'hw': '🛍️',       // Alipay/Alibaba (hw)
-    'nv': '🇰🇷',      // Naver (nv)
-    'yw': '🔍',       // Yandex (yw)
-    'qq': '🐧',       // QQ (qq)
-    'bd': '🔍',       // Baidu (bd)
-    'dz': '🎵',       // Douyin (dz)
+
     'xhs': '📕',      // Xiaohongshu (xhs)
     'jd': '🛒',       // JD.com (jd)
     'pdd': '🛒',      // Pinduoduo (pdd)

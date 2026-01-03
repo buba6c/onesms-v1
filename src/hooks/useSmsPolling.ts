@@ -20,7 +20,7 @@ interface ActiveNumber {
   price: number;
   charged: boolean;
   type?: 'activation' | 'rental';
-  provider?: 'sms-activate' | '5sim' | 'smspva' | 'onlinesim' | 'herosms'; // All providers
+  provider?: 'sms-activate' | '5sim' | 'smspva' | 'onlinesim' | 'herosms' | 'grizzly' | 'textverified' | 'smspool'; // All providers
 }
 
 interface UseSmsPollingOptions {
@@ -41,6 +41,10 @@ const getStatusCheckerFunction = (provider?: string): string => {
       return 'check-smspva-status';
     case 'onlinesim':
       return 'check-onlinesim-status';
+    case 'grizzly':
+      return 'check-grizzly-status';
+    case 'textverified':
+      return 'check-textverified-status';
     case 'sms-activate':
     case 'herosms':
     default:

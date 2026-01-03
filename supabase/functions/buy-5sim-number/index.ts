@@ -288,7 +288,8 @@ serve(async (req) => {
           country: country,
           price: price,
           status: 'pending',
-          expires: expiresAt.toISOString()
+          expires: expiresAt.toISOString(),
+          provider: '5sim'  // CRITICAL: Frontend needs this to call correct status checker
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

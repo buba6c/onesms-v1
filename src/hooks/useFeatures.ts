@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 
 export interface Features {
     rentals_enabled: boolean
+    maintenance_mode: boolean
 }
 
 export function useFeatures() {
@@ -13,25 +14,29 @@ export function useFeatures() {
             const { data, error } = await supabase
                 .from('system_settings')
                 .select('key, value')
-                .eq('key', 'rentals_enabled')
-                .single()
+                .in('key', ['rentals_enabled', 'maintenance_mode'])
 
             if (error) {
                 console.warn('Failed to fetch feature flags:', error)
-                // Default to true if missing to avoid breaking legacy behavior unexpectedly
-                return { rentals_enabled: true }
+                return { rentals_enabled: true, maintenance_mode: false }
             }
 
-            // Value is stored as string 'true'/'false'
-            const isEnabled = data?.value === 'true'
-            return { rentals_enabled: isEnabled }
+            // Map results
+            const rentals = data?.find(s => s.key === 'rentals_enabled')?.value === 'true'
+            const maintenance = data?.find(s => s.key === 'maintenance_mode')?.value === 'true'
+
+            return {
+                rentals_enabled: rentals ?? true,
+                maintenance_mode: maintenance ?? false
+            }
         },
-        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+        staleTime: 5 * 60 * 1000,
         retry: 2
     })
 
     return {
-        isRentalsEnabled: features?.rentals_enabled ?? true, // Default true while loading/error
+        isRentalsEnabled: features?.rentals_enabled ?? true,
+        isMaintenanceMode: features?.maintenance_mode ?? false,
         isLoading
     }
 }
