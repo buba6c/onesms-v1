@@ -4,6 +4,7 @@ import { lazy, Suspense } from 'react'
 import { Toaster } from '@/components/ui/toaster'
 import Layout from '@/components/layout/Layout'
 import { CookieConsent } from '@/components/CookieConsent'
+import { Analytics } from '@vercel/analytics/react'
 
 // Public pages - loaded immediately
 import HomePage from '@/pages/HomePage'
@@ -76,6 +77,7 @@ const AdminEmails = lazy(() => import('@/pages/admin/AdminEmails'))
 const AdminPromoCodes = lazy(() => import('@/pages/admin/AdminPromoCodes'))
 const AdminPaymentProviders = lazy(() => import('@/pages/admin/AdminPaymentProviders'))
 const AdminWavePayments = lazy(() => import('@/pages/admin/AdminWavePayments'))
+const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'))
 
 // OPTIMIZATION: Configure staleTime and gcTime for caching
 const queryClient = new QueryClient({
@@ -160,11 +162,13 @@ function App() {
               <Route path="wave-payments" element={<AdminWavePayments />} />
               <Route path="promo-codes" element={<AdminPromoCodes />} />
               <Route path="payment-providers" element={<AdminPaymentProviders />} />
+              <Route path="support" element={<AdminSupport />} />
             </Route>
           </Routes>
         </Suspense>
         <Toaster />
         <CookieConsent />
+        <Analytics />
       </Router>
     </QueryClientProvider>
   )
