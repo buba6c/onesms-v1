@@ -24,9 +24,8 @@ dist-ssr
 
 # Environment variables
 .env
-.env.local
-.env.production
-.env.icons
+.env.*
+api-server/.env
 
 # Icon generation output
 out-icons/
@@ -35,3 +34,4 @@ import-results.ndjson
 
 # Local Netlify folder
 .netlify
+.vercel
