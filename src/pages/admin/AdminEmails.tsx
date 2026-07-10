@@ -56,6 +56,12 @@ const EMAIL_TEMPLATES = {
     message: 'Decouvrez notre nouvelle fonctionnalite : [DESCRIPTION]. Cette amelioration vous permet de [AVANTAGE]. Connectez-vous pour l\'essayer des maintenant.',
     icon: '✨',
   },
+  new_rental: {
+    name: 'Annonce: Locations Longue Durée',
+    title: 'Nouveau service de location de numéros disponible',
+    message: 'Bonjour,\n\nNous vous informons du lancement de notre nouveau service de location longue durée sur la plateforme One SMS.\n\nIl est désormais possible de louer un numéro de téléphone dédié pour une durée allant de 4 heures jusqu\'à 1 mois. Ce service vous permet de recevoir de manière illimitée vos codes de vérification durant toute la période de location choisie.\n\nCette option est particulièrement recommandée pour la sécurisation durable de vos comptes.\n\nVous pouvez retrouver l\'ensemble de ces offres directement depuis votre espace client.\n\nCordialement,\nL\'équipe One SMS',
+    icon: '•',
+  },
   welcome_back: {
     name: 'Retour utilisateur inactif',
     title: 'Nous vous avons manque',
@@ -82,7 +88,7 @@ const EMAIL_TEMPLATES = {
   },
 };
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 100;
 
 export default function AdminEmails() {
   const [activeTab, setActiveTab] = useState('compose');
@@ -119,6 +125,18 @@ export default function AdminEmails() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const pausedRef = useRef(false);
 
+  // Prevent closing tab while sending
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (sendingState === 'sending' || sendingState === 'paused') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [sendingState]);
+
   // Fetch campaigns history
   const { data: campaigns, isLoading: loadingCampaigns, refetch: refetchCampaigns } = useQuery({
     queryKey: ['email-campaigns'],
@@ -140,10 +158,16 @@ export default function AdminEmails() {
       let query = supabase
         .from('users')
         .select('id', { count: 'exact', head: true })
-        .not('email', 'is', null);
+        .not('email', 'is', null)
+        .neq('email', '');
 
       if (minBalance) query = query.gte('balance', parseFloat(minBalance));
       if (maxBalance) query = query.lte('balance', parseFloat(maxBalance));
+      if (inactiveDays) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - parseInt(inactiveDays));
+        query = query.lte('updated_at', cutoffDate.toISOString());
+      }
 
       const { count, error } = await query;
       if (error) throw error;
@@ -167,6 +191,13 @@ export default function AdminEmails() {
       setLoadingPreview(false);
     }
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPreviewCount();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [minBalance, maxBalance, inactiveDays, limit]);
 
   const startSending = async () => {
     if (!title.trim() || !message.trim()) {
@@ -195,18 +226,19 @@ export default function AdminEmails() {
         status: 'in_progress',
         total_recipients: totalToProcess,
         sent_count: 0,
-        failed_count: 0,
         created_by: session.user.id,
         sent_at: new Date().toISOString(),
       }
       if (promoCode) campaignData.promo_code = promoCode;
       if (discount) campaignData.discount = discount;
 
-      const { data: campaign, error: createError } = await supabase
+      const { data, error: createError } = await supabase
         .from('email_campaigns')
         .insert(campaignData)
         .select('id')
         .single();
+        
+      const campaign = data as any;
 
       if (createError) throw createError;
       campaignId = campaign.id;
@@ -280,7 +312,7 @@ export default function AdminEmails() {
         if (pausedRef.current) {
           setSendingState('paused');
           if (campaignId) {
-            await supabase.from('email_campaigns').update({ status: 'paused' }).eq('id', campaignId);
+            await (supabase.from('email_campaigns') as any).update({ status: 'paused' }).eq('id', campaignId);
           }
           return;
         }
@@ -288,11 +320,28 @@ export default function AdminEmails() {
         const batchSize = Math.min(BATCH_SIZE, targetCount - processedCount);
         if (batchSize <= 0) break;
 
-        // Send Batch
-        const result = await sendBatch(currentOffset, batchSize, campaignId);
+        // Send Batch with robust retry logic
+        let retries = 3;
+        let success = false;
+        let batchSent = 0;
+        let batchFailed = 0;
 
-        const batchSent = result.sent || 0;
-        const batchFailed = result.failed || 0;
+        while (retries > 0 && !success) {
+          try {
+            const result = await sendBatch(currentOffset, batchSize, campaignId);
+            batchSent = result.sent || 0;
+            batchFailed = result.failed || 0;
+            success = true;
+          } catch (err: any) {
+            console.error(`Batch error at offset ${currentOffset}, retries left: ${retries - 1}`, err);
+            retries--;
+            if (retries === 0) {
+              throw err;
+            }
+            // Wait 2.5 seconds before retrying to respect rate limits
+            await new Promise(resolve => setTimeout(resolve, 2500));
+          }
+        }
 
         processedCount += batchSize;
         currentOffset += batchSize;
@@ -304,9 +353,8 @@ export default function AdminEmails() {
 
           // Fire and forget update to DB (best effort for live feedback)
           if (campaignId) {
-            supabase.from('email_campaigns').update({
-              sent_count: nextSuccess,
-              failed_count: nextFailed
+            (supabase.from('email_campaigns') as any).update({
+              sent_count: nextSuccess
             }).eq('id', campaignId).then();
           }
 
@@ -319,7 +367,7 @@ export default function AdminEmails() {
           };
         });
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
       finishSending(campaignId);
@@ -392,11 +440,10 @@ export default function AdminEmails() {
     const id = campaignId || currentCampaignId;
     if (id) {
       try {
-        await supabase.from('email_campaigns').update({
+        await (supabase.from('email_campaigns') as any).update({
           status: 'sent',
           // Ensure final consistent state
           sent_count: progress.success,
-          failed_count: progress.failed,
         }).eq('id', id);
       } catch (e) { console.error(e) }
     }
@@ -404,9 +451,25 @@ export default function AdminEmails() {
     setSendingState('completed');
     toast({ title: 'Campagne terminée', description: 'Tous les emails ont été traités.' });
     refetchCampaigns();
-    setTimeout(() => {
-      // Optional confirmation
-    }, 2000);
+  };
+
+  const resumeCampaignFromHistory = (campaign: any) => {
+    setTitle(campaign.title);
+    setMessage(campaign.message);
+    if (campaign.promo_code) setPromoCode(campaign.promo_code);
+    if (campaign.discount) setDiscount(campaign.discount);
+    
+    // Set the offset to what was already sent
+    setStartOffset(campaign.sent_count.toString());
+    setLimit((campaign.total_recipients - campaign.sent_count).toString());
+    
+    // Go to compose tab
+    setActiveTab('compose');
+    
+    toast({ 
+      title: 'Campagne restaurée', 
+      description: `Vous pouvez reprendre l'envoi. ${campaign.sent_count} emails ont déjà été envoyés.` 
+    });
   };
 
   const progressPercentage = progress.total > 0 ? (progress.sent / progress.total) * 100 : 0;
@@ -464,6 +527,13 @@ export default function AdminEmails() {
                     </div>
                   </div>
 
+                  {sendingState === 'sending' && (
+                    <div className="bg-blue-100/50 border border-blue-200 text-blue-800 p-3 rounded-md text-sm flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-blue-600" />
+                      <strong>Important :</strong> Ne fermez pas cet onglet pendant l'envoi. La campagne sera mise en pause si vous quittez la page.
+                    </div>
+                  )}
+
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs font-medium text-blue-800">
                       <span>Progression: {progress.sent} / {progress.total}</span>
@@ -482,7 +552,7 @@ export default function AdminEmails() {
                       <span className="text-gray-500 text-xs">Échecs</span>
                     </div>
                     <div className="bg-white/50 rounded p-2">
-                      <span className="block font-bold text-blue-600">~{Math.ceil((progress.total - progress.sent) / BATCH_SIZE) * 0.5}s</span>
+                      <span className="block font-bold text-blue-600">~{Math.ceil((progress.total - progress.sent) / BATCH_SIZE) * 1}s</span>
                       <span className="text-gray-500 text-xs">Temps restant estimé</span>
                     </div>
                   </div>
@@ -576,7 +646,7 @@ export default function AdminEmails() {
                 <CardContent className="space-y-4">
                   <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="filters">
-                      <AccordionTrigger>Filtres Avancés</AccordionTrigger>
+                      <AccordionTrigger>Filtres Avancés & Limite</AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-4 pt-2">
                           <div className="grid grid-cols-2 gap-4">
@@ -589,27 +659,15 @@ export default function AdminEmails() {
                               <Input type="number" value={maxBalance} onChange={e => setMaxBalance(e.target.value)} placeholder="Max" className="h-8" />
                             </div>
                           </div>
-                          <div>
-                            <label className="text-xs font-medium mb-1 block">Inactif depuis (jours)</label>
-                            <Input type="number" value={inactiveDays} onChange={e => setInactiveDays(e.target.value)} placeholder="ex: 30" className="h-8" />
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem value="limits">
-                      <AccordionTrigger>Limites & Offset</AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-4 pt-2">
-                          <div>
-                            <label className="text-xs font-medium mb-1 block">Limite Totale (facultatif)</label>
-                            <Input type="number" value={limit} onChange={e => setLimit(e.target.value)} placeholder="Toutes" className="h-8" />
-                            <p className="text-[10px] text-gray-500">Max destinataires pour cette campagne</p>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium mb-1 block">Offset de départ</label>
-                            <Input type="number" value={startOffset} onChange={e => setStartOffset(e.target.value)} placeholder="0" className="h-8" />
-                            <p className="text-[10px] text-gray-500">Sauter les N premiers utilisateurs</p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs font-medium mb-1 block">Inactif depuis (jours)</label>
+                              <Input type="number" value={inactiveDays} onChange={e => setInactiveDays(e.target.value)} placeholder="ex: 30" className="h-8" />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium mb-1 block">Limite Totale (Test)</label>
+                              <Input type="number" value={limit} onChange={e => setLimit(e.target.value)} placeholder="Toutes" className="h-8" />
+                            </div>
                           </div>
                         </div>
                       </AccordionContent>
@@ -619,15 +677,6 @@ export default function AdminEmails() {
                   <div className="pt-4 border-t">
                     <div className="flex justify-between items-center mb-4">
                       <div className="text-sm font-medium">Estimer l'audience</div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => fetchPreviewCount()}
-                        disabled={loadingPreview}
-                        className="h-8"
-                      >
-                        {loadingPreview ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                      </Button>
                     </div>
 
                     <div className="bg-blue-50 p-4 rounded-lg flex items-center justify-between">
@@ -681,18 +730,29 @@ export default function AdminEmails() {
                   campaigns?.length ? (
                     <div className="space-y-4 text-left">
                       {campaigns.map(c => (
-                        <div key={c.id} className="p-3 bg-white border rounded shadow-sm flex justify-between items-center">
+                        <div key={c.id} className="p-4 bg-white border rounded shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
                           <div>
-                            <div className="font-bold">{c.title}</div>
-                            <div className="text-xs text-gray-500">{new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString()}</div>
+                            <div className="font-bold text-gray-900">{c.title}</div>
+                            <div className="text-sm text-gray-500 line-clamp-1">{c.message}</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              Créé le {new Date(c.created_at).toLocaleDateString()} à {new Date(c.created_at).toLocaleTimeString()}
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge variant={c.status === 'sent' ? 'default' : c.status === 'in_progress' ? 'outline' : 'secondary'}>
-                              {c.status === 'in_progress' && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
-                              {c.sent_count}/{c.total_recipients}
+                          <div className="flex items-center gap-3">
+                            <Badge variant={c.status === 'sent' ? 'default' : c.status === 'in_progress' || c.status === 'paused' ? 'outline' : 'secondary'}>
+                              {(c.status === 'in_progress' || c.status === 'paused') && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                              {c.sent_count} / {c.total_recipients}
                             </Badge>
-                            {c.status === 'sent' && (
-                              <span className="text-[10px] text-green-600">Terminé</span>
+                            
+                            {c.status === 'sent' ? (
+                              <span className="text-xs font-bold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
+                                <CheckCircle className="w-3 h-3" /> Terminé
+                              </span>
+                            ) : (
+                              <Button variant="outline" size="sm" onClick={() => resumeCampaignFromHistory(c)} className="h-8 text-blue-600 border-blue-200 hover:bg-blue-50">
+                                <Play className="w-3 h-3 mr-1" />
+                                Reprendre
+                              </Button>
                             )}
                           </div>
                         </div>

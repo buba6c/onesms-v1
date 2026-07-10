@@ -1,39 +1,52 @@
 
 import { supabase } from './supabase';
 
-// Cache for settings to avoid too many database calls
 const settingsCache: Record<string, { value: string; timestamp: number }> = {};
-const CACHE_DURATION = 10 * 1000; // 10 seconds (reduced for faster updates)
+const inFlightRequests: Record<string, Promise<string>> = {};
+const CACHE_DURATION = 60 * 1000; // 60 seconds (increased to help with stampedes)
 
 /**
- * Get a system setting from database or cache
+ * Get a system setting from database or cache (with in-flight deduplication)
  */
 export async function getSetting(key: string): Promise<string> {
-  // Check cache first
+  // 1. Check cache first
   const cached = settingsCache[key];
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log(`[SETTINGS] Cache hit for ${key}:`, cached.value);
     return cached.value;
   }
 
-  // Fetch from database
-  console.log(`[SETTINGS] Fetching ${key} from database...`);
-  const { data, error } = await (supabase as any)
-    .rpc('get_setting', { setting_key: key });
-
-  if (error) {
-    console.error(`[SETTINGS] Error fetching ${key}:`, error);
-    // Fallback to env variable
-    return import.meta.env[`VITE_${key.toUpperCase()}`] || '';
+  // 2. Check if already in flight (DEDUPLICATION)
+  if (inFlightRequests[key]) {
+    return inFlightRequests[key];
   }
 
-  const value = data || '';
-  console.log(`[SETTINGS] Got ${key} from DB:`, value);
+  // 3. Fetch from database with retry logic inside the promise
+  const fetchPromise = (async () => {
+    try {
+      // Small random delay (0-50ms) to stagger simultaneous parallel fetches if they missed the in-flight check
+      await new Promise(r => setTimeout(r, Math.random() * 50));
+      
+      const { data, error } = await (supabase as any)
+        .rpc('get_setting', { setting_key: key });
 
-  // Update cache
-  settingsCache[key] = { value, timestamp: Date.now() };
+      if (error) throw error;
+      
+      const value = data || '';
+      
+      // Update cache
+      settingsCache[key] = { value, timestamp: Date.now() };
+      return value;
+    } catch (error) {
+      console.warn(`[SETTINGS] Error fetching ${key}, using env fallback:`, error);
+      return import.meta.env[`VITE_${key.toUpperCase()}`] || '';
+    } finally {
+      // Clean up in-flight request
+      delete inFlightRequests[key];
+    }
+  })();
 
-  return value;
+  inFlightRequests[key] = fetchPromise;
+  return fetchPromise;
 }
 
 /**

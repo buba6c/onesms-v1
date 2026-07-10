@@ -17,6 +17,12 @@ export default function AdminRoute() {
     return <Navigate to="/dashboard" replace />
   }
 
+  // Defense-in-depth: Verify 2FA was completed before allowing admin access
+  const is2FAVerified = sessionStorage.getItem('admin_2fa_verified')
+  if (!is2FAVerified) {
+    return <Navigate to="/login" replace />
+  }
+
   return (
     <AdminLayout>
       <Outlet />

@@ -23,7 +23,10 @@ import {
   Image,
   Trash2,
   Eye,
-  ToggleLeft
+  ToggleLeft,
+  Settings,
+  Video,
+  PlayCircle
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
@@ -44,7 +47,7 @@ const MODERN_SETTINGS = {
     title: 'Tarification',
     description: 'Configuration des marges et limites',
     settings: [
-      { key: 'default_margin_percentage', label: 'Marge par défaut (%)', secret: false, placeholder: '30' },
+      { key: 'margin_percentage', label: 'Marge par défaut (%)', secret: false, placeholder: '100' },
       { key: 'min_purchase_amount', label: 'Achat minimum (FCFA)', secret: false, placeholder: '500' },
       { key: 'max_purchase_amount', label: 'Achat maximum (FCFA)', secret: false, placeholder: '100000' },
       { key: 'default_balance', label: 'Balance initiale', secret: false, placeholder: '0' },
@@ -474,33 +477,33 @@ export default function AdminSettings() {
 
       {/* Settings Tabs */}
       <Tabs defaultValue="appearance" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="appearance" className="flex items-center gap-2">
+        <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1 p-1 bg-muted/20">
+          <TabsTrigger value="appearance" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <Palette className="h-4 w-4" />
             <span className="hidden sm:inline">Apparence</span>
           </TabsTrigger>
-          <TabsTrigger value="pricing" className="flex items-center gap-2">
+          <TabsTrigger value="pricing" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <Percent className="h-4 w-4" />
             <span className="hidden sm:inline">Tarification</span>
           </TabsTrigger>
-          <TabsTrigger value="general" className="flex items-center gap-2">
+          <TabsTrigger value="general" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">Général</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
+          <TabsTrigger value="notifications" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <div className="animate-pulse-slow">🔊</div>
-            <span className="hidden sm:inline">Sound</span>
+            <span className="hidden sm:inline">Son</span>
           </TabsTrigger>
-          <TabsTrigger value="api" className="flex items-center gap-2">
+          <TabsTrigger value="api" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <Key className="h-4 w-4" />
-            <span className="hidden sm:inline">API Info</span>
+            <span className="hidden sm:inline">API</span>
           </TabsTrigger>
 
-          <TabsTrigger value="features" className="flex items-center gap-2">
+          <TabsTrigger value="features" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <ToggleLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Fonctionnalités</span>
           </TabsTrigger>
-          <TabsTrigger value="help" className="flex items-center gap-2">
+          <TabsTrigger value="help" className="flex-1 sm:flex-none flex items-center justify-center gap-2">
             <Info className="h-4 w-4" />
             <span className="hidden sm:inline">Aide</span>
           </TabsTrigger>

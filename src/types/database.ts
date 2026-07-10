@@ -20,8 +20,10 @@ export interface Database {
           credits: number
           is_active: boolean
           language: string
+          has_seen_tutorial: boolean
           created_at: string
           updated_at: string
+          banned_reason: string | null
         }
         Insert: {
           id?: string
@@ -33,8 +35,10 @@ export interface Database {
           credits?: number
           is_active?: boolean
           language?: string
+          has_seen_tutorial?: boolean
           created_at?: string
           updated_at?: string
+          banned_reason?: string | null
         }
         Update: {
           id?: string
@@ -46,8 +50,10 @@ export interface Database {
           credits?: number
           is_active?: boolean
           language?: string
+          has_seen_tutorial?: boolean
           created_at?: string
           updated_at?: string
+          banned_reason?: string | null
         }
       }
       credits_history: {

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/authStore';
@@ -8,12 +9,19 @@ import { supabase, cloudFunctions } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useUIStore } from '@/stores/uiStore';
+import { SmsRevealPopup } from '@/components/ui/SmsRevealPopup';
+import { StatusFeedbackModal } from '@/components/ui/StatusFeedbackModal';
+import { PaymentSuccessModal } from '@/components/ui/PaymentSuccessModal';
 import { useSmsPolling } from '@/hooks/useSmsPolling';
 import { useRentPolling, type RentMessagesCache } from '@/hooks/useRentPolling';
 import { useRealtimeSms } from '@/hooks/useRealtimeSms';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { formatPhoneNumber } from '@/utils/phoneFormatter';
+import { RentOnboardingModal } from '../components/ui/RentOnboardingModal';
+import { ExtendRentalModal } from '@/components/ExtendRentalModal';
+import { computeServiceCountrySuccessRate, sortCountriesByReliability, getRealServiceCountryStats, getAnchorCompletedSms } from '@/lib/country-scoring';
 import {
   Search,
   X,
@@ -30,7 +38,15 @@ import {
   MessageSquare,
   Gift,
   Link2,
-  Share2
+  Share2,
+  CheckCircle2,
+  ChevronRight,
+  Trophy,
+  Award,
+  TrendingUp,
+  Sparkles,
+  Check,
+  Activity
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -53,74 +69,15 @@ import { get5simProductName } from '@/lib/service-mapping';
 import { getSetting } from '@/lib/settings';
 
 // ============================================================================
+const EMPTY_ARRAY: any[] = [];
+
+// ============================================================================
 // 🗺️ MAPPING SMS-ACTIVATE ID → NOM DU PAYS
 // Pour convertir les country_code stockés en DB vers des noms lisibles
 // ============================================================================
-const SMS_ACTIVATE_ID_TO_NAME: Record<string, string> = {
-  // Par ID numérique (SMS-Activate country ID)
-  '0': 'Russia', '1': 'Ukraine', '2': 'Kazakhstan', '3': 'China', '4': 'Philippines',
-  '5': 'Myanmar', '6': 'Indonesia', '7': 'Malaysia', '8': 'Kenya', '9': 'Tanzania',
-  '10': 'Vietnam', '11': 'Kyrgyzstan', '12': 'England', '13': 'Israel', '14': 'Hong Kong',
-  '15': 'Poland', '16': 'Egypt', '17': 'Nigeria', '18': 'Macau', '19': 'Morocco',
-  '20': 'Ghana', '21': 'Argentina', '22': 'India', '23': 'Uzbekistan', '24': 'Cambodia',
-  '25': 'Cameroon', '26': 'Chad', '27': 'Germany', '28': 'Lithuania', '29': 'Croatia',
-  '30': 'Sweden', '31': 'Iraq', '32': 'Romania', '33': 'Colombia', '34': 'Austria',
-  '35': 'Belarus', '36': 'Canada', '37': 'Saudi Arabia', '38': 'Mexico', '39': 'South Africa',
-  '40': 'Spain', '41': 'Iran', '42': 'Algeria', '43': 'Netherlands', '44': 'Bangladesh',
-  '45': 'Brazil', '46': 'Turkey', '47': 'Japan', '48': 'South Korea', '49': 'Taiwan',
-  '50': 'Singapore', '51': 'UAE', '52': 'Thailand', '53': 'Pakistan', '54': 'Nepal',
-  '55': 'Sri Lanka', '56': 'Portugal', '57': 'New Zealand', '58': 'Italy', '59': 'Belgium',
-  '60': 'Switzerland', '61': 'Greece', '62': 'Czech Republic', '63': 'Hungary', '64': 'Denmark',
-  '65': 'Norway', '66': 'Finland', '67': 'Ireland', '68': 'Slovakia', '69': 'Bulgaria',
-  '70': 'Serbia', '71': 'Slovenia', '72': 'North Macedonia', '73': 'Peru', '74': 'Chile',
-  '75': 'Ecuador', '76': 'Venezuela', '77': 'Bolivia', '78': 'France', '79': 'Paraguay',
-  '80': 'Uruguay', '81': 'Costa Rica', '82': 'Panama', '83': 'Dominican Republic', '84': 'El Salvador',
-  '85': 'Guatemala', '86': 'Honduras', '87': 'Nicaragua', '88': 'Cuba', '89': 'Haiti',
-  '90': 'Jamaica', '91': 'Trinidad and Tobago', '92': 'Puerto Rico', '93': 'Barbados', '94': 'Bahamas',
-  '95': 'Belize', '96': 'Guyana', '97': 'Suriname', '98': 'French Guiana', '99': 'Martinique',
-  '100': 'Guadeloupe', '101': 'Aruba', '102': 'Curacao', '103': 'Sint Maarten', '104': 'Bonaire',
-  '105': 'Grenada', '106': 'Saint Lucia', '107': 'Saint Vincent', '108': 'Afghanistan',
-  '109': 'Albania', '110': 'Armenia', '111': 'Azerbaijan', '112': 'Bosnia Herzegovina',
-  '113': 'Montenegro', '114': 'Andorra', '115': 'San Marino', '116': 'Monaco', '117': 'Laos',
-  '118': 'Brunei', '119': 'East Timor', '120': 'Mongolia', '121': 'Tajikistan', '122': 'Turkmenistan',
-  '123': 'Moldova', '124': 'Georgia', '125': 'Latvia', '126': 'Estonia', '127': 'Iceland',
-  '128': 'Luxembourg', '129': 'Sudan', '130': 'South Sudan', '131': 'Tunisia', '132': 'Libya',
-  '133': 'Mali', '134': 'Mauritania', '135': 'Burkina Faso', '136': 'Niger', '137': 'Benin',
-  '138': 'Togo', '139': 'Ivory Coast', '140': 'Liberia', '141': 'Jordan', '142': 'Sierra Leone',
-  '143': 'Guinea', '144': 'Guinea Bissau', '145': 'Cape Verde', '146': 'Gambia', '147': 'Djibouti',
-  '148': 'Eritrea', '149': 'Somalia', '150': 'Comoros', '151': 'Mauritius', '152': 'Seychelles',
-  '153': 'Madagascar', '154': 'Malawi', '155': 'Mozambique', '156': 'Zambia', '157': 'Zimbabwe',
-  '158': 'Botswana', '159': 'Namibia', '160': 'Lesotho', '161': 'Swaziland', '162': 'Angola',
-  '163': 'Palestine', '164': 'Congo', '165': 'Bahrain', '166': 'Lebanon', '167': 'Yemen',
-  '168': 'Syria', '169': 'Oman', '170': 'Qatar', '171': 'Kuwait', '172': 'Ethiopia', '173': 'Rwanda',
-  '174': 'Uganda', '175': 'Australia', '176': 'Fiji', '177': 'Papua New Guinea', '178': 'Solomon Islands',
-  '179': 'Vanuatu', '180': 'Samoa', '181': 'Tonga', '182': 'Kiribati', '183': 'Marshall Islands',
-  '184': 'Micronesia', '185': 'Palau', '186': 'Nauru', '187': 'USA', '188': 'Maldives',
-  '189': 'Bhutan', '190': 'Central African Republic', '191': 'Congo (DRC)', '192': 'Burundi',
-  '193': 'Gabon', '194': 'Equatorial Guinea', '195': 'Sao Tome', '196': 'Senegal',
-  // Par code pays (ancien format)
-  'russia': 'Russia', 'ukraine': 'Ukraine', 'kazakhstan': 'Kazakhstan', 'china': 'China',
-  'philippines': 'Philippines', 'myanmar': 'Myanmar', 'indonesia': 'Indonesia', 'malaysia': 'Malaysia',
-  'kenya': 'Kenya', 'tanzania': 'Tanzania', 'vietnam': 'Vietnam', 'england': 'England',
-  'israel': 'Israel', 'hongkong': 'Hong Kong', 'hong_kong': 'Hong Kong', 'poland': 'Poland',
-  'egypt': 'Egypt', 'nigeria': 'Nigeria', 'morocco': 'Morocco', 'ghana': 'Ghana',
-  'india': 'India', 'germany': 'Germany', 'france': 'France', 'spain': 'Spain',
-  'italy': 'Italy', 'brazil': 'Brazil', 'mexico': 'Mexico', 'canada': 'Canada',
-  'usa': 'USA', 'united_states': 'USA', 'australia': 'Australia', 'japan': 'Japan',
-  'south_korea': 'South Korea', 'taiwan': 'Taiwan', 'singapore': 'Singapore', 'uae': 'UAE',
-  'thailand': 'Thailand', 'pakistan': 'Pakistan', 'bangladesh': 'Bangladesh', 'turkey': 'Turkey',
-  'netherlands': 'Netherlands', 'belgium': 'Belgium', 'switzerland': 'Switzerland', 'austria': 'Austria',
-  'sweden': 'Sweden', 'norway': 'Norway', 'denmark': 'Denmark', 'finland': 'Finland',
-  'portugal': 'Portugal', 'greece': 'Greece', 'czech': 'Czech Republic', 'czech_republic': 'Czech Republic',
-  'hungary': 'Hungary', 'romania': 'Romania', 'bulgaria': 'Bulgaria', 'serbia': 'Serbia',
-  'croatia': 'Croatia', 'slovenia': 'Slovenia', 'slovakia': 'Slovakia', 'ireland': 'Ireland',
-  'senegal': 'Senegal', 'cameroon': 'Cameroon', 'jordan': 'Jordan', 'bahrain': 'Bahrain',
-  'ethiopia': 'Ethiopia', 'argentina': 'Argentina', 'colombia': 'Colombia', 'peru': 'Peru',
-  'chile': 'Chile', 'venezuela': 'Venezuela', 'ecuador': 'Ecuador', 'bolivia': 'Bolivia',
-  'south_africa': 'South Africa', 'new_zealand': 'New Zealand', 'saudi_arabia': 'Saudi Arabia',
-  // Codes courts (ex: "hw" pour services)
-  'hw': 'Alipay', 'full': 'Location complète'
-};
+const SMS_ACTIVATE_ID_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(SMS_ACTIVATE_COUNTRIES).map(c => [c.id.toString(), c.name])
+);
 
 // ============================================================================
 // 🎯 MAPPING COMPLET DES CODES SERVICES → NOMS
@@ -374,6 +331,7 @@ interface ActiveNumber {
   smsText?: string;
   price: number;
   charged: boolean;
+  metadata?: Record<string, any>;
   // Champs spécifiques aux rentals
   type?: 'activation' | 'rental';
   rentalId?: string;
@@ -459,9 +417,10 @@ interface DBUserProfile {
 type Step = 'service' | 'country' | 'confirm' | 'active';
 
 export default function DashboardPage() {
-  const { t } = useTranslation();
   const { user } = useAuthStore();
+  const { t } = useTranslation();
   const { toast } = useToast();
+  const { showSmsReveal, showStatusFeedback } = useUIStore();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -644,12 +603,15 @@ export default function DashboardPage() {
   const [isFinishingRental, setIsFinishingRental] = useState(false);
 
   // State pour le popup de confirmation Cancel Rental
+    const [showExtendRentalDialog, setShowExtendRentalDialog] = useState(false);
+  const [rentalToExtend, setRentalToExtend] = useState<{ rentalId: string; phone: string; service: string } | null>(null);
   const [showCancelRentalDialog, setShowCancelRentalDialog] = useState(false);
-  const [rentalToCancel, setRentalToCancel] = useState<{ rentalId: string; phone: string; createdAt: string; frozenAmount?: number } | null>(null);
+  const [rentalToCancel, setRentalToCancel] = useState<{ rentalId: string; phone: string; createdAt: string; frozenAmount?: number; messageCount?: number } | null>(null);
   const [isCancellingRental, setIsCancellingRental] = useState(false);
 
   // State pour la bannière de succès de paiement
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  
   const [showReferralBonus, setShowReferralBonus] = useState(false);
   const [referralBonusAmount, setReferralBonusAmount] = useState(0);
 
@@ -727,13 +689,6 @@ export default function DashboardPage() {
       // Show success banner (visible on mobile)
       setShowPaymentSuccess(true);
 
-      // Show success toast
-      toast({
-        title: `✅ ${t('toasts.paymentSuccess')}`,
-        description: t('toasts.paymentSuccessDesc'),
-        duration: 8000,
-      });
-
       // Refresh user balance
       queryClient.invalidateQueries({ queryKey: ['user-balance'] });
 
@@ -791,7 +746,7 @@ export default function DashboardPage() {
 
   // Fetch services - OPTIMISÉ: Lecture directe depuis DB avec total_available mis à jour par Cron
   // 🔄 En mode RENT, on charge les services depuis l'API getRentServicesAndCountries
-  const { data: services = [], isLoading: loadingServices } = useQuery<Service[]>({
+  const { data: services = EMPTY_ARRAY, isLoading: loadingServices } = useQuery<Service[]>({
     queryKey: ['services', selectedCategory, mode, rentDuration],
     queryFn: async () => {
       // Debug disabled: console.log(`⚡ [SERVICES] Chargement mode=${mode}...`);
@@ -809,9 +764,9 @@ export default function DashboardPage() {
           };
           const rentTime = rentTimeMap[rentDuration];
 
-          // Appeler l'API pour obtenir les services rent avec quantités agrégées
-          const { data: rentData, error } = await cloudFunctions.invoke('get-rent-services', {
-            body: { rentTime, getServices: true }
+          // Appeler l'API pour obtenir les services rent
+          const { data: rentData, error } = await cloudFunctions.invoke('get-sms-activate-rent-services', {
+            body: { time: rentTime, getServices: true } // getServices: true is handled below to fetch for default country
           });
 
           if (error) {
@@ -829,33 +784,35 @@ export default function DashboardPage() {
             dbServices?.map(s => [s.code, s.display_name || s.name]) || []
           );
 
-          // rentData.services contient maintenant les quantités agrégées depuis plusieurs pays
-          // { serviceCode: { cost, quant: { current, total }, ... } }
-          const rentServices = rentData?.services || {};
-          const servicesList = Object.entries(rentServices)
-            .filter(([code]) => code !== 'full' && code !== 'ot' && code !== 'any') // Exclure full et "Any other"
-            .map(([code, data]: [string, any]) => ({
-              code,
-              quantity: data.quant?.current || data.quant?.total || 0
-            }));
+          // Create a map of available quantities from API
+          const availableQuantities = new Map(
+            (rentData?.availableServices || []).map((s: any) => [s.code, s.available || 0])
+          );
 
-          // Services loaded for rent
-          // console.log(`✅ [RENT SERVICES] ${servicesList.length} services disponibles`);
-
-          // Mapper vers le format Service avec quantités réelles
-          const mappedServices = servicesList.map(({ code, quantity }) => {
-            return {
-              id: code,
-              name: serviceNamesMap.get(code) || code,
-              code: code,
-              icon: code,
-              count: quantity, // Quantité agrégée réelle depuis les pays populaires
-              _priority: getServicePriority(code)
-            };
-          })
+          // Mapper tous les services de la DB (actifs) vers le format Service
+          const mappedServices = (dbServices || [])
+            .filter(s => s.code !== 'full' && s.code !== 'ot' && s.code !== 'any') // Exclure full et "Any other"
+            .map(s => {
+              const quantity = availableQuantities.get(s.code) || 0;
+              return {
+                id: s.code,
+                name: s.display_name || s.name || s.code,
+                code: s.code,
+                icon: s.code,
+                count: quantity, // Quantité réelle ou 0 si pas de stock
+                _priority: getServicePriority(s.code)
+              };
+            })
             .sort((a, b) => {
+              // Si un service a du stock et l'autre non, celui avec stock passe en premier
+              if (Number(a.count) > 0 && Number(b.count) === 0) return -1;
+              if (Number(a.count) === 0 && Number(b.count) > 0) return 1;
+              
+              // Ensuite on trie par priorité
               if (a._priority !== b._priority) return b._priority - a._priority;
-              return b.count - a.count;
+              
+              // Enfin par quantité décroissante
+              return Number(b.count) - Number(a.count);
             })
             .map(({ _priority, ...service }) => service);
 
@@ -877,19 +834,13 @@ export default function DashboardPage() {
         .from('services')
         .select('code, name, display_name, icon, total_available, category, popularity_score')
         .eq('active', true)
-        .gt('total_available', 0) // Seulement services disponibles
         .order('popularity_score', { ascending: false })
         .order('total_available', { ascending: false })
         .range(0, 9999) as { data: DBService[] | null; error: any }; // Range permet de dépasser la limite PostgREST par défaut
 
       if (error) {
         console.error('❌ [SERVICES] Erreur DB:', error);
-        toast({
-          title: t('toasts.loadingError'),
-          description: t('toasts.loadingErrorDesc'),
-          variant: 'destructive'
-        });
-        return [];
+        throw error;
       }
 
       if (!dbServices || dbServices.length === 0) {
@@ -962,12 +913,14 @@ export default function DashboardPage() {
 
       return sortedServices;
     },
-    staleTime: 30000 // Cache 30 secondes (DB mise à jour par Cron toutes les 5 min)
+    staleTime: 60000, // ⚡ Cache 60s (DB mise à jour par Cron toutes les 15 min maintenant)
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 5000),
   });
 
   // Charger les activations en cours depuis la DB
   const {
-    data: dbActivations = [],
+    data: dbActivations = EMPTY_ARRAY,
     refetch: refetchActivations,
     isLoading: loadingActivations,
     isFetching: fetchingActivations,
@@ -997,7 +950,7 @@ export default function DashboardPage() {
 
       if (error) {
         console.error('❌ [LOAD] Erreur:', error);
-        return [];
+        throw error;
       }
 
       // console.log('✅ [LOAD] Activations brutes:', data?.length || 0);
@@ -1048,12 +1001,14 @@ export default function DashboardPage() {
     refetchOnMount: 'always', // Toujours refetch au mount
     // Polling désactivé - les mises à jour arrivent via WebSocket (useRealtimeSms)
     // Le polling manuel est déclenché par useRentPolling pour les rentals
-    refetchInterval: false
+    refetchInterval: false,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 5000),
   });
 
   // Charger les rentals actifs depuis la DB
   const {
-    data: dbRentals = [],
+    data: dbRentals = EMPTY_ARRAY,
     refetch: refetchRentals,
     isLoading: loadingRentals,
     isFetching: fetchingRentals,
@@ -1074,7 +1029,7 @@ export default function DashboardPage() {
 
       if (error) {
         console.error('❌ [LOAD] Erreur rentals:', error);
-        return [];
+        throw error;
       }
 
       // console.log('✅ [LOAD] Rentals chargés:', data?.length || 0);
@@ -1118,13 +1073,18 @@ export default function DashboardPage() {
     refetchOnMount: 'always', // Toujours refetch au mount
     // Polling désactivé - les mises à jour arrivent via WebSocket (useRealtimeSms)
     // Le polling manuel est déclenché par useRentPolling pour les rentals
-    refetchInterval: false
+    refetchInterval: false,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 5000),
   });
 
   // Synchroniser activeNumbers avec la DB (fusionner activations + rentals)
   // Auto-masquer les numéros qui ont reçu un SMS après 20 secondes
   const [hiddenNumbers, setHiddenNumbers] = useState<Set<string>>(new Set());
   const [smsReceivedTimestamps, setSmsReceivedTimestamps] = useState<Map<string, number>>(new Map());
+  const [timeoutTimestamps, setTimeoutTimestamps] = useState<Set<string>>(new Set());
+  const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const hiddenStorageKey = user?.id ? `hiddenNumbers:${user.id}` : null;
 
   // Flag pour savoir si le chargement initial est terminé
@@ -1174,6 +1134,20 @@ export default function DashboardPage() {
     combined.forEach(num => {
       if (num.type === 'activation' && num.smsCode && !smsReceivedTimestamps.has(num.id)) {
         setSmsReceivedTimestamps(prev => new Map(prev).set(num.id, Date.now()));
+        // Afficher le popup SMS premium
+        const code = num.smsCode.includes('STATUS_OK:') ? num.smsCode.split(':')[1] : num.smsCode;
+        showSmsReveal({ id: num.id, service_code: num.serviceCode, sms_code: code, phone: num.phone });
+      }
+
+      // Détecter les timeouts / expirations automatiques pour afficher le feedback premium
+      if ((num.status === 'timeout' || num.status === 'expired' || num.status === 'cancelled') && !num.smsCode && !timeoutTimestamps.has(num.id)) {
+        // Seulement déclencher si l'expiration est récente (dans les 10 dernières secondes) pour éviter les spams au chargement
+        const expiresAtTime = num.expiresAt ? new Date(num.expiresAt).getTime() : 0;
+        const nowTime = Date.now();
+        if (expiresAtTime > 0 && Math.abs(nowTime - expiresAtTime) < 10000) {
+          setTimeoutTimestamps(prev => new Set(prev).add(num.id));
+          showStatusFeedback('timeout');
+        }
       }
     });
 
@@ -1402,11 +1376,11 @@ export default function DashboardPage() {
         // 1️⃣ D'abord, obtenir la liste des pays disponibles (avec getCountries: true)
         // 🔑 Pour Full Rent ou services spécifiques, passer le serviceCode pour obtenir les quantités
         const serviceCode = selectedService.code;
-        const { data: rentData, error } = await cloudFunctions.invoke('get-rent-services', {
+        const { data: rentData, error } = await cloudFunctions.invoke('get-sms-activate-rent-services', {
           body: {
-            rentTime,
+            time: rentTime,
             getCountries: true,
-            serviceCode: serviceCode // ✅ Retourne tous les pays avec quantités pour ce service
+            serviceCode: serviceCode // Not fully supported by API but we pass it anyway
           }
         });
 
@@ -1423,35 +1397,29 @@ export default function DashboardPage() {
         const MIN_PRICE_COINS = 5; // Prix minimum 5 Ⓐ
 
         // Convertir directement les données de l'API en format Country
-        const availableCountries: Country[] = countriesArray.map((c: any) => {
-          // Utiliser le sellingPrice de l'API (déjà calculé avec marge et >= activation)
+        const availableCountries: Country[] = countriesArray.map((c: any, idx: number) => {
           const sellingPrice = c.sellingPrice || MIN_PRICE_COINS;
+          const dbCountry = dbCountriesMap.get(c.name.toLowerCase());
+          const rate = computeServiceCountrySuccessRate(c.code, c.name, serviceCode, dbCountry?.success_rate);
 
           return {
             id: `rent-${c.id}`,
             name: c.name,
             code: c.code,
             flag: getFlagEmoji(c.code) || '🌍',
-            successRate: 85,
+            successRate: rate,
             count: c.quantity || 0,
-            price: sellingPrice, // Prix garanti >= activation
-            compositeScore: (c.quantity || 0) * 85 / 100,
-            rank: c.id,
+            price: sellingPrice,
+            compositeScore: (c.quantity || 0) * rate / 100,
+            rank: idx + 1,
             share: 0,
             _smsActivateId: c.id,
             _service: serviceCode
           } as Country;
         });
 
-        // Tri: pays avec stock en premier (par quantité décroissante), puis les autres
-        availableCountries.sort((a, b) => {
-          if ((a.count || 0) > 0 && (b.count || 0) === 0) return -1;
-          if ((a.count || 0) === 0 && (b.count || 0) > 0) return 1;
-          if ((a.count || 0) > 0 && (b.count || 0) > 0) return (b.count || 0) - (a.count || 0);
-          return a.name.localeCompare(b.name);
-        });
-
-        return availableCountries;
+        // ✅ Tri intelligent: en stock en premier, puis par FIABILITÉ par service (taux de réussite)
+        return sortCountriesByReliability(availableCountries);
       }
 
       // ✅ MODE ACTIVATION (code existant)
@@ -1466,6 +1434,9 @@ export default function DashboardPage() {
       const successRateMap = new Map(
         countriesData?.map((c: DBCountry) => [c.code.toLowerCase(), c.success_rate]) || []
       );
+
+      // 🧠 Auto-Apprentissage : Récupérer les vrais taux d'activations par pays pour CE service
+      const realStatsMap = await getRealServiceCountryStats(apiServiceCode, supabase);
 
       // 3️⃣ Appeler Edge Function pour obtenir les pays triés intelligemment
       // ✅ Utilise getTopCountriesByServiceRank de SMS-Activate (tri par performance + popularité)
@@ -1490,35 +1461,41 @@ export default function DashboardPage() {
           throw new Error('No countries available');
         }
 
-        // 4️⃣ Mapper vers le format Country avec tri intelligent SMS-Activate
+        // 4️⃣ Mapper vers le format Country avec tri par taux de réussite SMS
         const mapped = countries
-          .filter((c: any) => c.count > 0 && c.price > 0) // ✅ Filtrer pays avec stock ET prix valide
-          .map((c: any) => {
-            // Utiliser directement le prix SMS-Activate (plus fiable et toujours à jour)
+          .filter((c: any) => c.count > 0 && c.price > 0)
+          .map((c: any, idx: number) => {
             const finalPrice = c.price;
-
-            // ✅ Success rate : Utiliser notre DB si disponible, sinon ne pas afficher
             const ourSuccessRate = successRateMap.get(c.countryCode.toLowerCase());
-            const smsActivateSuccessRate = c.successRate; // Peut être null
-
-            // Priorité: Notre DB > SMS-Activate > null (pas de badge si pas de données)
-            const finalSuccessRate = ourSuccessRate || smsActivateSuccessRate || null;
+            const realStat = realStatsMap.get(c.countryCode?.toLowerCase()) ||
+                             realStatsMap.get(c.countryName?.toLowerCase()) ||
+                             realStatsMap.get(c.countryId?.toString());
+            const finalSuccessRate = computeServiceCountrySuccessRate(
+              c.countryCode,
+              c.countryName,
+              apiServiceCode,
+              ourSuccessRate,
+              c.successRate,
+              realStat
+            );
 
             return {
               id: c.countryId.toString(),
               name: c.countryName,
               code: c.countryCode,
               flag: getFlagEmoji(c.countryCode),
-              successRate: finalSuccessRate ? Number(finalSuccessRate.toFixed(1)) : null,
-              count: c.count, // ✅ Nombre de numéros disponibles chez SMS-Activate
-              price: Number(finalPrice.toFixed(2)), // Prix en pièces (Ⓐ)
-              compositeScore: c.compositeScore, // Score de tri intelligent
-              rank: c.rank, // Position dans le classement SMS-Activate
-              share: c.share // Part de marché
+              successRate: finalSuccessRate,
+              completedSms: realStat ? realStat.completed : getAnchorCompletedSms(apiServiceCode, c.countryCode, c.countryName),
+              count: c.count,
+              price: Number(finalPrice.toFixed(2)),
+              compositeScore: c.compositeScore,
+              rank: c.rank || (idx + 1),
+              share: c.share
             };
           });
 
-        return mapped;
+        // ✅ TRI STRICT PAR FIABILITÉ ET TAUX DE RÉUSSITE PAR SERVICE
+        return sortCountriesByReliability(mapped);
       } catch (error) {
         // Fallback: récupérer prix en temps réel via get-real-time-prices
         try {
@@ -1545,14 +1522,20 @@ export default function DashboardPage() {
             (dbCountries || []).map((c: DBCountry) => [c.code.toLowerCase(), c])
           );
 
-          return pricesData.data.map((p: any) => {
+          const mappedFallback = pricesData.data.map((p: any) => {
             const countryInfo = countryInfoMap.get(p.countryCode.toLowerCase());
+            const rate = computeServiceCountrySuccessRate(
+              p.countryCode,
+              countryInfo?.name || p.countryCode,
+              apiServiceCode,
+              countryInfo?.success_rate
+            );
             return {
               id: p.countryCode,
               name: countryInfo?.name || p.countryCode,
               code: p.countryCode,
               flag: getFlagEmoji(p.countryCode),
-              successRate: countryInfo?.success_rate || null,
+              successRate: rate,
               count: p.count,
               price: p.priceCoins,
               compositeScore: null,
@@ -1560,6 +1543,8 @@ export default function DashboardPage() {
               share: null
             };
           }).filter((c: any) => c.count > 0 && c.price > 0);
+
+          return sortCountriesByReliability(mappedFallback);
         } catch (fallbackError) {
           console.error('❌ [FALLBACK] Erreur get-real-time-prices:', fallbackError);
           return [];
@@ -1571,15 +1556,7 @@ export default function DashboardPage() {
     refetchInterval: false
   });
 
-  // Timer for active numbers - Recalculer timeRemaining à chaque seconde
-  // SANS modifier le state, juste forcer un re-render
-  const [, forceUpdate] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      forceUpdate(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  // ⚡ Timer dupliqué supprimé — le timer setTimerTick (ligne 660) gère déjà le re-render chaque seconde
 
   // Polling automatique pour vérifier les SMS reçus (backup)
   // ⚡️ MEMOIZED CALLBACKS: Prevent polling restart on every render (component renders every 1s)
@@ -1722,7 +1699,8 @@ export default function DashboardPage() {
         // ⚡ ACTIVATION: Check Provider
         if (providerMode === '5sim') {
           // 🟥 USE 5SIM
-          functionName = 'buy-5sim-number';
+          functionName = 'buy-number-intelligent';
+          requestBody.providerOverride = '5sim';
 
           // Map ID to Name (5sim needs 'england', 'russia' etc.)
           let countryName = getCountryName(countryId).toLowerCase();
@@ -1751,7 +1729,8 @@ export default function DashboardPage() {
           };
         } else if (providerMode === 'onlinesim') {
           // 🟠 USE ONLINESIM
-          functionName = 'buy-onlinesim-number';
+          functionName = 'buy-number-intelligent';
+          requestBody.providerOverride = 'onlinesim';
           requestBody = {
             country: countryId,
             operator: 'any',
@@ -1761,7 +1740,8 @@ export default function DashboardPage() {
           };
         } else if (providerMode === 'intelligent' || providerMode === 'smart') {
           // 🧠 INTELLIGENT MODE: Try HeroSMS first (fallback handled in error handler)
-          functionName = 'buy-sms-activate-number';
+          functionName = 'buy-number-intelligent';
+          requestBody.providerOverride = 'sms-activate';
           requestBody = {
             country: countryId,
             operator: 'any',
@@ -1771,7 +1751,8 @@ export default function DashboardPage() {
           };
         } else {
           // 🟦 DEFAULT: SMS ACTIVATE (HeroSMS)
-          functionName = 'buy-sms-activate-number';
+          functionName = 'buy-number-intelligent';
+          requestBody.providerOverride = 'sms-activate';
           requestBody = {
             country: countryId,
             operator: 'any',
@@ -1831,8 +1812,8 @@ export default function DashboardPage() {
             expectedPrice: finalPrice
           };
 
-          const { data: buyData5sim, error: buyError5sim } = await cloudFunctions.invoke('buy-5sim-number', {
-            body: requestBody5sim
+          const { data: buyData5sim, error: buyError5sim } = await cloudFunctions.invoke('buy-number-intelligent', {
+            body: { ...requestBody5sim, providerOverride: '5sim' }
           });
 
           if (buyError5sim || !buyData5sim?.success) {
@@ -1863,15 +1844,11 @@ export default function DashboardPage() {
 
       if (!isRent) {
         // Track which provider was actually used (for status check)
-        const usedProvider = (buyData as any)?.data?.provider === '5sim' || functionName === 'buy-5sim-number'
-          ? '5sim'
-          : 'sms-activate';
+        const usedProvider = buyData?.data?.provider || (functionName.includes('5sim') ? '5sim' : 'sms-activate');
 
         // Pour activation: Vérifier IMMÉDIATEMENT si le SMS est déjà arrivé
-        // Use provider-specific status checker
-        const statusCheckerFunction = usedProvider === '5sim'
-          ? 'check-5sim-status'
-          : 'check-sms-activate-status';
+        // Use provider-specific status checker dynamically
+        const statusCheckerFunction = `check-${usedProvider}-status`;
 
         setTimeout(async () => {
           try {
@@ -1967,7 +1944,7 @@ export default function DashboardPage() {
       });
 
       if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || `${provider || 'HeroSMS'} cancellation failed`);
+        throw new Error(data?.error || error?.message || 'Annulation échouée');
       }
 
       // Update Supabase status
@@ -2046,37 +2023,56 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col lg:flex-row min-h-[calc(100vh-64px)] lg:h-[calc(100vh-80px)] pt-4 lg:pt-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20">
-      {/* 🎉 Bannière de succès de paiement - PREMIUM DESIGN */}
-      {showPaymentSuccess && (
-        <div className="fixed top-16 left-0 right-0 z-50 mx-4 animate-in slide-in-from-top zoom-in-95 duration-500">
-          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white rounded-3xl p-5 shadow-2xl shadow-green-500/40 border border-white/20">
-            {/* Sparkle decorations */}
-            <div className="absolute top-2 right-12 w-2 h-2 bg-yellow-300 rounded-full animate-ping" />
-            <div className="absolute top-4 right-20 w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-            <div className="absolute bottom-3 left-16 w-1 h-1 bg-yellow-200 rounded-full animate-bounce" />
-
-            <div className="flex items-center gap-4">
-              <div className="flex-shrink-0 w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center animate-bounce">
-                <span className="text-3xl">🎉</span>
+      <RentOnboardingModal />
+      
+      {/* 🎉 Bannière de succès de paiement - 21ST DYNAMIC PILL DESIGN */}
+      <AnimatePresence>
+        {showPaymentSuccess && (
+          <motion.div 
+            initial={{ opacity: 0, y: -40, scale: 0.9, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -20, scale: 0.9, filter: "blur(10px)" }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="fixed top-24 md:top-28 left-0 right-0 z-[100] flex justify-center px-4 pointer-events-none"
+          >
+            <div className="relative pointer-events-auto bg-white rounded-full p-2 pr-6 shadow-[0_20px_40px_-10px_rgba(37,99,235,0.2)] border border-blue-100 flex items-center gap-4 overflow-hidden group">
+              {/* Highlight sweep animation */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/50 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+              
+              {/* Spinning Check Icon */}
+              <div className="relative flex-shrink-0 w-12 h-12 bg-gradient-to-tr from-blue-600 to-cyan-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <motion.div
+                  initial={{ rotate: -180, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ delay: 0.1, type: "spring", bounce: 0.6 }}
+                >
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </motion.div>
+                {/* Ping effect */}
+                <div className="absolute inset-0 border-2 border-blue-400 rounded-full animate-ping opacity-20" />
               </div>
-              <div className="flex-1 min-w-0">
+              
+              <div className="flex flex-col py-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-black text-xl tracking-tight">{t('toasts.paymentSuccess')}</h3>
-                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">✓</span>
+                  <h3 className="font-extrabold text-blue-900 text-sm tracking-tight">
+                    {t('toasts.paymentSuccess')}
+                  </h3>
                 </div>
-                <p className="text-sm text-white/90 mt-1 font-medium">{t('toasts.paymentSuccessDesc')}</p>
+                <p className="text-xs text-blue-600/70 font-bold">
+                  {t('toasts.paymentSuccessDesc')}
+                </p>
               </div>
+              
               <button
                 onClick={() => setShowPaymentSuccess(false)}
-                className="flex-shrink-0 w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 hover:scale-110 transition-all duration-200"
+                className="ml-2 flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-all text-blue-400 hover:text-blue-600"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* 🎁 Bannière de bonus de parrainage - PREMIUM DESIGN */}
       {showReferralBonus && (
         <div className="fixed top-16 left-0 right-0 z-50 mx-4 animate-in slide-in-from-top zoom-in-95 duration-500" style={{ top: showPaymentSuccess ? '160px' : '64px' }}>
@@ -2162,25 +2158,41 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500">{t('dashboard.selectService')}</p>
           </div>
 
-          {/* Mode Toggle - Always visible (conditioned by feature flag) */}
+          {/* Mode Toggle - Magic UI / 21st style segment control with Logo Colors */}
           {isRentalsEnabled && (
-            <div className="flex bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-1.5 mb-4 lg:mb-5 shadow-inner">
+            <div className="relative flex bg-gray-100/80 backdrop-blur-sm rounded-[20px] p-1.5 mb-6 shadow-inner border border-gray-200/50">
+              {/* Sliding Pill Background */}
+              <div 
+                className={`absolute inset-y-1.5 left-1.5 rounded-[16px] shadow-md transition-all duration-400 cubic-bezier(0.4, 0, 0.2, 1) ${
+                  mode === 'activation' 
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-500 shadow-blue-500/30' 
+                    : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'
+                }`}
+                style={{
+                  width: 'calc(50% - 6px)',
+                  transform: mode === 'activation' ? 'translateX(0)' : 'translateX(100%)',
+                }}
+              />
               <button
                 onClick={() => setMode('activation')}
-                className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${mode === 'activation'
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                className={`relative z-10 flex-1 py-3 text-[15px] font-extrabold tracking-wide rounded-[16px] transition-colors duration-300 ${mode === 'activation'
+                  ? 'text-white'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
                   }`}
               >
                 {t('common.activation')}
               </button>
               <button
                 onClick={() => setMode('rent')}
-                className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${mode === 'rent'
-                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                className={`relative z-10 flex-1 py-3 text-[15px] font-extrabold tracking-wide rounded-[16px] transition-colors duration-300 ${mode === 'rent'
+                  ? 'text-white'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
                   }`}
               >
+                {/* Nouveau Badge */}
+                <span className="absolute -top-2 right-2 sm:right-6 md:right-8 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 border border-white/20 animate-bounce">
+                    Nouveau
+                </span>
                 {t('common.rent')}
               </button>
             </div>
@@ -2213,26 +2225,53 @@ export default function DashboardPage() {
 
                   {/* Special Service for Rent Mode */}
                   {mode === 'rent' && (
-                    <div className="mb-5">
-                      <p className="text-[10px] text-purple-500 uppercase tracking-widest font-bold mb-3 flex items-center gap-2">
-                        <span className="w-5 h-0.5 bg-purple-400 rounded-full"></span>
-                        {t('dashboard.universalService')}
-                      </p>
-                      <div className="space-y-2 mb-4">
-                        {/* Location complète - service universel */}
-                        <div
-                          onClick={() => handleServiceSelect({ id: 'full', name: t('dashboard.fullRent'), code: 'full', count: 597, icon: 'home' })}
-                          className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-purple-400 hover:shadow-lg hover:shadow-purple-100 transition-all duration-300 group"
-                        >
-                          <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
-                            <Home className="w-7 h-7 text-white" />
+                    <div className="mb-6 relative">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse" />
+                        <p className="text-[11px] text-blue-600 uppercase tracking-widest font-extrabold">
+                          Exclusivité
+                        </p>
+                      </div>
+                      
+                      {/* Location complète - Full Blue Premium */}
+                      <div
+                        onClick={() => handleServiceSelect({ id: 'full', name: t('dashboard.fullRent'), code: 'full', count: 597, icon: 'home' })}
+                        className="relative group cursor-pointer overflow-hidden rounded-[1.2rem] shadow-lg hover:shadow-[0_8px_30px_rgba(37,99,235,0.3)] transition-all duration-300 transform hover:-translate-y-0.5"
+                      >
+                        {/* Full Blue Background Gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#004ade] via-blue-500 to-[#18c2ec]" />
+                        
+                        {/* Inner Glow / Highlights */}
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.3)_0%,transparent_50%)]" />
+                        <div className="absolute -inset-[1.5px] bg-gradient-to-r from-cyan-300 via-blue-300 to-indigo-300 rounded-[1.2rem] opacity-0 group-hover:opacity-40 blur-sm transition-opacity duration-500" />
+                        
+                        {/* Shimmer sweep effect */}
+                        <div className="absolute inset-0 overflow-hidden rounded-2xl z-10 pointer-events-none">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="relative z-20 p-4 flex items-center gap-4">
+                          
+                          {/* Premium Icon Container - White Glassmorphism */}
+                          <div className="relative w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/20 backdrop-blur-md border border-white/30 group-hover:bg-white/30 transition-colors">
+                            <Home className="w-7 h-7 text-white drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
                           </div>
+                          
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-base text-gray-900">{t('dashboard.fullRent')}</p>
-                            <p className="text-xs text-purple-600">{t('dashboard.receiveFromAny')}</p>
+                            <p className="font-extrabold text-lg text-white drop-shadow-sm">
+                              {t('dashboard.fullRent')}
+                            </p>
+                            <p className="text-sm font-medium text-blue-50/90 drop-shadow-sm">
+                              {t('dashboard.receiveFromAny')}
+                            </p>
                           </div>
-                          <div className="text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            →
+                          
+                          {/* Chevron */}
+                          <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white group-hover:bg-white group-hover:text-blue-600 group-hover:translate-x-1 transition-all duration-300 shadow-sm">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
                           </div>
                         </div>
                       </div>
@@ -2253,33 +2292,38 @@ export default function DashboardPage() {
                     {filteredServices.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center text-gray-400">
                         <Search className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">Aucun service trouvÃ©</p>
+                        <p className="text-sm">Aucun service trouvé</p>
                       </div>
                     ) : (
                       filteredServices.map((service) => (
                         <div
                           key={service.id}
-                          onClick={() => handleServiceSelect(service)}
-                          className="group bg-white border border-gray-100 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-400 hover:shadow-md hover:shadow-blue-100/50 transition-all duration-300"
+                          onClick={() => {
+                            if (service.count > 0) handleServiceSelect(service);
+                          }}
+                          className={`group bg-white border rounded-2xl p-3.5 flex items-center justify-between transition-all duration-300 ${service.count > 0 ? 'border-gray-200/80 shadow-2xs cursor-pointer hover:border-[#00A3FF] hover:shadow-sm active:scale-[0.99]' : 'border-gray-100 opacity-50 grayscale cursor-not-allowed'}`}
                         >
-                          <div className="w-10 h-10 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm group-hover:shadow-md group-hover:border-blue-200 transition-all">
-                            <img
-                              src={getServiceLogo(service.code || service.name)}
-                              alt={service.name}
-                              className="w-7 h-7 object-contain"
-                              onError={(e) => handleLogoError(e, service.code || service.name)}
-                            />
-                            <span className="text-lg hidden items-center justify-center">{getServiceIcon(service.code || service.name)}</span>
+                          <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                            <div className="w-11 h-11 bg-gray-50 border border-gray-200/60 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 shadow-2xs group-hover:bg-[#00A3FF]/10 transition-colors">
+                              <img
+                                src={getServiceLogo(service.code || service.name)}
+                                alt={service.name}
+                                className="w-6 h-6 object-contain"
+                                onError={(e) => handleLogoError(e, service.code || service.name)}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-bold text-sm text-gray-900 truncate transition-colors ${service.count > 0 ? 'group-hover:text-[#0055FF]' : ''}`}>{service.name}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${service.count > 0 ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                                  {service.count > 0 ? `${service.count.toLocaleString()} disponibles` : 'Rupture de stock'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-gray-900 truncate group-hover:text-blue-600 transition-colors">{service.name}</p>
-                            <p className="text-[11px] text-gray-500 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                              {service.count >= 0 ? `${service.count.toLocaleString()} ${t('dashboard.numbersAvailable')}` : t('dashboard.available')}
-                            </p>
-                          </div>
-                          <div className="text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all text-sm">
-                            â†’
+                          <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-[#0055FF] group-hover:text-white transition-all flex-shrink-0">
+                            <ChevronRight className="w-4 h-4" />
                           </div>
                         </div>
                       ))
@@ -2356,62 +2400,114 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center justify-between mb-3 text-[11px] text-gray-500 px-2 font-medium">
-                            <span>{t('dashboard.countrySuccessRate')}</span>
-                            <span>{t('dashboard.price')}</span>
+                          <div className="mb-4 p-4 bg-white border border-gray-200/80 rounded-2xl flex items-center justify-between shadow-2xs">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0055FF] to-[#00A3FF] flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                                <Trophy className="w-4 h-4 text-white" />
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-black text-gray-900 tracking-wide uppercase">
+                                  Classement par Réussite SMS
+                                </h4>
+                                <p className="text-[11px] text-gray-500 mt-0.5">
+                                  Ordre d'activation optimisé pour <span className="font-bold text-gray-900">{selectedService?.name}</span>
+                                </p>
+                              </div>
+                            </div>
                           </div>
 
                           {filteredCountries.length === 0 ? (
                             <div className="text-center py-12">
-                              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                <span className="text-2xl">🌍</span>
+                              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400">
+                                <Search className="w-6 h-6" />
                               </div>
                               <p className="text-sm text-gray-500">{t('dashboard.noCountryAvailable')}</p>
                             </div>
                           ) : (
                             <div className="space-y-2.5 max-h-[calc(100vh-500px)] overflow-y-auto pr-1">
-                              {filteredCountries.map((country) => {
+                              {filteredCountries.map((country, idx) => {
                                 const hasStock = (country.count || 0) > 0;
+                                const rankPos = (country as any).rank || (idx + 1);
+                                const isTop1 = rankPos === 1 && hasStock;
+                                const isTop3 = rankPos <= 3 && hasStock;
+
                                 return (
                                   <div
                                     key={country.id}
                                     onClick={() => hasStock && handleCountrySelect(country)}
-                                    className={`group bg-white border-2 rounded-xl p-3.5 flex items-center justify-between transition-all duration-300 ${hasStock
-                                      ? 'border-gray-100 cursor-pointer hover:border-green-400 hover:shadow-lg hover:shadow-green-100/50 hover:scale-[1.01]'
-                                      : 'border-gray-100 opacity-50 cursor-not-allowed'
+                                    className={`group p-4 rounded-2xl border transition-all flex items-center justify-between ${hasStock
+                                      ? isTop1
+                                        ? 'bg-gradient-to-r from-[#00A3FF]/5 via-white to-white border-[#00A3FF]/40 shadow-2xs cursor-pointer hover:border-[#0055FF] hover:shadow-sm active:scale-[0.99]'
+                                        : 'bg-white border-gray-200/80 shadow-2xs cursor-pointer hover:border-gray-300 hover:shadow-sm active:scale-[0.99]'
+                                      : 'bg-gray-50/60 border-gray-100 opacity-50 grayscale cursor-not-allowed'
                                       }`}
                                   >
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                      <div className="w-12 h-9 rounded-lg border border-gray-200 overflow-hidden bg-white flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
+                                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                                      {/* Rank Indicator */}
+                                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-extrabold flex-shrink-0 ${isTop1
+                                        ? 'bg-[#0055FF] text-white shadow-2xs'
+                                        : isTop3
+                                          ? 'bg-gray-900 text-white'
+                                          : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                        #{rankPos}
+                                      </div>
+
+                                      {/* Flag Container */}
+                                      <div className="w-11 h-8 rounded-lg border border-gray-200/80 overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 shadow-2xs">
                                         <img
                                           src={getCountryFlag(country.name)}
                                           alt={country.name}
                                           className="w-full h-full object-cover"
                                           onError={(e) => {
-                                            const target = e.target as HTMLImageElement
-                                            target.style.display = 'none'
-                                            const emoji = target.nextElementSibling as HTMLSpanElement
-                                            if (emoji) emoji.style.display = 'flex'
+                                            const target = e.target as HTMLImageElement;
+                                            target.style.display = 'none';
                                           }}
                                         />
-                                        <span className="text-2xl hidden items-center justify-center">{getFlagEmoji(country.name)}</span>
                                       </div>
+
                                       <div className="flex-1 min-w-0">
-                                        <p className={`font-bold text-sm truncate transition-colors ${hasStock ? 'text-gray-900 group-hover:text-green-600' : 'text-gray-400'}`}>{country.name}</p>
-                                        <p className={`text-xs flex items-center gap-1 ${hasStock ? 'text-green-600' : 'text-gray-400'}`}>
-                                          <span className={`w-1.5 h-1.5 rounded-full ${hasStock ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
-                                          {hasStock
-                                            ? `${country.count.toLocaleString()} ${t('dashboard.numbersAvailable')}`
-                                            : t('dashboard.noStock')}
-                                        </p>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <p className={`font-bold text-sm tracking-tight truncate transition-colors ${hasStock ? 'text-gray-900 group-hover:text-[#0055FF]' : 'text-gray-400'}`}>
+                                            {country.name}
+                                          </p>
+                                          {isTop1 && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00A3FF]/10 border border-[#00A3FF]/20 text-[#0055FF] text-[10px] font-black uppercase tracking-wider">
+                                              <Award className="w-3 h-3 text-[#0055FF]" />
+                                              1er Rang
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                          <p className={`text-xs flex items-center gap-1.5 ${hasStock ? 'text-gray-600 font-medium' : 'text-gray-400'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${hasStock ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+                                            {hasStock
+                                              ? `${country.count.toLocaleString()} ${t('dashboard.numbersAvailable')}`
+                                              : t('dashboard.noStock')}
+                                          </p>
+                                          {hasStock && (
+                                            country.successRate !== null && country.successRate !== undefined ? (
+                                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/90 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                                                <TrendingUp className="w-3 h-3 text-emerald-600" />
+                                                {country.successRate}% Réussite
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                --% Réussite
+                                              </span>
+                                            )
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-base flex-shrink-0 shadow-lg transition-shadow ${hasStock
-                                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-blue-500/30 group-hover:shadow-xl group-hover:shadow-blue-500/40'
-                                      : 'bg-gray-200 text-gray-400 shadow-none'
+
+                                    <div className={`px-3.5 py-2 rounded-xl font-bold transition-all flex-shrink-0 ${hasStock
+                                      ? 'bg-gradient-to-r from-[#0055FF] to-[#00A3FF] text-white shadow-sm shadow-[#00A3FF]/25 group-hover:from-[#0044CC] group-hover:to-[#0088CC] group-hover:shadow-md'
+                                      : 'bg-gray-100 border border-gray-200 text-gray-400'
                                       }`}>
-                                      <span>{Math.floor(country.price || 0)}</span>
-                                      <span className="text-xs opacity-80">Ⓐ</span>
+                                      <span className="text-sm font-black tracking-tight">{Math.floor(country.price || 0)}</span>
+                                      <span className="text-xs ml-0.5 font-normal opacity-90">Ⓐ</span>
                                     </div>
                                   </div>
                                 );
@@ -2493,7 +2589,7 @@ export default function DashboardPage() {
                       <Button
                         onClick={handleActivate}
                         className={`w-full h-16 text-white text-lg font-bold rounded-2xl flex items-center justify-between px-6 shadow-xl transition-all duration-300 hover:scale-[1.02] ${mode === 'rent'
-                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-purple-500/30'
+                          ? 'bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 shadow-cyan-500/30'
                           : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/30'
                           }`}
                       >
@@ -2536,14 +2632,23 @@ export default function DashboardPage() {
         <div className="p-4 lg:p-8">
           {/* Header avec titre et compteur - Seulement si des numéros actifs */}
           {activeNumbers.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
-              <div>
-                <h2 className="text-xl lg:text-2xl font-bold text-gray-900">{t('dashboard.activeNumbers')}</h2>
-                <p className="text-sm text-gray-500">{t('dashboard.manageNumbers')}</p>
-              </div>
-              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                {activeNumbers.length} {t('dashboard.active')}
+            <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+                    {t('dashboard.activeNumbers')}
+                  </h2>
+                  <div className="bg-green-100/50 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1 rounded-full text-[13px] font-bold flex items-center gap-2 border border-green-200/50 dark:border-green-800">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    {activeNumbers.length} {t('dashboard.active')}
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                  {t('dashboard.manageNumbers')}
+                </p>
               </div>
             </div>
           )}
@@ -2740,14 +2845,23 @@ export default function DashboardPage() {
                 const hasMessages = num.type === 'rental' && (rentMessages.length > 0 || (num.messageCount && num.messageCount > 0));
                 const isReceived = hasCode || hasMessages;
 
+                const remainingSeconds = getRealTimeRemaining(num.expiresAt);
+                const remainingMinutes = Math.floor(remainingSeconds / 60);
+
                 return (
-                  <div key={num.id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm ${isReceived ? 'border-blue-200' : 'border-gray-100'}`}>
-                    {/* Row 1: Logo + Service + Country | Timer + Menu */}
-                    <div className="px-4 py-2.5 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {/* Logo with flag */}
+                  <div
+                    key={num.id}
+                    className={`rounded-3xl border-2 transition-all duration-300 overflow-hidden ${
+                      isReceived
+                        ? 'bg-gradient-to-b from-emerald-50/60 via-white to-white border-emerald-400 shadow-xl shadow-emerald-500/10'
+                        : 'bg-white border-gray-200/80 shadow-md hover:shadow-lg'
+                    }`}
+                  >
+                    {/* Header Row: Logo, Service, Country & Live Time Badge */}
+                    <div className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100">
+                      <div className="flex items-center gap-3.5">
                         <div className="relative flex-shrink-0">
-                          <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${num.type === 'rental' ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
                             <img
                               src={getServiceLogo(num.service.toLowerCase())}
                               alt={num.service}
@@ -2755,165 +2869,210 @@ export default function DashboardPage() {
                               onError={(e) => handleLogoError(e, num.service.toLowerCase())}
                             />
                           </div>
-                          <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-md border-2 border-white overflow-hidden bg-white shadow-sm flex items-center justify-center">
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white overflow-hidden shadow-sm flex items-center justify-center bg-white">
                             <img
                               src={getCountryFlag(num.country)}
                               alt={num.country}
                               className="w-full h-full object-cover"
                               onError={(e) => handleFlagError(e)}
                             />
-                            <span className="text-xs hidden items-center justify-center">{getFlagEmoji(num.country)}</span>
                           </div>
                         </div>
 
-                        {/* Service name + country */}
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900">{getServiceName(num.service)}</h3>
+                            <h3 className="font-extrabold text-gray-900 text-base sm:text-lg leading-tight">
+                              {getServiceName(num.service)}
+                            </h3>
                             {num.type === 'rental' && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
-                                RENT
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-700">
+                                Location {num.durationHours ? `${num.durationHours}H` : ''}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                          <p className="text-xs text-gray-500 mt-1 font-semibold flex items-center gap-1.5">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                             {getCountryName(num.country)}
                           </p>
                         </div>
                       </div>
 
-                      {/* Timer + Menu */}
-                      <div className="flex items-center gap-1.5">
-                        {(num.status === 'waiting' || num.status === 'pending' || num.status === 'active') && (
-                          <div className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium">
-                            <Clock className="h-3.5 w-3.5" />
+                      {/* Live Status Badge */}
+                      <div className="flex items-center gap-2">
+                        {isReceived ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider border border-emerald-200 shadow-sm">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-bounce" />
+                            <span>SMS REÇU</span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 text-[#0055FF] text-xs font-bold border border-blue-200 shadow-sm">
+                            <Clock className="w-3.5 h-3.5 animate-pulse" />
                             <span>
-                              {(() => {
-                                const remainingSeconds = getRealTimeRemaining(num.expiresAt);
-                                const remainingMinutes = Math.floor(remainingSeconds / 60);
-                                const totalHours = Math.floor(remainingSeconds / 3600);
-
-                                // Pour les rentals ou temps > 1h, afficher en heures/jours
-                                if (num.type === 'rental' || remainingMinutes >= 60) {
-                                  const days = Math.floor(totalHours / 24);
-                                  const hours = totalHours % 24;
-                                  const mins = Math.floor((remainingSeconds % 3600) / 60);
-
-                                  // Afficher en jours si > 24h
-                                  if (days > 0) {
-                                    return `${days}j ${hours}h`;
-                                  }
-                                  return mins > 0 ? `${hours}h${mins.toString().padStart(2, '0')}` : `${hours}h`;
-                                }
-                                // Afficher en secondes si moins d'une minute
-                                if (remainingMinutes < 1) {
-                                  return `${remainingSeconds}s`;
-                                }
-                                return `${remainingMinutes} min`;
-                              })()}
+                              Expire dans {remainingMinutes > 0 ? `${remainingMinutes} min` : `${remainingSeconds}s`}
                             </span>
                           </div>
                         )}
+                      </div>
+                    </div>
 
-                        {/* Menu dropdown */}
-                        {num.type === 'rental' ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="w-8 h-8 hover:bg-gray-100 rounded-lg flex items-center justify-center transition-colors">
-                                <MoreVertical className="h-4 w-4 text-gray-400" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                              <DropdownMenuItem
-                                onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service)}
-                                className="cursor-pointer"
-                              >
-                                <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
-                                <span>Voir messages</span>
-                              </DropdownMenuItem>
-                              {/* Bouton conditionnel Annuler/Terminer selon l'âge du rental */}
-                              {(() => {
-                                const minutesElapsed = calculateMinutesElapsed(num.createdAt);
-                                // Si un SMS est arrivé avant 20 minutes, on force le bouton Terminer
-                                const canRefund = minutesElapsed <= 20 && !hasMessages;
+                    {/* Phone Number Banner (Ultra-Visible & One-Click Copy) */}
+                    <div className="p-4 sm:p-5 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="text-center sm:text-left">
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400 block mb-1">
+                          Numéro de téléphone attribué
+                        </span>
+                        <span className="text-xl sm:text-2xl font-mono font-black tracking-wider select-all text-white">
+                          {formatPhoneNumber(num.phone)}
+                        </span>
+                      </div>
 
-                                return canRefund ? (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setRentalToCancel({
-                                        rentalId: num.rentalId,
-                                        phone: num.phone,
-                                        createdAt: num.createdAt,
-                                        frozenAmount: num.frozenAmount
-                                      });
-                                      setShowCancelRentalDialog(true);
-                                    }}
-                                    className="cursor-pointer text-green-600"
-                                  >
-                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                    <span>Annuler & Rembourser</span>
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setRentalToFinish({ rentalId: num.rentalId, phone: num.phone });
-                                      setShowFinishRentalDialog(true);
-                                    }}
-                                    className="cursor-pointer text-red-600"
-                                  >
-                                    <X className="h-4 w-4 mr-2" />
-                                    <span>Terminer</span>
-                                  </DropdownMenuItem>
-                                );
-                              })()}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          copyToClipboard(num.phone, 'phone');
+                          setCopiedPhoneId(num.id);
+                          setTimeout(() => setCopiedPhoneId(null), 2500);
+                        }}
+                        className={`h-11 px-5 rounded-xl font-extrabold transition-all shadow-md flex items-center gap-2 ${
+                          copiedPhoneId === num.id
+                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                            : 'bg-[#0055FF] hover:bg-[#0044CC] text-white'
+                        }`}
+                      >
+                        {copiedPhoneId === num.id ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span>Copié !</span>
+                          </>
                         ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="w-8 h-8 hover:bg-gray-100 rounded-lg flex items-center justify-center transition-colors">
-                                <MoreVertical className="h-4 w-4 text-gray-400" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                              {!hasCode && (
-                                <DropdownMenuItem
-                                  onClick={async () => {
-                                    try {
-                                      console.log('[CHECK-STATUS] Sending activationId:', num.id, '(orderId:', num.orderId, ')');
-                                      const { data, error } = await cloudFunctions.invoke('check-sms-activate-status', {
-                                        body: { activationId: num.id, userId: user?.id }
-                                      });
-                                      if (error) throw error;
-                                      toast({ title: 'Statut vérifié', description: data?.smsCode ? 'SMS reçu !' : 'En attente...' });
-                                      refetchActivations();
-                                    } catch (e: any) {
-                                      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                          <>
+                            <Copy className="w-4 h-4" />
+                            <span>Copier le numéro</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* SMS Status / Live Waiting Area */}
+                    <div className="p-4 sm:p-5">
+                      {num.type === 'rental' ? (
+                        hasMessages ? (
+                          <button
+                            onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service)}
+                            className="w-full px-5 py-4 flex items-center justify-between text-purple-800 bg-purple-50 border-2 border-purple-200 rounded-2xl font-bold hover:bg-purple-100 transition-all shadow-sm"
+                          >
+                            <div className="flex items-center gap-3">
+                              <MessageSquare className="w-5 h-5 text-purple-600" />
+                              <span>{rentMessages.length || num.messageCount} messages reçus — Cliquez pour consulter</span>
+                            </div>
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <div className="w-full bg-blue-50/70 border border-blue-200/80 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                            <div className="flex items-center gap-3.5">
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                <Loader2 className="w-5 h-5 text-[#0055FF] animate-spin" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-extrabold text-gray-900">En attente de SMS sur cette location...</p>
+                                <p className="text-xs text-gray-500 font-medium mt-0.5">Mise à jour automatique en continu</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        hasCode ? (
+                          /* SMS CODE RECEIVED HERO BOX */
+                          <div className="bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 sm:p-6 text-center sm:text-left shadow-inner">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                              <div>
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-200/80 text-emerald-900 text-xs font-black uppercase tracking-wider mb-2">
+                                  ✓ Code Reçu
+                                </div>
+                                <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-900 tracking-tight select-all">
+                                  {num.smsCode?.includes('STATUS_OK:') ? num.smsCode.split(':')[1] : num.smsCode}
+                                </div>
+                              </div>
+
+                              <Button
+                                type="button"
+                                onClick={() => {
+                                  const cleanCode = num.smsCode?.includes('STATUS_OK:')
+                                    ? num.smsCode.split(':')[1]
+                                    : num.smsCode || '';
+                                  copyToClipboard(cleanCode, 'code');
+                                  setCopiedCodeId(num.id);
+                                  setTimeout(() => setCopiedCodeId(null), 2500);
+                                }}
+                                className={`h-12 px-6 rounded-xl font-extrabold text-sm transition-all shadow-md flex items-center gap-2 ${
+                                  copiedCodeId === num.id
+                                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                }`}
+                              >
+                                {copiedCodeId === num.id ? (
+                                  <>
+                                    <Check className="w-4 h-4" />
+                                    <span>Code Copié !</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-4 h-4" />
+                                    <span>Copier le Code</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* LIVE WAITING & ACTION BAR */
+                          <div className="bg-blue-50/60 border border-blue-200/70 rounded-2xl p-4 sm:p-5 space-y-4">
+                            <div className="flex items-start gap-3.5">
+                              <div className="w-10 h-10 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <Activity className="w-5 h-5 text-[#0055FF] animate-pulse" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-extrabold text-gray-900">
+                                  📡 En attente de votre SMS en direct...
+                                </h4>
+                                <p className="text-xs text-gray-600 font-medium mt-1 leading-relaxed">
+                                  Entrez le numéro ci-dessus dans l&apos;application <span className="font-bold text-gray-900">{getServiceName(num.service)}</span>. Dès que le SMS arrive, il s&apos;affichera automatiquement ici.
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Direct Actions: Check Now & Cancel/Refund */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-blue-100">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={async () => {
+                                  try {
+                                    const { data, error } = await cloudFunctions.invoke(`check-${num.provider}-status`, {
+                                      body: { activationId: num.id, userId: user?.id }
+                                    });
+                                    if (error) throw error;
+                                    if (data?.smsCode) {
+                                      toast({ title: 'SMS Reçu !', description: 'Le code SMS est maintenant disponible.', variant: 'success' });
+                                    } else {
+                                      toast({ title: 'Vérification terminée', description: 'En attente, aucun SMS pour l\'instant...', variant: 'info' });
                                     }
-                                  }}
-                                  className="cursor-pointer"
-                                >
-                                  <RefreshCw className="h-4 w-4 mr-2 text-blue-500" />
-                                  <span>Vérifier SMS</span>
-                                </DropdownMenuItem>
-                              )}
-                              {hasCode ? (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setHiddenNumbers(prev => new Set(prev).add(num.id));
-                                    toast({ title: 'Numéro masqué' });
-                                  }}
-                                  className="cursor-pointer"
-                                >
-                                  <X className="h-4 w-4 mr-2 text-gray-500" />
-                                  <span>Masquer</span>
-                                </DropdownMenuItem>
-                              ) : canCancelActivation(num.expiresAt) ? (
-                                <DropdownMenuItem
+                                    refetchActivations();
+                                  } catch (e: any) {
+                                    toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                  }
+                                }}
+                                className="w-full sm:w-auto h-10 px-4 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 border-blue-200 text-[#0055FF]"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                                <span>⚡ Vérifier maintenant</span>
+                              </Button>
+
+                              {canCancelActivation(num.expiresAt) ? (
+                                <Button
+                                  type="button"
                                   onClick={async () => {
                                     try {
-                                      // Use provider-specific cancel function
                                       let cancelFunction = 'cancel-sms-activate-order';
                                       if (num.provider === '5sim') cancelFunction = 'cancel-5sim-order';
                                       else if (num.provider === 'grizzly') cancelFunction = 'cancel-grizzly-order';
@@ -2925,91 +3084,27 @@ export default function DashboardPage() {
                                         body: { activationId: num.id, orderId: num.orderId, userId: user?.id }
                                       });
                                       if (error || !data?.success) throw new Error(data?.error || error?.message);
-                                      toast({ title: 'Activation annulée' });
+                                      showStatusFeedback('cancelled');
                                       refetchActivations();
                                     } catch (e: any) {
                                       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                     }
                                   }}
-                                  className="cursor-pointer text-red-600"
+                                  className="w-full sm:w-auto h-10 px-4 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 shadow-none"
                                 >
-                                  <X className="h-4 w-4 mr-2" />
-                                  <span>Annuler</span>
-                                </DropdownMenuItem>
+                                  <X className="w-3.5 h-3.5 mr-1.5" />
+                                  <span>🛡️ Annuler & Rembourser (Gratuit)</span>
+                                </Button>
                               ) : (
-                                <DropdownMenuItem
-                                  disabled
-                                  className="cursor-not-allowed opacity-50"
-                                >
-                                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                                  <span className="text-xs">Annuler dans {Math.ceil((300 - getTimeElapsedSinceCreation(num.expiresAt)) / 60)}min</span>
-                                </DropdownMenuItem>
+                                <span className="text-xs text-gray-400 font-medium">
+                                  Annulation dans {Math.ceil((300 - getTimeElapsedSinceCreation(num.expiresAt)) / 60)} min
+                                </span>
                               )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
+                            </div>
+                          </div>
+                        )
+                      )}
                     </div>
-
-                    {/* Row 2: Phone number with gray background */}
-                    <div className="mx-4 mb-3 px-4 py-2.5 bg-gray-50 rounded-xl flex items-center justify-center gap-2">
-                      <span className="font-mono text-base font-bold text-gray-900 tracking-wide">
-                        {formatPhoneNumber(num.phone)}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(num.phone, 'phone')}
-                        className="w-8 h-8 bg-gray-200 hover:bg-gray-300 rounded-lg flex items-center justify-center transition-colors"
-                      >
-                        <Copy className="h-4 w-4 text-gray-600" />
-                      </button>
-                    </div>
-
-                    {/* Row 3: Status bar - Different styles for waiting vs received */}
-                    {num.type === 'rental' ? (
-                      /* RENTAL */
-                      hasMessages ? (
-                        <button
-                          onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service)}
-                          className="w-full px-4 py-2.5 flex items-center justify-center gap-2 text-green-700 font-medium bg-green-50 border-t border-green-100"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          <span>{rentMessages.length || num.messageCount} {(rentMessages.length || num.messageCount || 0) === 1 ? 'message reçu' : 'messages reçus'}</span>
-                        </button>
-                      ) : (
-                        <div className="px-4 py-2.5 flex items-center justify-center gap-2 text-amber-600 bg-amber-50/80 border-t border-amber-100/50">
-                          <div className="w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="font-medium text-sm">{t('dashboard.waitingForSMS')}</span>
-                        </div>
-                      )
-                    ) : (
-                      /* ACTIVATION */
-                      hasCode ? (
-                        <button
-                          onClick={() => {
-                            const cleanCode = num.smsCode?.includes('STATUS_OK:')
-                              ? num.smsCode.split(':')[1]
-                              : num.smsCode || '';
-                            copyToClipboard(cleanCode, 'code');
-                          }}
-                          className="w-full px-4 py-2.5 flex items-center justify-center gap-2 text-blue-700 font-medium bg-blue-50 border-t border-blue-100"
-                        >
-                          <span className="font-mono font-bold tracking-wider">
-                            {num.smsCode?.includes('STATUS_OK:') ? num.smsCode.split(':')[1] : num.smsCode}
-                          </span>
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      ) : (num.status === 'waiting' || num.status === 'pending') ? (
-                        <div className="px-4 py-2.5 flex items-center justify-center gap-2 text-amber-600 bg-amber-50/80 border-t border-amber-100/50">
-                          <div className="w-3.5 h-3.5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="font-medium text-sm">{t('dashboard.waitingForSMS')}</span>
-                        </div>
-                      ) : num.status === 'timeout' ? (
-                        <div className="px-4 py-2.5 flex items-center justify-center gap-2 text-gray-500 bg-gray-50 border-t border-gray-100">
-                          <Clock className="w-4 h-4" />
-                          <span className="font-medium text-sm">{t('dashboard.noSMS')}</span>
-                        </div>
-                      ) : null
-                    )}
                   </div>
                 );
               })}
@@ -3115,8 +3210,8 @@ export default function DashboardPage() {
                     return (
                       <div key={index} className="bg-white rounded-xl p-4 shadow-sm">
                         {/* Code Section */}
-                        {extractedCode && (
-                          <div className="mb-3 pb-3 border-b border-gray-100">
+                        {extractedCode ? (
+                          <div className="mb-1">
                             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Code</p>
                             <div className="flex items-center justify-between">
                               <span className="text-3xl font-mono font-bold text-gray-900 tracking-wider">{extractedCode}</span>
@@ -3134,10 +3229,9 @@ export default function DashboardPage() {
                               </button>
                             </div>
                           </div>
+                        ) : (
+                          <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{decodedText}</p>
                         )}
-
-                        {/* Message */}
-                        <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{decodedText}</p>
 
                         {/* Footer */}
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
@@ -3191,56 +3285,61 @@ export default function DashboardPage() {
       </Dialog>
 
       {/* Dialog de solde insuffisant */}
+      {/* Dialog de solde insuffisant - PREMIUM REDESIGN */}
       <Dialog open={showInsufficientBalanceDialog} onOpenChange={setShowInsufficientBalanceDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-2 sm:gap-3 mb-2">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+        <DialogContent className="sm:max-w-md border-0 p-0 overflow-hidden shadow-[0_0_50px_-12px_rgba(37,99,235,0.5)]">
+          {/* Header avec Dégradé */}
+          <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-6 text-white text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-full bg-white/5 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30"></div>
+            
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-xl border border-white/20">
+                <Wallet className="w-8 h-8 text-white" />
               </div>
-              <DialogTitle className="text-lg sm:text-xl">{t('insufficientBalance.title')}</DialogTitle>
+              <DialogTitle className="text-2xl font-black tracking-tight">{t('insufficientBalance.title')}</DialogTitle>
+              <DialogDescription className="text-blue-100 font-medium mt-1 text-sm px-4">
+                {t('insufficientBalance.description')}
+              </DialogDescription>
             </div>
-            <DialogDescription className="text-sm sm:text-base">
-              {t('insufficientBalance.description')}
-            </DialogDescription>
-          </DialogHeader>
+          </div>
 
-          {insufficientBalanceData && (
-            <div className="space-y-2 sm:space-y-3 py-3 sm:py-4">
-              <div className="flex justify-between items-center p-2.5 sm:p-3 bg-muted rounded-lg">
-                <span className="text-sm text-muted-foreground">{t('insufficientBalance.needed')}</span>
-                <span className="font-bold text-base sm:text-lg">{insufficientBalanceData.needed} Ⓐ</span>
+          <div className="p-6 bg-white dark:bg-gray-950 space-y-6">
+            {insufficientBalanceData && (
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-4 space-y-3 border border-gray-100 dark:border-gray-800">
+                <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-800">
+                  <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{t('insufficientBalance.needed')}</span>
+                  <span className="font-black text-lg text-gray-900 dark:text-white">{insufficientBalanceData.needed} Ⓐ</span>
+                </div>
+                <div className="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-800">
+                  <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{t('insufficientBalance.available')}</span>
+                  <span className="font-black text-lg text-gray-900 dark:text-white">{insufficientBalanceData.available} Ⓐ</span>
+                </div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-sm font-black text-red-500 uppercase tracking-widest">{t('insufficientBalance.missing')}</span>
+                  <span className="font-black text-xl text-red-600 dark:text-red-400">{insufficientBalanceData.missing} Ⓐ</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center p-2.5 sm:p-3 bg-muted rounded-lg">
-                <span className="text-sm text-muted-foreground">{t('insufficientBalance.available')}</span>
-                <span className="font-semibold text-base sm:text-lg">{insufficientBalanceData.available} Ⓐ</span>
-              </div>
-              <div className="flex justify-between items-center p-2.5 sm:p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-900/50">
-                <span className="text-sm text-red-600 dark:text-red-400 font-medium">{t('insufficientBalance.missing')}</span>
-                <span className="font-bold text-base sm:text-lg text-red-600 dark:text-red-400">{insufficientBalanceData.missing} Ⓐ</span>
-              </div>
-            </div>
-          )}
+            )}
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowInsufficientBalanceDialog(false)}
-              className="w-full sm:w-auto order-2 sm:order-1"
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              onClick={() => {
-                setShowInsufficientBalanceDialog(false);
-                navigate('/top-up');
-              }}
-              className="w-full sm:w-auto gap-2 order-1 sm:order-2"
-            >
-              <Wallet className="w-4 h-4" />
-              {t('insufficientBalance.topUp')}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="flex gap-3 sm:gap-3 flex-row pt-2">
+              <button
+                onClick={() => setShowInsufficientBalanceDialog(false)}
+                className="flex-1 py-4 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={() => {
+                  setShowInsufficientBalanceDialog(false);
+                  navigate('/top-up');
+                }}
+                className="flex-[2] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-xl py-4 shadow-xl shadow-blue-500/30 transition-all active:scale-95 flex justify-center items-center gap-2"
+              >
+                <Wallet className="w-5 h-5" />
+                {t('insufficientBalance.topUp')}
+              </button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -3249,10 +3348,10 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
-              {t('modals.finishRental.title')}
+              Terminer la location ?
             </DialogTitle>
             <DialogDescription className="text-base text-gray-600 mt-2">
-              {t('modals.finishRental.description')}
+              <><span className="block text-red-600 font-semibold mb-2">⚠️ Attention : Action Définitive</span>Si vous terminez cette location, l'argent sera <strong className="text-gray-900">définitivement débité</strong> de votre solde et vous ne pourrez plus annuler ni demander de remboursement. Êtes-vous sûr de vouloir continuer ?</>
             </DialogDescription>
           </DialogHeader>
 
@@ -3343,10 +3442,13 @@ export default function DashboardPage() {
                   <p className="font-mono font-medium text-gray-900">{rentalToCancel.phone}</p>
                   <p className="text-sm text-green-600 font-medium">
                     {(() => {
+                      if (rentalToCancel.messageCount > 0) {
+                        return <span className="text-orange-500">⚠️ Annulation sans remboursement (SMS déjà reçu)</span>;
+                      }
                       const minutesLeft = 20 - calculateMinutesElapsed(rentalToCancel.createdAt);
                       return minutesLeft > 0
                         ? `✅ Remboursement possible (${minutesLeft}min restantes)`
-                        : '⚠️ Période de grâce expirée';
+                        : <span className="text-red-500">⚠️ Période de grâce expirée</span>;
                     })()}
                   </p>
                   {rentalToCancel.frozenAmount && (
@@ -3418,6 +3520,9 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <SmsRevealPopup />
+      <StatusFeedbackModal />
     </div>
   );
 }

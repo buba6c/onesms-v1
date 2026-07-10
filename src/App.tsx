@@ -20,6 +20,9 @@ import TermsPage from '@/pages/TermsPage'
 import PrivacyPage from '@/pages/PrivacyPage'
 import ContactPage from '@/pages/ContactPage'
 import UnsubscribePage from '@/pages/UnsubscribePage'
+import ExportUIPage from '@/pages/ExportUIPage'
+import ApiDocumentation from '@/pages/ApiDocumentation'
+import SmsActivateAlternative from '@/pages/landing/SmsActivateAlternative'
 import PrivateRoute from '@/components/PrivateRoute'
 import AdminRoute from '@/components/AdminRoute'
 import { useFeatures } from '@/hooks/useFeatures'
@@ -53,6 +56,7 @@ const RentPage = lazy(() => import('@/pages/RentPage'))
 const MenuPage = lazy(() => import('@/pages/MenuPage'))
 const WavePaymentProof = lazy(() => import('@/pages/WavePaymentProof'))
 const BuyNumberPage = lazy(() => import('@/pages/BuyNumberPage'))
+const ApiDashboard = lazy(() => import('@/pages/user/ApiDashboard'))
 
 // Admin pages - lazy loaded
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
@@ -78,13 +82,16 @@ const AdminPromoCodes = lazy(() => import('@/pages/admin/AdminPromoCodes'))
 const AdminPaymentProviders = lazy(() => import('@/pages/admin/AdminPaymentProviders'))
 const AdminWavePayments = lazy(() => import('@/pages/admin/AdminWavePayments'))
 const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'))
+const AdminApiManager = lazy(() => import('@/pages/admin/AdminApiManager'))
+const AdminAnnouncements = lazy(() => import('@/pages/admin/AnnouncementsManager').then(m => ({ default: m.AnnouncementsManager })))
 
 // OPTIMIZATION: Configure staleTime and gcTime for caching
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false, // Don't refetch on window focus
-      retry: 1,
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 5000),
       staleTime: 60 * 1000, // 1 minute: Data is considered fresh for 1 min
       gcTime: 10 * 60 * 1000, // 10 minutes: Keep unused data in garbage collector
     },
@@ -105,6 +112,7 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Routes */}
+            <Route path="/export-ui" element={<ExportUIPage />} />
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
               <Route path="login" element={<LoginPage />} />
@@ -119,6 +127,8 @@ function App() {
               <Route path="unsubscribe" element={<UnsubscribePage />} />
               <Route path="terms" element={<TermsPage />} />
               <Route path="privacy" element={<PrivacyPage />} />
+              <Route path="api-docs" element={<ApiDocumentation />} />
+              <Route path="sms-activate-alternative" element={<SmsActivateAlternative />} />
 
               {/* Protected Routes - Main Dashboard becomes home after login */}
               <Route element={<PrivateRoute />}>
@@ -135,6 +145,7 @@ function App() {
                 <Route path="referral" element={<ReferralPage />} />
                 <Route path="menu" element={<MenuPage />} />
                 <Route path="buy" element={<BuyNumberPage />} />
+                <Route path="api-dashboard" element={<ApiDashboard />} />
               </Route>
             </Route>
 
@@ -143,6 +154,7 @@ function App() {
               <Route index element={<AdminDashboard />} />
               <Route path="monitoring" element={<AdminMonitoring />} />
               <Route path="users" element={<AdminUsers />} />
+              <Route path="announcements" element={<AdminAnnouncements />} />
               <Route path="providers" element={<AdminProviders />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="countries" element={<AdminCountries />} />
@@ -163,6 +175,7 @@ function App() {
               <Route path="promo-codes" element={<AdminPromoCodes />} />
               <Route path="payment-providers" element={<AdminPaymentProviders />} />
               <Route path="support" element={<AdminSupport />} />
+              <Route path="api-manager" element={<AdminApiManager />} />
             </Route>
           </Routes>
         </Suspense>

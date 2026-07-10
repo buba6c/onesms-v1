@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { resetPasswordForEmail } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
-import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Mail, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react'
+import AuthLayout from '@/components/layout/AuthLayout'
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation()
@@ -19,7 +19,6 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setLoading(true)
 
-    // Validation email
     if (!email || !email.includes('@')) {
       toast({
         title: 'Email invalide',
@@ -48,85 +47,77 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
-            </div>
-            <CardTitle className="text-green-600">{t('auth.emailSent')}</CardTitle>
-            <CardDescription className="mt-2">
-              {t('auth.resetEmailSentDescription')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-              <p className="font-medium mb-1">{t('auth.checkSpam')}</p>
-              <p className="text-blue-600">{email}</p>
-            </div>
-            
-            <Link to="/login" className="block">
-              <Button variant="outline" className="w-full">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {t('auth.backToLogin')}
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthLayout
+        title={t('auth.emailSent', 'Check your email')}
+        subtitle={t('auth.resetEmailSentDescription', 'We have sent a password reset link to your email address.')}
+      >
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-700">
+            <p className="font-medium mb-1">{t('auth.checkSpam', 'Please check your spam folder if you do not see the email.')}</p>
+            <p className="text-blue-600 font-bold">{email}</p>
+          </div>
+          
+          <Link to="/login" className="block">
+            <Button variant="outline" className="w-full h-12 rounded-xl border-gray-200 hover:bg-gray-50 transition-all font-medium">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              {t('auth.backToLogin', 'Back to login')}
+            </Button>
+          </Link>
+        </div>
+      </AuthLayout>
     )
   }
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-            <Mail className="w-8 h-8 text-primary" />
-          </div>
-          <CardTitle>{t('auth.forgotPasswordTitle')}</CardTitle>
-          <CardDescription>
-            {t('auth.forgotPasswordDescription')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="text-sm font-medium">
-                {t('auth.email')}
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="exemple@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+    <AuthLayout
+      title={t('auth.forgotPasswordTitle', 'Forgot Password?')}
+      subtitle={t('auth.forgotPasswordDescription', "No worries, we'll send you reset instructions.")}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1">
+          <label htmlFor="email" className="text-sm font-medium text-gray-700">
+            {t('auth.email', 'Email')}
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-gray-400" />
             </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('common.loading') : t('auth.sendResetLink')}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center space-y-2">
-            <Link 
-              to="/login" 
-              className="text-sm text-muted-foreground hover:text-primary inline-flex items-center gap-1"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {t('auth.backToLogin')}
-            </Link>
-            <div className="text-sm text-muted-foreground">
-              Pas de compte ?{' '}
-              <Link to="/register" className="text-primary hover:underline">
-                Créer un compte
-              </Link>
-            </div>
+            <Input
+              id="email"
+              type="email"
+              placeholder="eg. alex@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="pl-10 h-12 bg-white border-gray-200 focus:border-blue-500 focus:ring-blue-500 transition-all rounded-xl"
+            />
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        <Button 
+          type="submit" 
+          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl shadow-lg shadow-blue-500/30 transition-all" 
+          disabled={loading}
+        >
+          {loading ? t('common.loading', 'Loading...') : t('auth.sendResetLink', 'Send reset link')}
+        </Button>
+      </form>
+
+      <div className="mt-8 text-center space-y-4">
+        <Link 
+          to="/login" 
+          className="text-sm font-semibold text-gray-500 hover:text-blue-600 inline-flex items-center gap-1 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {t('auth.backToLogin', 'Back to login')}
+        </Link>
+        <div className="text-sm text-gray-500">
+          Pas de compte ?{' '}
+          <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+            Créer un compte
+          </Link>
+        </div>
+      </div>
+    </AuthLayout>
   )
 }

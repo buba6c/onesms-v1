@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
@@ -8,6 +8,8 @@ import { supabase, cloudFunctions } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { formatPhoneNumber } from '@/utils/phoneFormatter';
+import { ExtendRentalModal } from '@/components/ExtendRentalModal';
+
 import { useRealtimeActivations, useRealtimeRentals, useRealtimeTransactions } from '@/hooks/useRealtimeSubscription';
 import {
   Copy,
@@ -215,9 +217,9 @@ export default function HistoryPage() {
     onStatusChange: (activation, _oldStatus) => {
       if (activation.status === 'cancelled' || activation.status === 'timeout') {
         toast({
-          title: activation.status === 'timeout' ? '⏰ Expiration' : '❌ Annulation',
-          description: `${activation.phone} - Crédits remboursés`,
-          variant: 'destructive',
+          title: activation.status === 'timeout' ? 'Expiration du numéro' : 'Annulation du numéro',
+          description: `${activation.phone} - Crédits remboursés avec succès`,
+          variant: 'warning',
           duration: 4000,
         });
       }
@@ -293,6 +295,21 @@ export default function HistoryPage() {
     enabled: !!user?.id
   });
 
+  // Auto-refresh messages when new messages arrive while the modal is open
+  useEffect(() => {
+    if (showRentMessagesModal && selectedRentalForMessages) {
+      // Find the rental in the fresh data from the real-time query
+      const rental = rentals.find(r => r.rent_id === selectedRentalForMessages.rentalId);
+      if (rental) {
+        const cachedCount = rentMessagesCache[selectedRentalForMessages.rentalId]?.length || 0;
+        // If the database says we have more messages than we have in cache, refresh!
+        if (rental.message_count !== cachedCount) {
+          loadRentalMessages(selectedRentalForMessages.rentalId);
+        }
+      }
+    }
+  }, [rentals, showRentMessagesModal, selectedRentalForMessages]);
+
   // Combiner activations + rentals en une liste unifiée triée par date
   const combinedOrders: HistoryItem[] = [
     ...activations.map(a => ({
@@ -318,10 +335,12 @@ export default function HistoryPage() {
       price: r.total_cost || (r.hourly_rate * (r.rent_hours || 1)),
       status: r.status,
       createdAt: r.created_at,
+      updatedAt: ((r as any).updated_at || r.created_at) as string,
       expiresAt: r.end_date,
       type: 'rental' as const,
       messageCount: r.message_count || 0,
-      durationHours: r.rent_hours
+      durationHours: r.rent_hours,
+      metadata: (r as any).metadata
     }))
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -329,7 +348,8 @@ export default function HistoryPage() {
 
   // Fonction pour charger les messages d'un rental
   const loadRentalMessages = async (rentalId: string) => {
-    if (rentMessagesCache[rentalId]) return; // Déjà en cache
+    // Ne pas retourner si déjà en cache, on veut toujours rafraîchir pour avoir les nouveaux messages
+    // if (rentMessagesCache[rentalId]) return;
 
     setLoadingMessages(true);
     try {
@@ -387,7 +407,7 @@ export default function HistoryPage() {
       });
 
       if (error || !data?.success) {
-        throw new Error(data?.error || error?.message || `${provider || 'Provider'} cancellation failed`);
+        throw new Error(data?.error || error?.message || 'Annulation échouée');
       }
 
       // console.log('✅ [CANCEL] 5sim cancellation successful');
@@ -437,6 +457,7 @@ export default function HistoryPage() {
   const [extensionError, setExtensionError] = useState<string | null>(null);
   const [userCanAfford, setUserCanAfford] = useState(true);
   const [maxHoursAvailable, setMaxHoursAvailable] = useState<number | null>(null);
+  const [availableDurations, setAvailableDurations] = useState<{value: number, unit: string}[] | null>(null);
 
   // Fetch extension price when hours change
   const fetchExtensionPrice = async (rentalId: string, hours: number) => {
@@ -474,7 +495,37 @@ export default function HistoryPage() {
         setExtensionPriceLoading(false);
         return;
       }
+      
+      // Extract available durations if provided (either in error or success payload)
+      const availableDurationsArray = data?.availableDurations || data?.data?.availableDurations;
+      if (availableDurationsArray && availableDurationsArray.length > 0) {
+        setAvailableDurations(availableDurationsArray);
+      }
 
+      // Handle available durations array (Smart Auto-Select with Units on Error)
+      if (data?.availableDurations && data.availableDurations.length > 0) {
+        // Normalize durations to handle both new format [{value: 2, unit: 'hour'}] and old format [2, 4]
+        const normalizedDurations = data.availableDurations.map((d: any) => {
+          if (typeof d === 'number' || typeof d === 'string') {
+            return { value: Number(d), unit: 'hour' };
+          }
+          return d;
+        });
+
+        const formattedDurations = normalizedDurations.map((d: any) => `${d.value}${d.unit === 'minute' ? 'm' : 'h'}`);
+        setExtensionError(`Durées disponibles : ${formattedDurations.join(', ')}`);
+        
+        // Auto-select the first available duration value
+        const bestDurationValue = normalizedDurations[0].value;
+        if (hours !== bestDurationValue && !isNaN(bestDurationValue)) {
+          setExtensionHours(String(bestDurationValue));
+          // Instant retry with the valid duration
+          fetchExtensionPrice(rentalId, bestDurationValue);
+          return;
+        }
+        setExtensionPriceLoading(false);
+        return;
+      }
       if (error || !data?.success) {
         throw new Error(data?.error || 'Impossible d\'obtenir le prix');
       }
@@ -504,6 +555,7 @@ export default function HistoryPage() {
     setExtensionHours(String(defaultHours));
     setExtensionPrice(null);
     setExtensionError(null);
+    setAvailableDurations(null);
     setExtendDialogOpen(true);
     // Fetch price for default duration
     fetchExtensionPrice(rental.id, defaultHours);
@@ -565,10 +617,19 @@ export default function HistoryPage() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Statut vérifié',
-        description: data?.smsCode ? 'SMS reçu !' : 'Toujours en attente...'
-      });
+      if (data?.smsCode) {
+        toast({
+          title: 'SMS Reçu !',
+          description: 'Le code SMS est maintenant disponible.',
+          variant: 'success'
+        });
+      } else {
+        toast({
+          title: 'Vérification terminée',
+          description: 'Aucun SMS reçu pour le moment...',
+          variant: 'info' // Using info or loading here
+        });
+      }
 
       await queryClient.invalidateQueries({ queryKey: ['activations-history', user?.id] });
       await queryClient.invalidateQueries({ queryKey: ['orders-history', user?.id] });
@@ -582,11 +643,12 @@ export default function HistoryPage() {
   };
 
   const formatTime = (seconds: number) => {
-    if (seconds <= 0) return '0 min';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  
 
   // Format temps restant pour les rentals (avec jours si > 24h)
   const formatRentalTimeRemaining = (seconds: number): string => {
@@ -1026,25 +1088,9 @@ export default function HistoryPage() {
                   return (
                     <div
                       key={item.id}
-                      className={`bg-card border rounded-xl p-3 sm:px-5 sm:py-4 hover:shadow-md transition-all ${isRental ? 'border-purple-200 dark:border-purple-800' : 'border-border'
+                      className={`bg-white dark:bg-card border rounded-2xl p-4 sm:px-5 sm:py-4 shadow-sm hover:shadow-md transition-all ${isRental ? 'border-purple-200 dark:border-purple-800' : 'border-gray-100 dark:border-border'
                         }`}>
-                      {/* Badge type rental avec temps restant */}
-                      {isRental && (
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-1">
-                            <Home className="w-3 h-3 text-purple-500" />
-                            <span className="text-xs font-medium text-purple-600 dark:text-purple-400">{t('history.rentalHours', { hours: item.durationHours })}</span>
-                          </div>
-                          {actualStatus === 'active' && timeRemaining > 0 && (
-                            <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                              <Clock className="w-3 h-3 text-purple-500" />
-                              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
-                                {formatRentalTimeRemaining(timeRemaining)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+
                       {/* Mobile Layout */}
                       <div className="flex flex-col sm:hidden gap-3">
                         {/* Top row: Logo + Service + Price */}
@@ -1052,17 +1098,16 @@ export default function HistoryPage() {
                           <div className="flex items-center gap-3">
                             {/* Logo + Flag */}
                             <div className="relative flex-shrink-0">
-                              <div className={`w-11 h-11 border rounded-xl flex items-center justify-center ${isRental ? 'bg-purple-50 border-purple-200' : 'bg-muted border-border'
-                                }`}>
+                              <div className={`w-12 h-12 bg-gray-50 border rounded-xl flex items-center justify-center ${isRental ? 'border-purple-200' : 'border-gray-100'}`}>
                                 <img
                                   src={getServiceLogo(item.serviceCode)}
                                   alt={item.serviceCode}
-                                  className="w-6 h-6 object-contain"
+                                  className="w-7 h-7 object-contain"
                                   onError={(e) => handleImageError(e, item.serviceCode)}
                                 />
                                 <span className="text-base hidden items-center justify-center">{getServiceIcon(item.serviceCode)}</span>
                               </div>
-                              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-background overflow-hidden bg-background shadow-md flex items-center justify-center">
+                              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-md border-2 border-white overflow-hidden bg-white shadow-sm flex items-center justify-center">
                                 <img
                                   src={getCountryFlag(item.countryCode)}
                                   alt={item.countryCode}
@@ -1074,16 +1119,26 @@ export default function HistoryPage() {
                             </div>
                             {/* Service Name */}
                             <div>
-                              <p className="font-semibold text-sm text-foreground leading-tight">
-                                {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+                                  {getServiceName(item.serviceCode)}
+                                </h3>
+                                {isRental && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                                    RENT {item.durationHours}H
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                {getCountryName(item.countryCode)}
                               </p>
-                              <p className="text-xs text-muted-foreground">{getCountryName(item.countryCode)}</p>
                             </div>
                           </div>
                           {/* Price + Menu */}
                           <div className="flex items-center gap-2">
-                            <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full ${isRental ? 'bg-purple-100 text-purple-700' : 'bg-muted text-muted-foreground'}`}>
-                              <span className="text-xs font-semibold">{Math.floor(item.price)}</span>
+                            <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full ${isRental ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-muted text-muted-foreground'}`}>
+                              <span className="text-xs font-bold">{Math.floor(item.price)}</span>
                               <span className="text-[10px] ml-0.5">Ⓐ</span>
                             </div>
                             {!isRental ? (
@@ -1148,73 +1203,79 @@ export default function HistoryPage() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             ) : (
-                              // Placeholder bouton désactivé pour garder l'UI cohérente
-                              <button className="p-1.5 rounded-lg opacity-50 cursor-not-allowed" disabled>
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+                                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem
+                                    onClick={() => copyToClipboard(item.phone)}
+                                    className="cursor-pointer text-sm"
+                                  >
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    {t('common.copyNumber')}
+                                  </DropdownMenuItem>
+                                  {['active', 'completed', 'expired'].includes(actualStatus) && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleExtendRental(item.id || '')}
+                                      className="cursor-pointer text-purple-600 font-medium"
+                                    >
+                                      <Clock className="h-4 w-4 mr-2" />
+                                      <span>Prolonger</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                           </div>
                         </div>
 
                         {/* Phone number row */}
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-semibold text-foreground bg-muted px-2.5 py-1 rounded flex-1">
+                        <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl p-1.5 pl-3">
+                          <span className="font-mono text-[15px] font-bold text-gray-800 dark:text-gray-200 tracking-wider">
                             {formatPhoneNumber(item.phone)}
                           </span>
                           <button
                             onClick={() => copyToClipboard(item.phone)}
-                            className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+                            className="p-2 bg-white dark:bg-card shadow-sm border border-gray-100 dark:border-gray-800 rounded-lg text-gray-500 hover:text-primary transition-colors"
                           >
-                            <Copy className="h-4 w-4 text-primary" />
+                            <Copy className="h-4 w-4" />
                           </button>
                         </div>
 
-                        {/* Status / SMS Code row */}
+                        {/* Status / Action row */}
                         <div className="flex items-center justify-between">
                           {isRental ? (
                             /* RENTAL: Afficher messages ou status */
                             actualStatus === 'active' || actualStatus === 'completed' ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <button
-                                  onClick={() => {
-                                    setSelectedRentalForMessages({
-                                      rentalId: item.orderId,
-                                      phone: item.phone,
-                                      service: item.serviceCode
-                                    });
-                                    loadRentalMessages(item.orderId);
-                                    setShowRentMessagesModal(true);
-                                  }}
-                                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 text-left active:scale-95 transition-transform"
-                                >
-                                  <span className="font-medium text-xs leading-relaxed block">
-                                    📨 {t('history.messagesReceived', { count: item.messageCount || 0 })}
-                                  </span>
-                                  <span className="text-[10px] opacity-70 flex items-center gap-1 mt-1">
-                                    {t('history.clickToView')}
-                                  </span>
-                                </button>
-                                {/* Extend button for active and completed rentals on mobile (per SMS-Activate API docs) */}
-                                {(actualStatus === 'active' || actualStatus === 'completed') && (
+                              <div className="flex flex-col gap-2 w-full">
+                                <div className="flex items-center gap-2">
                                   <button
-                                    onClick={() => handleExtendRental(item.id)}
-                                    disabled={isExtending && extendingRentalData?.id === item.id}
-                                    className="p-2 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/40 rounded-lg transition-colors disabled:opacity-50"
-                                    title={t('history.extendRental')}
+                                    onClick={() => {
+                                      setSelectedRentalForMessages({
+                                        rentalId: item.orderId,
+                                        phone: item.phone,
+                                        service: item.serviceCode
+                                      });
+                                      loadRentalMessages(item.orderId);
+                                      setShowRentMessagesModal(true);
+                                    }}
+                                    className="flex-1 bg-purple-50 text-purple-700 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl px-3 py-2 flex items-center justify-between active:scale-95 transition-transform"
                                   >
-                                    {isExtending && extendingRentalData?.id === item.id ? (
-                                      <RefreshCw className="h-4 w-4 text-purple-600 animate-spin" />
-                                    ) : (
-                                      <Plus className="h-4 w-4 text-purple-600" />
-                                    )}
+                                    <div className="flex flex-col items-start">
+                                      <span className="font-semibold text-sm">📨 {t('history.messagesReceived', { count: item.messageCount || 0 })}</span>
+                                      <span className="text-[10px] opacity-70 font-medium">{t('history.clickToView')}</span>
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 opacity-50" />
                                   </button>
-                                )}
+                                </div>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1.5 text-red-600">
-                                <span className="text-xs">✕</span>
-                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                              </div>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 dark:bg-red-900/20">
+                                <X className="w-3.5 h-3.5" /> {t('history.cancelled')}
+                              </span>
                             )
                           ) : (
                             /* ACTIVATION: Logique existante */
@@ -1226,58 +1287,80 @@ export default function HistoryPage() {
                                     : item.smsCode || '';
                                   copyToClipboard(cleanCode);
                                 }}
-                                className="bg-primary text-primary-foreground rounded-xl rounded-tr-sm px-3 py-2 shadow-sm flex-1 mr-2 text-left active:scale-95 transition-transform"
+                                className="bg-primary text-primary-foreground rounded-xl px-3 py-2 shadow-sm flex-1 mr-2 flex items-center justify-between active:scale-95 transition-transform"
                               >
-                                <span className="font-medium text-xs leading-relaxed block">
-                                  {(() => {
-                                    const cleanCode = item.smsCode?.includes('STATUS_OK:')
-                                      ? item.smsCode.split(':')[1]
-                                      : item.smsCode;
-                                    return item.smsText && !item.smsText.includes('STATUS_OK:')
-                                      ? item.smsText
-                                      : `Code: ${cleanCode}`;
-                                  })()}
-                                </span>
-                                <span className="text-[10px] opacity-70 flex items-center gap-1 mt-1">
-                                  <Copy className="w-3 h-3" /> {t('dashboard.clickToCopy')}
-                                </span>
+                                <div className="flex flex-col items-start">
+                                  <span className="font-bold text-sm tracking-wide">
+                                    {(() => {
+                                      const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                        ? item.smsCode.split(':')[1]
+                                        : item.smsCode;
+                                      return `Code: ${cleanCode}`;
+                                    })()}
+                                  </span>
+                                  <span className="text-[10px] opacity-70 font-medium">
+                                    {t('dashboard.clickToCopy')}
+                                  </span>
+                                </div>
+                                <Copy className="w-4 h-4 opacity-80" />
                               </button>
                             ) : actualStatus === 'waiting' ? (
                               <div className="flex items-center gap-2 flex-1">
                                 <div className="w-3.5 h-3.5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin"></div>
-                                <span className="text-xs text-muted-foreground">{t('dashboard.waitingForSMS')}</span>
+                                <span className="text-xs font-medium text-muted-foreground">{t('dashboard.waitingForSMS')}</span>
                               </div>
                             ) : actualStatus === 'timeout' ? (
-                              <div className="flex items-center gap-1.5 text-orange-600">
-                                <span className="text-xs">⏰</span>
-                                <span className="text-xs font-semibold">{t('history.timeout')}</span>
-                              </div>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-orange-50 text-orange-600 dark:bg-orange-900/20">
+                                <Clock className="w-3.5 h-3.5" /> {t('history.timeout')}
+                              </span>
                             ) : actualStatus === 'cancelled' ? (
-                              <div className="flex items-center gap-1.5 text-red-600">
-                                <span className="text-xs">✕</span>
-                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                              </div>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 dark:bg-red-900/20">
+                                <X className="w-3.5 h-3.5" /> {t('history.cancelled')}
+                              </span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">{t('dashboard.noSMS')}</span>
+                              <span className="text-xs text-muted-foreground font-medium">{t('dashboard.noSMS')}</span>
                             )
                           )}
 
-                          {/* Timer - only when waiting (activation only) */}
-                          {!isRental && actualStatus === 'waiting' && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Clock className="h-3.5 w-3.5" />
-                              <span className="text-xs font-semibold">{formatTime(timeRemaining)}</span>
-                            </div>
-                          )}
+                          {/* Timer & Prolongation */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* BADGE ACTIF (Locations) */}
+                            {isRental && actualStatus === 'active' && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400 border border-green-100 dark:border-green-800">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                                Actif
+                              </span>
+                            )}
+                            
+                            {((item as any).metadata?.extension_in_progress === true) && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg text-sm font-medium border border-blue-100 dark:border-blue-800">
+                                <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-600 rounded-full animate-spin"></div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Prolongation</span>
+                              </div>
+                            )}
+                            
+                            {/* TIMERS */}
+                            {!isRental && actualStatus === 'waiting' && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <Clock className="h-3.5 w-3.5" />
+                                <span className="text-xs font-bold">{formatTime(timeRemaining)}</span>
+                              </div>
+                            )}
+                            {isRental && actualStatus === 'active' && timeRemaining > 0 && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 rounded-lg border border-purple-100 dark:border-purple-800">
+                                <Clock className="h-3.5 w-3.5" />
+                                <span className="text-xs font-bold">{formatRentalTimeRemaining(timeRemaining)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Desktop Layout */}
-                      <div className="hidden sm:flex items-center gap-3">
-                        {/* Logo + Flag (48px zone) */}
+                      {/* Desktop Layout (Premium Flex) */}
+                      <div className="hidden sm:flex items-center gap-3 lg:gap-4 w-full overflow-hidden">
+                        {/* 1. Logo + Flag (48px zone) */}
                         <div className="relative flex-shrink-0">
-                          <div className={`w-12 h-12 border rounded-xl flex items-center justify-center ${isRental ? 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-700' : 'bg-muted border-border'
-                            }`}>
+                          <div className={`w-12 h-12 border rounded-xl flex items-center justify-center ${isRental ? 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-700' : 'bg-muted border-border'}`}>
                             <img
                               src={getServiceLogo(item.serviceCode)}
                               alt={item.serviceCode}
@@ -1297,138 +1380,157 @@ export default function HistoryPage() {
                           </div>
                         </div>
 
-                        {/* Service + Country (130px) */}
-                        <div className="w-[130px] flex-shrink-0">
-                          <div className="flex items-center gap-1">
-                            <p className="font-semibold text-sm text-foreground leading-tight truncate">
+                        {/* 2. Service + Country */}
+                        <div className="w-[120px] lg:w-[150px] flex-shrink-0 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <p className="font-bold text-[13px] text-foreground leading-tight truncate">
                               {isRental ? formatRentalLabel(item.serviceCode, item.durationHours, item.countryCode) : getServiceName(item.serviceCode)}
                             </p>
-                            {isRental && <Home className="w-3 h-3 text-purple-500 flex-shrink-0" />}
+                            {isRental && <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 leading-none">RENT</span>}
                           </div>
-                          <p className="text-xs text-muted-foreground leading-tight truncate">{getCountryName(item.countryCode)}</p>
+                          <p className="text-xs text-muted-foreground leading-tight truncate flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></span>
+                            {getCountryName(item.countryCode)}
+                          </p>
                         </div>
 
-                        {/* Phone number avec fond gris */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="font-mono text-sm font-semibold text-foreground bg-muted px-2 py-1 rounded">
+                        {/* 3. Phone number */}
+                        <div className="flex-shrink-0 flex items-center gap-2">
+                          <span className="font-mono text-[13px] font-bold text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 px-2.5 py-1.5 rounded-lg tracking-wider whitespace-nowrap">
                             {formatPhoneNumber(item.phone)}
                           </span>
                           <button
                             onClick={() => copyToClipboard(item.phone)}
-                            className="p-1 hover:bg-primary/10 rounded-md transition-colors"
+                            className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-md transition-colors text-gray-400"
                             title="Copier le numéro"
                           >
-                            <Copy className="h-4 w-4 text-primary" />
+                            <Copy className="h-4 w-4" />
                           </button>
                         </div>
 
-                        {/* Flexible right section */}
-                        <div className="flex items-center gap-3 flex-1 justify-end min-w-0">
-                          {/* Status / SMS - zone flexible avec limite */}
-                          <div className="flex-1 min-w-0 max-w-[280px]">
-                            {/* Pour RENTAL: Afficher messages ou status */}
-                            {isRental ? (
-                              actualStatus === 'active' || actualStatus === 'completed' ? (
-                                <button
-                                  onClick={() => {
-                                    setSelectedRentalForMessages({
-                                      rentalId: item.orderId,
-                                      phone: item.phone,
-                                      service: item.serviceCode
-                                    });
-                                    loadRentalMessages(item.orderId);
-                                    setShowRentMessagesModal(true);
-                                  }}
-                                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl px-3 py-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all w-full text-left"
-                                >
-                                  <span className="font-medium text-xs leading-relaxed block truncate">
-                                    📨 {t('history.messagesReceivedShort', { count: item.messageCount || 0, hours: item.durationHours })}
-                                  </span>
-                                </button>
-                              ) : actualStatus === 'expired' ? (
-                                <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
-                                  <span className="text-sm">⏰</span>
-                                  <span className="text-xs font-semibold">{t('history.expired')}</span>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-                                  <span className="text-sm">✕</span>
-                                  <span className="text-xs font-semibold">{t('history.cancelled')}</span>
-                                </div>
-                              )
-                            ) : actualStatus === 'received' && item.smsCode ? (
+                        {/* 4. Status / SMS (Flexible Area) */}
+                        <div className="flex-1 min-w-0 flex items-center px-2">
+                          {isRental ? (
+                            actualStatus === 'active' || actualStatus === 'completed' ? (
                               <button
                                 onClick={() => {
-                                  const cleanCode = item.smsCode?.includes('STATUS_OK:')
-                                    ? item.smsCode.split(':')[1]
-                                    : item.smsCode || '';
-                                  copyToClipboard(cleanCode);
+                                  setSelectedRentalForMessages({
+                                    rentalId: item.orderId,
+                                    phone: item.phone,
+                                    service: item.serviceCode
+                                  });
+                                  loadRentalMessages(item.orderId);
+                                  setShowRentMessagesModal(true);
                                 }}
-                                className="bg-primary text-primary-foreground rounded-xl px-3 py-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all w-full text-left"
+                                className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-100 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-300 rounded-xl px-3 py-1.5 shadow-sm cursor-pointer active:scale-95 transition-all max-w-[150px] flex items-center gap-2 min-w-0"
                               >
-                                <span className="font-medium text-xs leading-relaxed block truncate">
-                                  {(() => {
-                                    const cleanCode = item.smsCode?.includes('STATUS_OK:')
-                                      ? item.smsCode.split(':')[1]
-                                      : item.smsCode;
-
-                                    return item.smsText && !item.smsText.includes('STATUS_OK:')
-                                      ? item.smsText
-                                      : `Code: ${cleanCode}`;
-                                  })()}
-                                </span>
-                                <span className="text-[10px] opacity-70 flex items-center gap-1 mt-0.5">
-                                  <Copy className="w-2.5 h-2.5" /> {t('history.copy')}
+                                <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+                                <span className="font-semibold text-xs leading-relaxed truncate">
+                                  {item.messageCount || 0} message(s)
                                 </span>
                               </button>
-                            ) : actualStatus === 'waiting' || actualStatus === 'pending' ? (
-                              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
-                                <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-500 rounded-full animate-spin flex-shrink-0"></div>
-                                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{t('dashboard.waitingForSMS')}</span>
-                              </div>
-                            ) : actualStatus === 'timeout' ? (
-                              <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 rounded-lg">
-                                <span className="text-sm">⏰</span>
-                                <span className="text-xs font-semibold">{t('history.timeout')}</span>
-                              </div>
-                            ) : actualStatus === 'cancelled' || actualStatus === 'refunded' ? (
-                              <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-                                <span className="text-sm">✕</span>
-                                <span className="text-xs font-semibold">{t('history.cancelled')}</span>
+                            ) : actualStatus === 'expired' ? (
+                              <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-1.5 rounded-full border border-orange-100 dark:border-orange-900 flex-shrink-0">
+                                <span className="text-xs font-bold uppercase tracking-wider">{t('history.expired')}</span>
                               </div>
                             ) : (
-                              <span className="text-xs text-muted-foreground">{t('dashboard.noSMS')}</span>
-                            )}
-                          </div>
+                              <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full border border-red-100 dark:border-red-900 flex-shrink-0">
+                                <span className="text-xs font-bold uppercase tracking-wider">{t('history.cancelled')}</span>
+                              </div>
+                            )
+                          ) : actualStatus === 'received' && item.smsCode ? (
+                            <button
+                              onClick={() => {
+                                const cleanCode = item.smsCode?.includes('STATUS_OK:')
+                                  ? item.smsCode.split(':')[1]
+                                  : item.smsCode || '';
+                                copyToClipboard(cleanCode);
+                              }}
+                              className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl px-3 py-1.5 shadow-sm cursor-pointer active:scale-95 transition-all max-w-[200px] flex items-center gap-2 min-w-0"
+                            >
+                              <span className="font-mono font-bold text-xs truncate">
+                                Code: {item.smsCode?.includes('STATUS_OK:') ? item.smsCode.split(':')[1] : item.smsCode}
+                              </span>
+                              <Copy className="w-3 h-3 opacity-70 flex-shrink-0" />
+                            </button>
+                          ) : actualStatus === 'waiting' || actualStatus === 'pending' ? (
+                            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full border border-amber-100 dark:border-amber-900/50 min-w-0 flex-shrink-0">
+                              <div className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-500 rounded-full animate-spin flex-shrink-0"></div>
+                              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold tracking-wide uppercase truncate">{t('dashboard.waitingForSMS')}</span>
+                            </div>
+                          ) : actualStatus === 'timeout' ? (
+                            <div className="flex items-center gap-1.5 text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-3 py-1.5 rounded-full border border-orange-100 dark:border-orange-900 flex-shrink-0">
+                              <span className="text-xs font-bold uppercase tracking-wider">{t('history.timeout')}</span>
+                            </div>
+                          ) : actualStatus === 'cancelled' || actualStatus === 'refunded' ? (
+                            <div className="flex items-center gap-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full border border-red-100 dark:border-red-900 flex-shrink-0">
+                              <span className="text-xs font-bold uppercase tracking-wider">{t('history.cancelled')}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground truncate">{t('dashboard.noSMS')}</span>
+                          )}
+                        </div>
 
-                          {/* Timer (only when waiting) - Only for activations */}
-                          {!isRental && (actualStatus === 'waiting' || actualStatus === 'pending') && timeRemaining > 0 && (
-                            <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-lg flex-shrink-0">
-                              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-xs font-semibold text-foreground">{formatTime(timeRemaining)}</span>
+                        {/* 5. Right Badges (Timers, Prolongation, Price, Menu) */}
+                        <div className="flex items-center justify-end gap-2.5">
+                          {/* BADGE ACTIF & TIMERS (Locations) */}
+                          {isRental && actualStatus === 'active' && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 dark:bg-green-900/20 border border-green-100 flex-shrink-0">
+                              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                              Actif
+                            </span>
+                          )}
+                          
+                          {((item as any).metadata?.extension_in_progress === true) && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-600 rounded-lg flex-shrink-0 border border-blue-100">
+                              <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-500 rounded-full animate-spin"></div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider">Prolongation</span>
+                            </div>
+                          )}
+
+                          {(!isRental && (actualStatus === 'waiting' || actualStatus === 'pending') && timeRemaining > 0) && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 flex-shrink-0">
+                              <Clock className="h-3.5 w-3.5 text-gray-500" />
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{formatTime(timeRemaining)}</span>
+                            </div>
+                          )}
+
+                          {(isRental && actualStatus === 'active' && timeRemaining > 0) && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded-lg border border-purple-100 dark:border-purple-800 flex-shrink-0">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span className="text-xs font-bold">{formatRentalTimeRemaining(timeRemaining)}</span>
                             </div>
                           )}
 
                           {/* Prix Badge */}
-                          <div className={`flex items-center justify-center px-2.5 py-1.5 rounded-full flex-shrink-0 ${isRental ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-muted text-muted-foreground'
-                            }`}>
-                            <span className="text-xs font-semibold">{Math.floor(item.price)}</span>
+                          <div className={`flex items-center justify-center px-2 py-1 rounded-lg flex-shrink-0 font-bold ${isRental ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}>
+                            <span className="text-[13px]">{Math.floor(item.price)}</span>
                             <span className="text-[10px] ml-0.5">Ⓐ</span>
                           </div>
 
-                          {/* Menu dropdown - Aligné sur le comportement du dashboard (attente SMS) */}
+                          {isRental && ['active', 'completed', 'expired'].includes(actualStatus) && (
+                            <button
+                              onClick={() => handleExtendRental(item.id || '')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-all active:scale-95 flex-shrink-0"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>Prolonger</span>
+                            </button>
+                          )}
+
+                          {/* Menu dropdown */}
                           {!isRental ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="p-1.5 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
-                                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0">
+                                  <MoreVertical className="h-4 w-4 text-gray-400" />
                                 </button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" sideOffset={5} className="w-44">
+                              <DropdownMenuContent align="end" sideOffset={5} className="w-44 rounded-xl shadow-lg">
                                 {!hasSms && (actualStatus === 'waiting' || actualStatus === 'pending') && (
                                   <DropdownMenuItem
                                     onClick={() => checkActivationStatus(item.id)}
-                                    className="cursor-pointer text-sm"
+                                    className="cursor-pointer text-sm font-medium"
                                   >
                                     <RefreshCw className="h-4 w-4 mr-2 text-blue-500" />
                                     Vérifier SMS
@@ -1486,26 +1588,7 @@ export default function HistoryPage() {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" sideOffset={5} className="w-48">
-                                {/* Extend rental - for active and completed rentals (per SMS-Activate API docs) */}
-                                {(actualStatus === 'active' || actualStatus === 'completed') && (
-                                  <DropdownMenuItem
-                                    onClick={() => handleExtendRental(item.id)}
-                                    disabled={isExtending && extendingRentalData?.id === item.id}
-                                    className="cursor-pointer text-sm"
-                                  >
-                                    {isExtending && extendingRentalData?.id === item.id ? (
-                                      <>
-                                        <RefreshCw className="h-4 w-4 mr-2 animate-spin text-purple-500" />
-                                        {t('common.loading')}
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Plus className="h-4 w-4 mr-2 text-purple-500" />
-                                        {t('history.extendRental')}
-                                      </>
-                                    )}
-                                  </DropdownMenuItem>
-                                )}
+
 
                                 {/* Copy phone */}
                                 <DropdownMenuItem
@@ -1515,12 +1598,14 @@ export default function HistoryPage() {
                                   <Copy className="h-4 w-4 mr-2" />
                                   {t('common.copyNumber')}
                                 </DropdownMenuItem>
-
-                                {/* Status info for non-active */}
-                                {actualStatus !== 'active' && (
-                                  <DropdownMenuItem disabled className="cursor-not-allowed opacity-60 text-xs">
-                                    <X className="h-4 w-4 mr-2 text-gray-400" />
-                                    <span>{actualStatus === 'expired' ? t('history.expired') : t('history.cancelled')}</span>
+                                
+                                {['active', 'completed', 'expired'].includes(actualStatus) && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleExtendRental(item.id || '')}
+                                    className="cursor-pointer text-purple-600 font-medium"
+                                  >
+                                    <Clock className="h-4 w-4 mr-2" />
+                                    <span>Prolonger</span>
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
@@ -1695,7 +1780,7 @@ export default function HistoryPage() {
                                     payment.metadata?.rent_hours || payment.metadata?.duration_hours,
                                     payment.metadata?.country_code
                                   )
-                                  : (payment.description || '-')}
+                                  : (payment.type === 'purchase' ? null : (payment.description?.replace(/\s*\([^)]*\)/g, '').replace(/sms-activate/i, '').trim() || '-'))}
                               </p>
                             </div>
                             {/* Montant en activations */}
@@ -1838,8 +1923,8 @@ export default function HistoryPage() {
                   return (
                     <div key={index} className="bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm">
                       {/* Code Section */}
-                      {extractedCode && (
-                        <div className="mb-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+                      {extractedCode ? (
+                        <div className="mb-1">
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{t('history.rentMessages.code')}</p>
                           <div className="flex items-center justify-between">
                             <span className="text-3xl font-mono font-bold text-gray-900 dark:text-white tracking-wider">{extractedCode}</span>
@@ -1851,10 +1936,11 @@ export default function HistoryPage() {
                             </button>
                           </div>
                         </div>
+                      ) : (
+                        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                          {text.replace(/&#10;/g, '\n').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'")}
+                        </p>
                       )}
-
-                      {/* Message */}
-                      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{text}</p>
 
                       {/* Footer */}
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
@@ -1911,15 +1997,28 @@ export default function HistoryPage() {
                   <SelectValue placeholder={t('rent.selectDuration')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {[4, 8, 12, 24, 48, 72, 168].filter(h => !maxHoursAvailable || h <= maxHoursAvailable).map(h => (
-                    <SelectItem key={h} value={String(h)}>
-                      {h} {t('rent.hours')}{h === 24 ? ` (1 ${t('rent.day')})` : h === 48 ? ` (2 ${t('rent.days')})` : h === 72 ? ` (3 ${t('rent.days')})` : h === 168 ? ` (1 ${t('rent.week')})` : ''}
-                    </SelectItem>
-                  ))}
-                  {maxHoursAvailable && maxHoursAvailable > 0 && ![4, 8, 12, 24, 48, 72, 168].includes(maxHoursAvailable) && (
-                    <SelectItem value={String(maxHoursAvailable)}>
-                      {maxHoursAvailable} {t('rent.hours')} (max)
-                    </SelectItem>
+                  {availableDurations ? (
+                    availableDurations.map((d: any) => {
+                      const normalized = typeof d === 'number' || typeof d === 'string' ? { value: Number(d), unit: 'hour' } : d;
+                      return (
+                        <SelectItem key={`${normalized.value}-${normalized.unit}`} value={String(normalized.value)}>
+                          {normalized.value} {normalized.unit === 'minute' ? 'minutes' : t('rent.hours')}
+                        </SelectItem>
+                      );
+                    })
+                  ) : (
+                    <>
+                      {[4, 8, 12, 24, 48, 72, 168].filter(h => !maxHoursAvailable || h <= maxHoursAvailable).map(h => (
+                        <SelectItem key={h} value={String(h)}>
+                          {h} {t('rent.hours')}{h === 24 ? ` (1 ${t('rent.day')})` : h === 48 ? ` (2 ${t('rent.days')})` : h === 72 ? ` (3 ${t('rent.days')})` : h === 168 ? ` (1 ${t('rent.week')})` : ''}
+                        </SelectItem>
+                      ))}
+                      {maxHoursAvailable && maxHoursAvailable > 0 && ![4, 8, 12, 24, 48, 72, 168].includes(maxHoursAvailable) && (
+                        <SelectItem value={String(maxHoursAvailable)}>
+                          {maxHoursAvailable} {t('rent.hours')} (max)
+                        </SelectItem>
+                      )}
+                    </>
                   )}
                 </SelectContent>
               </Select>

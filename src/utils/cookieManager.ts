@@ -18,7 +18,7 @@ export const CookieManager = {
         const {
             days = 365,
             path = '/',
-            secure = true,
+            secure = typeof window !== 'undefined' && window.location.protocol === 'https:',
             sameSite = 'Lax'
         } = options;
 

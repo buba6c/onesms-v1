@@ -260,19 +260,18 @@ export default function AdminPromoCodes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Ticket className="h-6 w-6 text-purple-500" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+              <Ticket className="w-5 h-5 text-cyan-600" />
+            </div>
             Codes Promo
           </h1>
-          <p className="text-muted-foreground">
-            Gérez les codes promotionnels pour les recharges
-          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button onClick={openCreateDialog} className="bg-purple-600 hover:bg-purple-700">
-            <Plus className="h-4 w-4 mr-2" />
+        <div className="flex items-center gap-4">
+          <Button onClick={openCreateDialog} className="h-10 rounded-full px-4 bg-gray-900 text-white hover:bg-black shadow-sm gap-2">
+            <Plus className="h-4 w-4" />
             Nouveau code
           </Button>
         </div>
@@ -390,10 +389,10 @@ export default function AdminPromoCodes() {
       </div>
 
       {/* Codes List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tous les codes</CardTitle>
-        </CardHeader>
+      <Card className="overflow-hidden shadow-sm border-0 ring-1 ring-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900">Tous les codes</h3>
+        </div>
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center py-8">

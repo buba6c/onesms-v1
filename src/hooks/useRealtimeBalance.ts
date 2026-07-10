@@ -1,12 +1,12 @@
 /**
- * Hook pour synchroniser le solde utilisateur en temps réel
+ * Hook pour synchroniser le solde utilisateur en temps réel et de façon ultra-réactive
  * 
  * TERMINOLOGIE UNIFIÉE:
  * - solde = balance en DB = tout l'argent du compte (ce qui est affiché)
  * - frozen = frozen_balance en DB = montant gelé pour achats en cours
  * - disponible = solde - frozen (calculé dynamiquement, pas stocké)
  * 
- * Met à jour automatiquement quand les valeurs changent en DB
+ * Met à jour automatiquement quand les valeurs changent en DB, sur activations, ou au focus
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -22,51 +22,75 @@ export function useRealtimeBalance() {
   const userIdRef = useRef<string | null>(null);
   
   // Local state pour mise à jour immédiate
-  const [localBalance, setLocalBalance] = useState<number | null>(null);
-  const [localFrozen, setLocalFrozen] = useState<number | null>(null);
+  const [localBalance, setLocalBalance] = useState<number | null>(user?.balance ?? null);
+  const [localFrozen, setLocalFrozen] = useState<number | null>(user?.frozen_balance ?? null);
 
-  // Fonction pour forcer le refresh
+  // Fonction pour forcer le refresh depuis la base de données
   const refreshBalance = useCallback(async () => {
     if (!user?.id) return;
     
-    const { data } = await supabase
-      .from('users')
-      .select('balance, frozen_balance')
-      .eq('id', user.id)
-      .single<{ balance: number; frozen_balance: number }>();
-    
-    if (data) {
-      setLocalBalance(data.balance);
-      setLocalFrozen(data.frozen_balance);
-      // Aussi mettre à jour le store
-      setUser({ ...user, balance: data.balance, frozen_balance: data.frozen_balance });
-      // Et invalider la query
-      queryClient.invalidateQueries({ queryKey: ['user-balance', user.id] });
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('balance, frozen_balance')
+        .eq('id', user.id)
+        .single<{ balance: number; frozen_balance: number }>();
+      
+      if (!error && data) {
+        setLocalBalance(data.balance);
+        setLocalFrozen(data.frozen_balance);
+        // Mettre à jour le store Zustand
+        setUser({ ...user, balance: data.balance, frozen_balance: data.frozen_balance });
+        // Mettre à jour le cache React Query
+        queryClient.setQueryData(['user-balance', user.id], {
+          balance: data.balance,
+          frozen_balance: data.frozen_balance
+        });
+      }
+    } catch (err) {
+      console.error('⚠️ [REALTIME-BALANCE] Erreur refreshBalance:', err);
     }
   }, [user?.id, setUser, queryClient]);
 
+  // Sync au montage et lors du focus navigateur (mobile / desktop)
   useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
+    if (!user?.id) return;
 
-    // Éviter de recréer le channel si même user
+    // Fetch initial immédiat au montage
+    refreshBalance();
+
+    const handleFocus = () => {
+      refreshBalance();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        refreshBalance();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user?.id, refreshBalance]);
+
+  // Écoute Realtime sur la table users ET sur la table activations pour réactivité instantanée
+  useEffect(() => {
+    if (!user?.id) return;
+
     if (userIdRef.current === user.id && channelRef.current) {
       return;
     }
 
     userIdRef.current = user.id;
-    
-    // console.log('🔔 [REALTIME-BALANCE] Setting up subscription for user:', user.id);
 
-    // Clean up previous subscription
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
 
-    // Subscribe to changes on the users table for this specific user
     const channel = supabase
-      .channel(`user-balance-${user.id}-${Date.now()}`)
+      .channel(`user-balance-sync-${user.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -76,65 +100,59 @@ export function useRealtimeBalance() {
           filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          // console.log('💰 [REALTIME-BALANCE] User updated:', payload.new);
-          
           const newData = payload.new as any;
-          
-          // Mise à jour IMMÉDIATE du state local
-          setLocalBalance(newData.balance);
-          setLocalFrozen(newData.frozen_balance);
-          
-          // Aussi mettre à jour le store
-          setUser({
-            ...user,
-            balance: newData.balance,
-            frozen_balance: newData.frozen_balance,
-          });
-          
-          // Invalider les queries
-          queryClient.invalidateQueries({ queryKey: ['user-balance'] });
-
-          // console.log('✅ [REALTIME-BALANCE] Updated:', { balance: newData.balance, frozen_balance: newData.frozen_balance });
+          if (newData && typeof newData.balance === 'number') {
+            setLocalBalance(newData.balance);
+            setLocalFrozen(newData.frozen_balance ?? 0);
+            setUser({
+              ...user,
+              balance: newData.balance,
+              frozen_balance: newData.frozen_balance ?? 0,
+            });
+            queryClient.setQueryData(['user-balance', user.id], {
+              balance: newData.balance,
+              frozen_balance: newData.frozen_balance ?? 0
+            });
+            queryClient.invalidateQueries({ queryKey: ['user-balance', user.id] });
+          }
         }
       )
-      .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR' && import.meta.env.DEV) {
-          console.warn('⚠️ [REALTIME-BALANCE]:', err?.message || 'Channel error');
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'activations',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Si une activation est achetée, modifiée ou remboursée, on rafraîchit la balance immédiatement
+          refreshBalance();
         }
-        // Auto-reconnect géré par Supabase
-      });
+      )
+      .subscribe();
 
     channelRef.current = channel;
 
-    // Cleanup on unmount
     return () => {
-      // console.log('🔌 [REALTIME-BALANCE] Cleaning up subscription');
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [user?.id]); // Seulement user.id comme dépendance
+  }, [user?.id, refreshBalance, setUser, queryClient]);
 
-  // TERMINOLOGIE UNIFIÉE:
-  // - solde = balance en DB (tout l'argent du compte) - C'EST CE QU'ON AFFICHE
-  // - frozen = frozen_balance en DB (gelé pour achats en cours)
-  // - disponible = solde - frozen (calculé, pas stocké), jamais négatif
   const solde = localBalance ?? user?.balance ?? 0;
   const frozen = localFrozen ?? user?.frozen_balance ?? 0;
-  const disponible = Math.max(0, solde - frozen); // Jamais négatif
+  const disponible = Math.max(0, solde - frozen);
   
   return {
-    // Propriétés principales
-    solde,           // Balance totale du compte (affiché en header)
-    frozen,          // Montant gelé pour achats en cours
-    disponible,      // Ce que l'utilisateur peut dépenser (solde - frozen), >= 0
-    
-    // Alias pour compatibilité (utiliser solde/frozen/disponible à la place)
+    solde,
+    frozen,
+    disponible,
     balance: solde,
     frozenBalance: frozen,
     availableBalance: disponible,
-    
     refreshBalance,
   };
 }

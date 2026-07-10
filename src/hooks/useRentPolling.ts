@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { supabase, cloudFunctions } from '@/lib/supabase';
+import { supabase, cloudFunctions, getCurrentUser } from '@/lib/supabase';
 
 // Type pour un message de rent
 export interface RentMessage {
@@ -35,7 +35,7 @@ export function useRentPolling({
   rentalIds,
   onUpdate,
   onMessagesUpdate,
-  intervalMs = 5000
+  intervalMs = 15000 // ⚡ Optimized: 15s instead of 5s to reduce Supabase disk I/O
 }: RentalPollingOptions) {
   const intervalRef = useRef<NodeJS.Timeout>();
   const userIdRef = useRef<string | null>(null);
@@ -67,7 +67,7 @@ export function useRentPolling({
         if (!userIdRef.current) {
           const { data: { session } } = await supabase.auth.getSession();
           userIdRef.current = session?.user?.id || null;
-          
+
           // Si pas de session, ne pas faire de polling
           if (!userIdRef.current) {
             console.log('[RENT_POLLING] No session, skipping poll');
@@ -88,9 +88,9 @@ export function useRentPolling({
           if (error) {
             const errorKey = `rental-${rentalId}`;
             errorCounts[errorKey] = (errorCounts[errorKey] || 0) + 1;
-            
+
             if (errorCounts[errorKey] <= MAX_ERROR_LOGS) {
-              console.warn(`⚠️ Polling rental ${rentalId} (${errorCounts[errorKey]}/${MAX_ERROR_LOGS}):`, 
+              console.warn(`⚠️ Polling rental ${rentalId} (${errorCounts[errorKey]}/${MAX_ERROR_LOGS}):`,
                 error?.message || 'Failed to send a request to the Edge Function');
             }
             continue;
@@ -110,16 +110,16 @@ export function useRentPolling({
             // Limit error logging to avoid spam
             const errorKey = `rental-${rentalId}`;
             errorCounts[errorKey] = (errorCounts[errorKey] || 0) + 1;
-            
+
             if (errorCounts[errorKey] <= MAX_ERROR_LOGS) {
-              console.warn(`⚠️ Polling rental ${rentalId} (${errorCounts[errorKey]}/${MAX_ERROR_LOGS}):`, 
+              console.warn(`⚠️ Polling rental ${rentalId} (${errorCounts[errorKey]}/${MAX_ERROR_LOGS}):`,
                 data?.error || 'Unknown error');
             } else if (errorCounts[errorKey] === MAX_ERROR_LOGS + 1) {
               console.warn(`⚠️ Polling rental ${rentalId}: Suppressing further errors...`);
             }
             continue;
           }
-          
+
           // Reset error count on success
           const errorKey = `rental-${rentalId}`;
           if (errorCounts[errorKey]) {
@@ -127,12 +127,12 @@ export function useRentPolling({
           }
 
           const messages: RentMessage[] = data.messages || [];
-          
+
           // Stocker les messages dans le cache
           if (messages.length > 0) {
             const previousCount = newMessagesCache[rentalId]?.length || 0;
             newMessagesCache[rentalId] = messages;
-            
+
             if (messages.length > previousCount) {
               hasNewMessages = true;
               // New messages notification (silent)
@@ -179,7 +179,7 @@ export function useRentPolling({
     try {
       // Get current user ID if not cached
       if (!userIdRef.current) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { user } = await getCurrentUser();
         userIdRef.current = user?.id || null;
       }
 
@@ -191,10 +191,10 @@ export function useRentPolling({
         if (error || !data?.success) continue;
 
         const messages = data.messages || [];
-        
+
         // Messages loaded silently
       }
-      
+
       // L'edge function met à jour la DB, on notifie juste le parent
       if (onUpdate) {
         onUpdate();

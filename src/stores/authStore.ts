@@ -10,6 +10,64 @@ interface AuthState {
   signOut: () => Promise<void>
 }
 
+// ============================================================================
+// 🔒 MUTEX: Prevent multiple simultaneous checkAuth() calls
+// This was causing a stampede of 10+ requests at login
+// ============================================================================
+let checkAuthInProgress = false
+let checkAuthQueue: Array<() => void> = []
+
+/**
+ * Fetch profile with retry + exponential backoff.
+ * On fragile networks (mobile / West Africa), a single attempt often fails
+ * when fired alongside many concurrent requests.
+ */
+async function fetchProfileWithRetry(
+  userId: string,
+  maxRetries = 2,
+  baseDelay = 500
+): Promise<{ data: any; error: any }> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    // Success or non-network error (e.g. PGRST116 = row not found) → return immediately
+    if (!error || (error.code && error.code !== 'PGRST116' && !isNetworkError(error))) {
+      return { data, error }
+    }
+    if (!error) return { data, error }
+
+    // Network error + retries remaining → wait then retry
+    if (isNetworkError(error) && attempt < maxRetries) {
+      const delay = baseDelay * Math.pow(2, attempt) // 500ms, 1000ms
+      console.warn(`[AUTH] Profile fetch failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms...`)
+      await new Promise(r => setTimeout(r, delay))
+      continue
+    }
+
+    return { data, error }
+  }
+  // Should never reach here, but TypeScript wants a return
+  return { data: null, error: { message: 'Max retries exceeded' } }
+}
+
+function isNetworkError(error: any): boolean {
+  if (!error) return false
+  const msg = error.message || ''
+  return (
+    msg.includes('Load failed') ||
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError') ||
+    msg.includes('network') ||
+    msg.includes('TypeError') ||
+    msg.includes('ERR_') ||
+    !error.code // Supabase errors have a code, network errors typically don't
+  )
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -19,6 +77,15 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user, loading: false }),
 
       checkAuth: async () => {
+        // 🔒 MUTEX: If already running, wait for it to finish instead of stampeding
+        if (checkAuthInProgress) {
+          return new Promise<void>((resolve) => {
+            checkAuthQueue.push(resolve)
+          })
+        }
+
+        checkAuthInProgress = true
+
         try {
           // Si nous avons déjà un utilisateur localement stocké, on le marque comme chargé immédiatement
           // pour l'affichage (sensation de vitesse), mais on revérifie en background
@@ -29,44 +96,30 @@ export const useAuthStore = create<AuthState>()(
             set({ loading: true });
           }
 
-          // console.log('[AUTH] Starting checkAuth...')
-
           // getCurrentUser a maintenant son propre timeout et fallback
           const { user: authUser, error } = await getCurrentUser()
 
           if (error) {
             console.warn('[AUTH] Error getting current user:', error.message)
             // Si erreur, on efface l'utilisateur pour forcer la reco si nécessaire
-            // ou on garde le cache si c'est juste un problème réseau ?
-            // Pour sécurité, on clear si session invalide.
-            if (error.message.includes('Auth session missing')) {
+            if (error.message?.includes('Auth session missing')) {
               set({ user: null, loading: false })
             } else {
-              set({ loading: false }) // Keep existing user if just network error?
+              set({ loading: false }) // Keep existing user if just network error
             }
             return
           }
 
           if (!authUser) {
-            // console.log('[AUTH] No authenticated user found')
             if (get().user) {
               console.log('[AUTH] Clearing stale local user')
-              set({ user: null, loading: false })
-            } else {
-              set({ user: null, loading: false })
             }
+            set({ user: null, loading: false })
             return
           }
 
-          // console.log('[AUTH] User authenticated:', authUser.email)
-
-          // User found, fetching profile
-          // Get user profile from database
-          const { data: profile, error: profileError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .single()
+          // User found, fetching profile with retry logic
+          const { data: profile, error: profileError } = await fetchProfileWithRetry(authUser.id)
 
           if (profileError) {
             console.error('❌ [AUTH] Profile fetch error:', profileError)
@@ -119,7 +172,6 @@ export const useAuthStore = create<AuthState>()(
 
           if (profile) {
             // Comparer avec l'état actuel pour éviter re-render inutiles si identique
-            // JSON.stringify est simple pour comparaison deep basic
             const currentUserStr = JSON.stringify(get().user);
             const newProfileStr = JSON.stringify(profile);
 
@@ -155,6 +207,12 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error('❌ [AUTH] checkAuth exception:', error)
           set({ user: null, loading: false })
+        } finally {
+          // 🔒 Release mutex and resolve all waiting callers
+          checkAuthInProgress = false
+          const waiters = checkAuthQueue
+          checkAuthQueue = []
+          waiters.forEach(resolve => resolve())
         }
       },
 
@@ -185,31 +243,73 @@ export const useAuthStore = create<AuthState>()(
 
 // Initialize auth on load
 if (typeof window !== 'undefined') {
-  // D'abord charger la session existante
-  useAuthStore.getState().checkAuth()
+  // Flag to prevent multiple initial checks
+  let initialCheckStarted = false;
 
-  // Listen to auth changes
+  const startInitialCheck = () => {
+    if (initialCheckStarted) return;
+    initialCheckStarted = true;
+    useAuthStore.getState().checkAuth();
+  };
+
+  // Listen to auth changes — DEDUPLICATED: only handle meaningful events
   supabase.auth.onAuthStateChange(async (event, session) => {
-    // console.log('[AUTH] onAuthStateChange:', event, session?.user?.email)
-
     if (event === 'SIGNED_IN' && session) {
+      // checkAuth has its own mutex, safe to call
       useAuthStore.getState().checkAuth()
     } else if (event === 'SIGNED_OUT') {
       // Re-vérifier s'il y a une session valide (peut être refresh en cours)
       const { data: { session: currentSession } } = await supabase.auth.getSession()
 
       if (!currentSession) {
-        // console.log('[AUTH] Confirmed sign out')
         useAuthStore.getState().setUser(null)
       }
     } else if (event === 'INITIAL_SESSION') {
-      if (session) {
-        useAuthStore.getState().checkAuth()
-      } else {
-        // Ne pas effacer immédiatement si on a des données locales (persistence)
-        // Laisser checkAuth décider si le token est invalide
-        useAuthStore.getState().checkAuth()
-      }
+      // INITIAL_SESSION occurs on client load — use the single startInitialCheck
+      startInitialCheck();
     }
   })
+
+  // Fallback: Si INITIAL_SESSION ne tire pas assez vite, on lance quand même
+  setTimeout(startInitialCheck, 1000);
+
+  // ============================================================================
+  // 🔒 Admin 2FA verification — DELAYED to avoid stampede at login
+  // Only runs on /admin routes, with a longer delay to let auth settle first
+  // ============================================================================
+  const checkAdminVerification = async () => {
+    // 1. Never force logout if we are on the login page
+    if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+      return
+    }
+
+    // 2. Only enforce 2FA when actually on an admin route
+    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
+      return
+    }
+
+    // 3. Wait for auth to be settled (don't race with checkAuth)
+    const store = useAuthStore.getState()
+    if (store.loading) {
+      // Auth still loading, retry in 1s
+      setTimeout(checkAdminVerification, 1000)
+      return
+    }
+
+    // 4. Use the already-loaded user from store instead of making another DB query
+    const user = store.user
+    if (user && user.role === 'admin') {
+      const verified = sessionStorage.getItem('admin_2fa_verified')
+
+      if (!verified) {
+        console.log('[AUTH] Admin 2FA missing on admin route. Redirecting to login.')
+        await supabase.auth.signOut()
+        useAuthStore.getState().setUser(null)
+        window.location.href = '/login'
+      }
+    }
+  }
+
+  // Run check on load — increased delay to 3s to let auth settle first
+  setTimeout(checkAdminVerification, 3000)
 }

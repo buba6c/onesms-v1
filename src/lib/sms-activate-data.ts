@@ -58,7 +58,7 @@ export const SMS_ACTIVATE_COUNTRIES = {
   "148": { id: 148, code: "armenia", name: "Armenia", priority: 80 },
   "151": { id: 151, code: "chile", name: "Chile", priority: 100 },
   "155": { id: 155, code: "albania", name: "Albania", priority: 80 },
-  "163": { id: 163, code: "finland", name: "Finland", priority: 120 },
+  "176": { id: 176, code: "finland", name: "Finland", priority: 120 },
   "172": { id: 172, code: "denmark", name: "Denmark", priority: 120 },
   "173": { id: 173, code: "switzerland", name: "Switzerland", priority: 150 },
   "174": { id: 174, code: "norway", name: "Norway", priority: 120 },

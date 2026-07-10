@@ -12,8 +12,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-console.log('✅ Supabase client initialized:', supabaseUrl)
-
 // Client principal pour DB/Auth (Coolify)
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -138,30 +136,24 @@ export const getCurrentUser = async () => {
     // D'abord essayer getSession (lecture locale, plus rapide)
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-    console.log('[SUPABASE] getSession result:', {
-      hasSession: !!session,
-      userId: session?.user?.id?.substring(0, 8),
-      error: sessionError?.message
-    })
-
     if (sessionError) {
       console.error('[SUPABASE] getSession error:', sessionError)
       return { user: null, error: sessionError }
     }
 
     if (session?.user) {
-      return { user: session.user, error: null }
+      // Si on a une session, on peut optionnellement appeler getUser pour vérifier la validité
+      // auprès du serveur (plus sûr mais plus lent)
+      // On le fait seulement si on a une session pour éviter l'erreur "Auth session missing"
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) {
+        return { user: null, error: userError }
+      }
+      return { user, error: null }
     }
 
-    // Si pas de session locale, essayer getUser avec timeout
-    console.log('[SUPABASE] No local session, trying getUser...')
-    const getUserPromise = supabase.auth.getUser()
-    const timeoutPromise = new Promise<{ data: { user: null }, error: Error }>((_, reject) =>
-      setTimeout(() => reject(new Error('getUser timeout')), 5000)
-    )
-
-    const result = await Promise.race([getUserPromise, timeoutPromise])
-    return { user: result.data.user, error: result.error }
+    // Si pas de session locale, on est déconnecté
+    return { user: null, error: null }
   } catch (error: any) {
     console.error('[SUPABASE] getCurrentUser exception:', error.message)
     return { user: null, error }

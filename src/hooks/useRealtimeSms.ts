@@ -6,6 +6,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from './use-toast';
+import { useUIStore } from '@/stores/uiStore';
 import { RealtimePostgresChangesPayload, RealtimeChannel } from '@supabase/supabase-js';
 
 interface Activation {
@@ -118,11 +119,19 @@ export function useRealtimeSms({ userId, onSmsReceived, onBalanceUpdate }: UseRe
               }
             });
 
-            // Afficher notification
+            // Afficher le popup SMS magnifique (SmsRevealPopup)
+            useUIStore.getState().showSmsReveal({
+              id: newActivation.id,
+              service_code: newActivation.service_code,
+              sms_code: newActivation.sms_code,
+              phone: newActivation.phone
+            });
+            
+            // On garde quand même un petit toast discret (optionnel)
             toast({
               title: '✅ SMS Reçu !',
               description: `Code: ${newActivation.sms_code} - ${newActivation.phone}`,
-              duration: 5000,
+              duration: 3000,
             });
 
             // Rafraîchir le solde

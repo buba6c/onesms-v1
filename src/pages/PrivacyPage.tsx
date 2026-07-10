@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   Shield, 
   Database, 
@@ -118,7 +119,7 @@ export default function PrivacyPage() {
             <ArrowLeft className="w-4 h-4" />
             {t('common.backToHome')}
           </Link>
-          <div className="max-w-3xl">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="max-w-3xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                 <Shield className="w-8 h-8" />
@@ -129,12 +130,12 @@ export default function PrivacyPage() {
             <p className="mt-4 text-white/70 text-sm">
               {t('privacy.lastUpdated')}: {new Date().toLocaleDateString()}
             </p>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* Data Types Overview */}
-      <div className="container mx-auto px-4 -mt-8">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="container mx-auto px-4 -mt-8">
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('privacy.dataWeCollect')}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -151,10 +152,10 @@ export default function PrivacyPage() {
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Quick Navigation */}
-      <div className="container mx-auto px-4 mt-6">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="container mx-auto px-4 mt-6">
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('privacy.tableOfContents')}</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -170,13 +171,17 @@ export default function PrivacyPage() {
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           {sections.map((section, index) => (
-            <section
+            <motion.section
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5 }}
               key={section.id}
               id={section.id}
               className="scroll-mt-24 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
@@ -194,12 +199,12 @@ export default function PrivacyPage() {
                   dangerouslySetInnerHTML={{ __html: section.content }}
                 />
               </div>
-            </section>
+            </motion.section>
           ))}
         </div>
 
         {/* Your Rights Summary */}
-        <div className="max-w-4xl mx-auto mt-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-4xl mx-auto mt-12">
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100 p-6">
             <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -224,10 +229,10 @@ export default function PrivacyPage() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Footer Actions */}
-        <div className="max-w-4xl mx-auto mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100">
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-4xl mx-auto mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <h3 className="font-semibold text-gray-900">{t('privacy.questions')}</h3>
@@ -242,7 +247,7 @@ export default function PrivacyPage() {
               </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

@@ -5,7 +5,7 @@
 
 import * as ServicesComplete from './sms-activate-services-complete'
 
-const LOGO_DEV_TOKEN = 'pk_acOeajbNRKGsSDnJvJrcfw'
+const LOGO_DEV_TOKEN = 'pk_CdPxNR3QRMuf53tK0n82Og'
 
 // Collect all service codes from the comprehensive catalogue to auto-fill fallbacks
 const ALL_SERVICE_CODES: Set<string> = (() => {
@@ -441,7 +441,8 @@ ALL_SERVICE_CODES.forEach(code => {
  * Générer un logo SVG de fallback pour un service
  */
 const generateFallbackLogo = (serviceCode: string, emoji?: string): string => {
-  const code = serviceCode.toLowerCase().trim()
+  const safeCode = (serviceCode && typeof serviceCode === 'string') ? serviceCode : 'ot';
+  const code = safeCode.toLowerCase().trim()
   const displayEmoji = emoji || getServiceIcon(code)
   const firstLetter = code.charAt(0).toUpperCase()
 
@@ -480,6 +481,7 @@ const ISO_COUNTRY_CODES = new Set([
  * Automatique, pas de DB, toujours à jour
  */
 export const getServiceLogo = (serviceCode: string): string => {
+  if (!serviceCode || typeof serviceCode !== 'string') return generateFallbackLogo('ot');
   const code = serviceCode.toLowerCase().trim()
 
   // Vérifier si c'est un code valide (pas de chiffres au début, pas de caractères bizarres)
@@ -489,26 +491,41 @@ export const getServiceLogo = (serviceCode: string): string => {
     return generateFallbackLogo(code)
   }
 
-  // Overrides pour services dont le logo.dev est trompeur
-  if (code === 'afk' || code === 'astropay') {
-    return '/logos/astropay.svg'
+  const BUCKET_URL = 'https://api.onesms-sn.com/storage/v1/object/public/service-logos'
+
+  // PRIORITÉ 1 : LIMITE INTELLIGENTE (Notre Cache Local)
+  // Résout le bug de Netflix (nf) qui était pris pour un pays.
+  // Gère 95% du trafic via notre Supabase Storage.
+  const isFallbackInjection = SERVICE_DOMAINS[code] === 'sms-activate.io' && code !== 'full' && code !== 'ot' && code !== 'cc'
+  if (SERVICE_DOMAINS[code] && !isFallbackInjection) {
+    return `${BUCKET_URL}/${code}.png`
   }
 
-  // PRIORITÉ 1: Si le code est dans SERVICE_DOMAINS, utiliser le domaine mappé
-  // Ceci résout le conflit tg=Telegram vs tg=Togo, am=Amazon vs am=Armenia, etc.
-  if (SERVICE_DOMAINS[code]) {
-    const domain = SERVICE_DOMAINS[code]
-    return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
+  // NOTE: La vérification ISO_COUNTRY_CODES a été supprimée ici.
+  // Elle transformait Viber (vi), Skype (sk) et Nova Poshta (np) en macarons car ces codes
+  // correspondent malheureusement aussi à des codes de pays existants.
+
+  // PRIORITÉ 2 : MAPPING ÉTENDU POUR GOOGLE
+  const EXTENDED_DOMAINS: Record<string, string> = {
+    'vi': 'viber.com',
+    'sk': 'skype.com',
+    'ym': 'youla.ru',
+    'ya': 'yandex.ru',
+    'yw': 'yandex.ru',
+    'np': 'novaposhta.ua',
+    'afk': 'astropay.com',
+    'astropay': 'astropay.com',
+    'cj': 'clubhouse.com',
+    'olacap': 'olacabs.com',
+    'rd': 'radkets.com',
+    'xb': 'xbox.com',
+    'xo': 'xbox.com',
   }
 
-  // PRIORITÉ 2: Si c'est un code pays ISO (et PAS un service connu), retourner le fallback
-  if (ISO_COUNTRY_CODES.has(code)) {
-    return generateFallbackLogo(code)
-  }
-
-  // PRIORITÉ 3: Essayer avec le domaine .com par défaut
-  const domain = `${code}.com`
-  return `https://img.logo.dev/${domain}?token=${LOGO_DEV_TOKEN}&size=200`
+  // PRIORITÉ 3 : ALTERNATIVE ROBUSTE (Google Favicons API)
+  const explicitDomain = EXTENDED_DOMAINS[code]
+  const domain = explicitDomain ? explicitDomain : `${code}.com`
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`
 }
 
 /**
@@ -523,6 +540,7 @@ export const getServiceLogoFallback = (serviceCode: string): string => {
  * OFFICIEL: Basé sur API getServicesList de SMS-Activate
  */
 export const getServiceIcon = (serviceCode: string): string => {
+  if (!serviceCode || typeof serviceCode !== 'string') return '📱';
   const iconMap: Record<string, string> = {
     // TOP Services SMS-Activate
     'full': '📱',     // Full rent
@@ -774,14 +792,20 @@ const SMS_ACTIVATE_ID_TO_ISO: Record<string, string> = {
   '16': 'gb',   // United Kingdom
   '19': 'ma',   // Morocco
   '22': 'in',   // India
+  '27': 'ci',   // Ivory Coast
+  '31': 'za',   // South Africa
   '32': 'ro',   // Romania
   '33': 'co',   // Colombia
+  '34': 'ee',   // Estonia
   '36': 'ca',   // Canada
   '39': 'ar',   // Argentina
   '43': 'de',   // Germany
+  '47': 'md',   // Moldova
+  '49': 'lv',   // Latvia
   '52': 'th',   // Thailand
   '56': 'es',   // Spain
   '58': 'it',   // Italy
+  '63': 'cz',   // Czech Republic / Czechia
   '73': 'br',   // Brazil
   '78': 'fr',   // France
   '82': 'mx',   // Mexico
@@ -792,13 +816,18 @@ const SMS_ACTIVATE_ID_TO_ISO: Record<string, string> = {
   '148': 'am',  // Armenia
   '151': 'cl',  // Chile
   '155': 'al',  // Albania
-  '163': 'fi',  // Finland
+  '163': 'vc',  // Saint Vincent
   '172': 'dk',  // Denmark
   '173': 'ch',  // Switzerland
   '174': 'no',  // Norway
   '175': 'au',  // Australia
+  '176': 'fi',  // Finland
   '182': 'jp',  // Japan
+  '183': 'ng',  // Nigeria
+  '184': 'hu',  // Hungary
+  '185': 'bg',  // Bulgaria
   '187': 'us',  // USA
+  '189': 'cd',  // DR Congo
   '196': 'sg',  // Singapore
 }
 

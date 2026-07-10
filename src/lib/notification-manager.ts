@@ -42,8 +42,8 @@ export const NotificationManager = {
         if (Notification.permission === 'granted') {
             try {
                 const notification = new Notification(title, {
-                    icon: '/pwa-192x192.png', // Default icon
-                    badge: '/pwa-192x192.png', // Android badge
+                    icon: '/icons/icon-192x192.png',
+                    badge: '/icons/icon-192x192.png',
                     vibrate: [200, 100, 200], // Vibration pattern
                     requireInteraction: true, // Keep until user interacts
                     ...options

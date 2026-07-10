@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { packagesApi, ActivationPackage } from '@/lib/api/packages';
+import { useCurrency } from '@/hooks/useCurrency';
 import {
   Plus,
   Pencil,
@@ -47,6 +48,7 @@ export default function PackagesManagementPage() {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { rates } = useCurrency();
 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['admin-packages'],
@@ -183,18 +185,17 @@ export default function PackagesManagementPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Package className="w-8 h-8 text-blue-600" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+              <Package className="w-5 h-5 text-cyan-600" />
+            </div>
             Gestion des Packages
           </h1>
-          <p className="text-gray-600 mt-1">
-            Gérer les packages de recharge disponibles pour les utilisateurs
-          </p>
         </div>
         {!isCreating && !editingId && (
-          <Button onClick={() => setIsCreating(true)} className="gap-2">
+          <Button onClick={() => setIsCreating(true)} className="h-10 rounded-full px-4 bg-gray-900 text-white hover:bg-black shadow-sm gap-2">
             <Plus className="w-4 h-4" />
             Nouveau Package
           </Button>
@@ -234,9 +235,15 @@ export default function PackagesManagementPage() {
                   type="number"
                   step="0.01"
                   value={formData.price_xof}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price_xof: parseFloat(e.target.value) })
-                  }
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setFormData({ 
+                      ...formData, 
+                      price_xof: val,
+                      price_usd: parseFloat((val * rates.USD).toFixed(2)),
+                      price_eur: parseFloat((val * rates.EUR).toFixed(2))
+                    });
+                  }}
                   required
                 />
               </div>
@@ -343,7 +350,7 @@ export default function PackagesManagementPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {packages.map((pkg) => (
-          <Card key={pkg.id} className="p-6 relative">
+          <Card key={pkg.id} className="p-6 relative overflow-hidden shadow-sm border-0 ring-1 ring-gray-100 hover:shadow-md transition-shadow">
             {pkg.is_popular && (
               <Badge className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white">
                 <Star className="w-3 h-3 mr-1" />

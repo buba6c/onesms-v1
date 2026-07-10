@@ -149,12 +149,6 @@ export default function ContactPage() {
       value: settings?.email || 'support@onesms-sn.com',
       description: settings?.email_response_time || t('contact.emailResponseTime')
     },
-    {
-      icon: MessageSquare,
-      title: t('contact.whatsapp'),
-      value: settings?.whatsapp || '+1 683 777 0410',
-      description: settings?.whatsapp_hours || t('contact.whatsappHours')
-    },
     ...(settings?.instagram ? [{
       icon: () => (
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">

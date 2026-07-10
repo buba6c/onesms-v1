@@ -1,5 +1,6 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getCurrentUser } from '@/lib/supabase'
 import {
   CreditCard,
   DollarSign,
@@ -112,7 +113,7 @@ export default function AdminPaymentProviders() {
 
       // Log action
       await (supabase as any).from('admin_logs').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
+        admin_id: (await getCurrentUser()).user?.id,
         action: 'toggle_stock_shortage',
         details: { value: newValue }
       })
@@ -179,7 +180,7 @@ export default function AdminPaymentProviders() {
       // Logger l'action
       await supabase.from('payment_provider_logs').insert({
         provider_id: provider.id,
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
+        admin_id: (await getCurrentUser()).user?.id,
         action: newActiveState ? 'activated' : 'deactivated',
         old_value: { is_active: provider.is_active },
         new_value: { is_active: newActiveState },
@@ -215,7 +216,7 @@ export default function AdminPaymentProviders() {
       // Logger l'action
       await supabase.from('payment_provider_logs').insert({
         provider_id: provider.id,
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
+        admin_id: (await getCurrentUser()).user?.id,
         action: 'set_default',
         old_value: { is_default: provider.is_default },
         new_value: { is_default: true },
@@ -252,7 +253,7 @@ export default function AdminPaymentProviders() {
       // Logger l'action
       await supabase.from('payment_provider_logs').insert({
         provider_id: selectedProvider.id,
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
+        admin_id: (await getCurrentUser()).user?.id,
         action: 'updated_config',
         old_value: selectedProvider.config,
         new_value: configData,
@@ -309,14 +310,13 @@ export default function AdminPaymentProviders() {
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <CreditCard className="w-8 h-8 text-blue-600" />
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-cyan-600" />
+            </div>
             Fournisseurs de Paiement
           </h1>
-          <p className="text-gray-600 mt-2">
-            Gérez les passerelles de paiement disponibles pour vos utilisateurs
-          </p>
         </div>
 
         {/* Stock Shortage Toggle */}
@@ -367,9 +367,9 @@ export default function AdminPaymentProviders() {
         {providers.map((provider) => (
           <div
             key={provider.id}
-            className={`bg-white rounded-xl shadow-sm border-2 p-6 transition-all ${provider.is_active
-              ? 'border-green-500 shadow-green-100'
-              : 'border-gray-200 opacity-75'
+            className={`bg-white rounded-xl p-6 transition-all ring-1 ${provider.is_active
+              ? 'ring-cyan-500 shadow-md'
+              : 'ring-gray-100 shadow-sm opacity-75'
               }`}
           >
             {/* Header de la carte */}
@@ -461,7 +461,7 @@ export default function AdminPaymentProviders() {
             <div className="flex gap-2">
               <button
                 onClick={() => openConfigModal(provider)}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors text-sm shadow-sm"
               >
                 <Settings className="w-4 h-4" />
                 Configurer

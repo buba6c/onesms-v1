@@ -22,13 +22,17 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-auto items-center gap-3 overflow-hidden rounded-xl px-4 py-3 shadow-xl transition-all duration-300 data-[swipe=cancel]:translate-y-0 data-[swipe=end]:translate-y-[var(--radix-toast-swipe-end-y)] data-[swipe=move]:translate-y-[var(--radix-toast-swipe-move-y)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+  "group pointer-events-auto relative flex w-auto items-center gap-3 overflow-hidden rounded-2xl px-4 py-3.5 shadow-2xl backdrop-blur-xl transition-all duration-300 data-[swipe=cancel]:translate-y-0 data-[swipe=end]:translate-y-[var(--radix-toast-swipe-end-y)] data-[swipe=move]:translate-y-[var(--radix-toast-swipe-move-y)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:zoom-out-95 data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
   {
     variants: {
       variant: {
-        default: "bg-gray-900 text-white border-0",
-        destructive: "bg-red-500 text-white border-0",
-        success: "bg-green-500 text-white border-0",
+        default: "bg-slate-900/95 text-white border border-slate-800/80",
+        smart: "bg-gradient-to-r from-slate-900/95 via-slate-900/95 to-blue-950/80 text-white border border-blue-500/30 shadow-blue-500/10",
+        destructive: "bg-gradient-to-r from-slate-900/95 via-slate-900/95 to-rose-950/80 text-white border border-rose-500/30 shadow-rose-500/10",
+        success: "bg-gradient-to-r from-slate-900/95 via-slate-900/95 to-emerald-950/80 text-white border border-emerald-500/30 shadow-emerald-500/10",
+        info: "bg-gradient-to-r from-slate-900/95 via-slate-900/95 to-cyan-950/80 text-white border border-cyan-500/30 shadow-cyan-500/10",
+        warning: "bg-gradient-to-r from-slate-900/95 via-slate-900/95 to-amber-950/80 text-white border border-amber-500/30 shadow-amber-500/10",
+        loading: "bg-slate-900/95 text-white border border-slate-800/80",
       },
     },
     defaultVariants: {

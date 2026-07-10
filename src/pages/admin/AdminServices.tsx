@@ -137,31 +137,29 @@ export default function AdminServices() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{t('admin.servicesManagement')}</h1>
-          <p className="text-gray-500">
-            {stats?.activeServices || 0} active / {stats?.totalServices || 0} services
-          </p>
-          {latestSync && (
-            <p className="text-xs text-gray-400 mt-1">
-              Last sync: {new Date(latestSync.started_at).toLocaleString()} - {latestSync.status}
-            </p>
-          )}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+              <span className="text-2xl leading-none">📱</span>
+            </div>
+            {t('admin.servicesManagement')}
+          </h1>
         </div>
-        <Button 
-          variant="default" 
-          className="bg-purple-600 hover:bg-purple-700"
-          onClick={() => syncMutation.mutate()}
-          disabled={syncMutation.isPending || latestSync?.status === 'running'}
-        >
-          {syncMutation.isPending || latestSync?.status === 'running' ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
-          )}
-          {t('admin.syncWithSMSActivate')}
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button 
+            onClick={() => syncMutation.mutate()} 
+            disabled={syncMutation.isPending || latestSync?.status === 'running'}
+            className="h-10 rounded-full px-4 bg-gray-900 text-white hover:bg-black shadow-sm"
+          >
+            {syncMutation.isPending || latestSync?.status === 'running' ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {t('admin.syncWithSMSActivate')}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -213,7 +211,7 @@ export default function AdminServices() {
       </div>
 
       {/* Services Table */}
-      <Card>
+      <Card className="overflow-hidden shadow-sm border-0 ring-1 ring-gray-100">
         {isLoading ? (
           <div className="p-12 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
@@ -222,27 +220,27 @@ export default function AdminServices() {
         ) : services.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-gray-500 mb-4">{t('admin.noServicesFound')}</p>
-            <Button onClick={() => syncMutation.mutate()} className="bg-purple-600">
+            <Button onClick={() => syncMutation.mutate()} className="bg-gray-900 text-white hover:bg-black rounded-full h-10 px-4">
               <RefreshCw className="w-4 h-4 mr-2" />
               Synchroniser avec SMS-Activate
             </Button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Popular</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Available</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Service</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Popular</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Available</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border">
                 {services.map(service => (
-                  <tr key={service.id} className="hover:bg-gray-50">
+                  <tr key={service.id} className="hover:bg-gray-50/50 transition-colors group border-b border-gray-50 last:border-0">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center overflow-hidden">

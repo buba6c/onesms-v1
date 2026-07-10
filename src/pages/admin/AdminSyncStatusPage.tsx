@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle2, RefreshCw, TrendingUp, Database, Globe, Package } from 'lucide-react';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr } from 'date-fns/locale/fr';
 
 interface SyncLog {
   id: string;
@@ -16,22 +16,22 @@ interface SyncLog {
   started_at: string;
   completed_at: string;
   duration_seconds: number;
-  
+
   // Stats API
   api_services_count: number;
   api_countries_count: number;
   api_total_stock: number;
-  
+
   // Stats DB
   db_services_total: number;
   db_services_active: number;
-  
+
   // Modifications
   services_deactivated: number;
   services_added: number;
   services_reactivated: number;
   stocks_updated: number;
-  
+
   // Erreurs
   error_count: number;
   error_details: any;
@@ -51,7 +51,7 @@ export default function AdminSyncStatusPage() {
         .order('started_at', { ascending: false })
         .limit(1)
         .single();
-      
+
       if (error) throw error;
       return data as SyncLog;
     },
@@ -67,7 +67,7 @@ export default function AdminSyncStatusPage() {
         .select('*')
         .order('started_at', { ascending: false })
         .limit(10);
-      
+
       if (error) throw error;
       return data as SyncLog[];
     },
@@ -77,14 +77,14 @@ export default function AdminSyncStatusPage() {
   // Déclencher sync manuelle
   const handleManualSync = async () => {
     setIsManualSyncing(true);
-    
+
     try {
       // Appeler API backend pour déclencher sync
       // (Vous devrez créer cette route)
       const response = await fetch('/api/admin/trigger-sync', {
         method: 'POST',
       });
-      
+
       if (response.ok) {
         // Attendre 5 secondes puis refresh
         setTimeout(() => {
@@ -103,11 +103,11 @@ export default function AdminSyncStatusPage() {
   // Calculer status global
   const getHealthStatus = () => {
     if (!latestSync) return 'unknown';
-    
+
     const lastSyncTime = new Date(latestSync.completed_at).getTime();
     const now = Date.now();
     const minutesSinceLastSync = (now - lastSyncTime) / (1000 * 60);
-    
+
     if (latestSync.status === 'error') return 'error';
     if (minutesSinceLastSync > 10) return 'warning'; // Plus de 10 min sans sync
     if (latestSync.status === 'success') return 'healthy';
@@ -142,12 +142,11 @@ export default function AdminSyncStatusPage() {
       </div>
 
       {/* Status Global */}
-      <Card className={`border-2 ${
-        healthStatus === 'healthy' ? 'border-green-500' :
-        healthStatus === 'warning' ? 'border-yellow-500' :
-        healthStatus === 'error' ? 'border-red-500' :
-        'border-gray-300'
-      }`}>
+      <Card className={`border-2 ${healthStatus === 'healthy' ? 'border-green-500' :
+          healthStatus === 'warning' ? 'border-yellow-500' :
+            healthStatus === 'error' ? 'border-red-500' :
+              'border-gray-300'
+        }`}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -158,9 +157,9 @@ export default function AdminSyncStatusPage() {
             </span>
             <Badge variant={
               healthStatus === 'healthy' ? 'default' :
-              healthStatus === 'warning' ? 'secondary' :
-              healthStatus === 'error' ? 'destructive' :
-              'outline'
+                healthStatus === 'warning' ? 'secondary' :
+                  healthStatus === 'error' ? 'destructive' :
+                    'outline'
             }>
               {healthStatus === 'healthy' && 'Opérationnel'}
               {healthStatus === 'warning' && 'Attention'}
@@ -289,14 +288,14 @@ export default function AdminSyncStatusPage() {
                   <span className="text-sm">Services ajoutés</span>
                 </div>
               )}
-              
+
               {latestSync.services_reactivated > 0 && (
                 <div className="flex items-center gap-2">
                   <Badge variant="default" className="bg-blue-500">↑{latestSync.services_reactivated}</Badge>
                   <span className="text-sm">Services réactivés</span>
                 </div>
               )}
-              
+
               {latestSync.services_deactivated > 0 && (
                 <div className="flex items-center gap-2">
                   <Badge variant="destructive">-{latestSync.services_deactivated}</Badge>
@@ -331,7 +330,7 @@ export default function AdminSyncStatusPage() {
                     {sync.status === 'success' && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                     {sync.status === 'partial' && <AlertCircle className="w-5 h-5 text-yellow-500" />}
                     {sync.status === 'error' && <AlertCircle className="w-5 h-5 text-red-500" />}
-                    
+
                     <div>
                       <p className="font-medium">
                         {format(new Date(sync.completed_at), 'dd MMM yyyy HH:mm:ss', { locale: fr })}
@@ -346,8 +345,8 @@ export default function AdminSyncStatusPage() {
 
                   <Badge variant={
                     sync.status === 'success' ? 'default' :
-                    sync.status === 'partial' ? 'secondary' :
-                    'destructive'
+                      sync.status === 'partial' ? 'secondary' :
+                        'destructive'
                   }>
                     {sync.status}
                   </Badge>

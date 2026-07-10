@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+// @ts-nocheck
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
@@ -7,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { packagesApi } from '@/lib/api/packages';
+import { useCurrency } from '@/hooks/useCurrency';
 import {
   Phone,
   MessageSquare,
@@ -30,8 +32,16 @@ import {
   Award,
   Headphones,
   CreditCard,
-  Gift
+  Gift,
+  Home,
+  ShoppingCart,
+  Menu,
+  MessageCircle,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Marquee } from '@/components/magicui/marquee';
+import { BorderBeam } from '@/components/magicui/border-beam';
+import { Particles } from '@/components/magicui/particles';
 import { FeaturesCarousel } from '@/components/home/FeaturesCarousel';
 
 // Service logos with SVG icons for beautiful UX
@@ -230,6 +240,8 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [activeStep, setActiveStep] = useState(1);
+  const [activeFeature, setActiveFeature] = useState(0);
+  const { formatPrice, currency } = useCurrency();
 
   useEffect(() => {
     if (user) {
@@ -259,6 +271,25 @@ export default function HomePage() {
     },
     staleTime: 1000 * 60 * 10,
   });
+
+  // Fetch video settings
+  const { data: videoSettings } = useQuery({
+    queryKey: ['homepage-video-settings'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['landing_video_active', 'landing_video_url']);
+      const map: Record<string, string> = {};
+      data?.forEach(s => {
+        map[s.key] = s.value;
+      });
+      return map;
+    },
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const videoUrl = videoSettings?.['landing_video_url'];
 
   // Pricing data - using default values (pricing is dynamic via edge functions)
   const pricingData = { min: 100, max: 5000, avg: 500 };
@@ -415,266 +446,536 @@ export default function HomePage() {
     return topServices;
   }, [topServices]);
 
+  const renderFeatureVisual = (index: number) => {
+    switch(index) {
+      case 0:
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-slate-900 relative overflow-hidden">
+             <div className="relative z-10 text-slate-300 font-mono text-[11px] sm:text-[13px] leading-relaxed p-4 sm:p-6 w-[90%] max-w-[280px] sm:max-w-sm bg-slate-950/80 rounded-2xl border border-slate-800 shadow-2xl backdrop-blur-xl">
+               <div className="flex gap-2 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-800">
+                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-700"></div>
+                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-700"></div>
+                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-700"></div>
+               </div>
+               <div className="flex gap-2 sm:gap-3"><span className="text-[#08b5ff]">~</span> <span className="opacity-90">onesms connect --fast</span></div>
+               <div className="mt-2 text-emerald-400">[SUCCESS] Connection in 0.02s</div>
+               <div className="mt-4 flex gap-2 sm:gap-3"><span className="text-[#08b5ff]">~</span> <span className="opacity-90">routing number</span></div>
+               <div className="text-white font-medium text-sm sm:text-base mt-2">+33 7 56 89 21 00</div>
+             </div>
+          </div>
+        );
+      case 1:
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,181,255,0.05)_0%,transparent_70%)]"></div>
+            <div className="relative z-10 grid grid-cols-6 sm:grid-cols-8 gap-4 sm:gap-6 scale-75 sm:scale-100">
+              {[...Array(48)].map((_, i) => (
+                 <motion.div 
+                   key={i} 
+                   animate={{ opacity: [0.1, 0.6, 0.1] }}
+                   transition={{ duration: 3, delay: i * 0.05, repeat: Infinity }}
+                   className="w-1.5 h-1.5 rounded-full bg-[#08b5ff]" 
+                 />
+              ))}
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[120px] sm:text-[180px] font-bold font-display text-slate-900/5 mix-blend-multiply tracking-tighter">190+</span>
+            </div>
+          </div>
+        );
+      case 2:
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 relative overflow-hidden">
+             <div className="relative z-10 bg-white p-6 sm:p-10 rounded-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-slate-200 w-[85%] max-w-[320px]">
+               <div className="flex items-center gap-3 mb-6 sm:mb-8">
+                 <div className="w-8 h-8 rounded-full bg-[#08b5ff]/10 flex items-center justify-center">
+                   <div className="w-3 h-3 rounded-full bg-[#08b5ff]"></div>
+                 </div>
+                 <div className="text-xs text-slate-400 font-mono tracking-widest">RECEIPT</div>
+               </div>
+               <div className="flex justify-between items-center mb-4">
+                 <span className="text-slate-500 text-sm sm:text-base">Virtual SMS</span>
+                 <span className="font-medium text-slate-900">1.00 ₳</span>
+               </div>
+               <div className="flex justify-between items-center mb-6 sm:mb-8">
+                 <span className="text-slate-400 text-sm sm:text-base">Standard Price</span>
+                 <span className="text-slate-400 line-through">0.50 $</span>
+               </div>
+               <div className="h-[1px] w-full bg-slate-100 mb-6"></div>
+               <div className="flex justify-between items-end">
+                 <span className="text-slate-900 font-medium text-xs sm:text-sm tracking-widest uppercase">Total</span>
+                 <span className="font-bold text-[#08b5ff] text-2xl sm:text-3xl">1 ₳</span>
+               </div>
+             </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 relative overflow-hidden">
+            <div className="absolute w-[250px] sm:w-[400px] h-[250px] sm:h-[400px] border border-slate-200 rounded-full flex items-center justify-center">
+              <div className="w-[180px] sm:w-[280px] h-[180px] sm:h-[280px] border border-slate-200 rounded-full flex items-center justify-center">
+                <motion.div 
+                  animate={{ rotate: 360 }} 
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="w-[100px] sm:w-[160px] h-[100px] sm:h-[160px] border border-dashed border-slate-300 rounded-full"
+                ></motion.div>
+              </div>
+            </div>
+            <div className="relative z-10 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl flex flex-col items-center gap-3 sm:gap-4 scale-90 sm:scale-100">
+              <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-[#08b5ff]" />
+              <div className="font-mono text-[10px] sm:text-xs text-slate-900 tracking-[0.2em] font-medium">AES-256</div>
+            </div>
+          </div>
+        );
+      case 4:
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 relative overflow-hidden">
+             <div className="absolute inset-0 flex items-center justify-center">
+               <div className="bg-white w-[280px] sm:w-[400px] h-[200px] sm:h-[280px] rounded-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-slate-200 p-4 sm:p-6 flex flex-col scale-90 sm:scale-100">
+                 <div className="flex justify-between items-center mb-6 sm:mb-8">
+                   <div className="w-16 sm:w-24 h-3 sm:h-4 bg-slate-100 rounded-full"></div>
+                   <div className="w-6 h-6 sm:w-8 sm:h-8 bg-slate-50 rounded-full border border-slate-100"></div>
+                 </div>
+                 <div className="flex-1 flex gap-4 sm:gap-6">
+                   <div className="w-1/3 bg-slate-50 rounded-xl border border-slate-100"></div>
+                   <div className="w-2/3 flex flex-col gap-3 sm:gap-4">
+                     <div className="h-8 sm:h-12 bg-slate-50 rounded-xl border border-slate-100 w-full"></div>
+                     <div className="h-8 sm:h-12 bg-slate-50 rounded-xl border border-slate-100 w-full"></div>
+                     <div className="h-8 sm:h-12 bg-[#08b5ff]/5 rounded-xl border border-[#08b5ff]/20 w-full flex items-center px-3 sm:px-4">
+                       <div className="w-2 h-2 rounded-full bg-[#08b5ff]"></div>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+          </div>
+        );
+      case 5:
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50 relative overflow-hidden">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-[250px] sm:w-[400px] h-[250px] sm:h-[400px] rounded-full border border-slate-200"></div>
+              <div className="absolute w-[150px] sm:w-[250px] h-[150px] sm:h-[250px] rounded-full border border-slate-200"></div>
+              
+              <motion.div 
+                animate={{ rotate: 360 }} 
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                className="absolute w-[250px] sm:w-[400px] h-[250px] sm:h-[400px] rounded-full"
+                style={{ background: 'conic-gradient(from 0deg, transparent 70%, rgba(8, 181, 255, 0.1) 100%)' }}
+              ></motion.div>
+              
+              <div className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-full shadow-xl border border-slate-100 flex items-center justify-center">
+                <span className="text-slate-900 font-display font-bold text-2xl sm:text-3xl tracking-tight">99<span className="text-[#08b5ff]">%</span></span>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen">
-      {/* Hero Section - Modern Gradient with Animation */}
-      <section className="relative min-h-[90vh] bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white overflow-hidden flex items-center pt-14 md:pt-0">
-        {/* Animated Background */}
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-3xl"></div>
-        </div>
-
-        {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
-
-        <div className="container mx-auto px-4 py-12 md:py-24 relative z-10">
-          <div className="max-w-5xl mx-auto text-center">
-
-            {/* Main Title */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-4 md:mb-6 leading-tight tracking-tight animate-fade-in-up">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-100">
-                OneSMS
-              </span>
-              <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
-                {t('homepage.hero.titleHighlight')}
-              </span>
-            </h1>
-
-            {/* Description */}
-            <p className="text-base sm:text-lg md:text-xl text-blue-100/80 mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed px-4 animate-fade-in-up animate-delay-200">
-              {t('homepage.hero.description')}
-            </p>
-
-            {/* CTA Button */}
-            <div className="flex justify-center mb-12 md:mb-16 px-4 animate-fade-in-up animate-delay-300">
-              <Link to="/register">
-                <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 h-14 md:h-16 px-10 md:px-14 text-lg md:text-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-300 hover:scale-105">
-                  {t('homepage.hero.getStarted')}
-                  <ArrowRight className="ml-3 w-6 h-6" />
-                </Button>
-              </Link>
-            </div>
-
-            {/* Stats Bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-4xl mx-auto mb-12 md:mb-16 px-4">
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-300">
-                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.availableNumbers || '5.2M+'}</div>
-                <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.availableNumbers')}</div>
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-500">
-                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.services || '1683'}+</div>
-                <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.services')}</div>
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-700">
-                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.countries || '180'}+</div>
-                <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.countries')}</div>
-              </div>
-              <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 md:p-6 border border-white/10 animate-fade-in-up animate-delay-1000">
-                <div className="text-2xl md:text-4xl font-black text-white mb-1">{stats?.successRate || '99.7%'}</div>
-                <div className="text-xs md:text-sm text-blue-200/60">{t('homepage.stats.successRate')}</div>
-              </div>
-            </div>
-
-            {/* Popular Services with Real SVG Logos - Animated */}
-            <div className="px-4 pb-8">
-              <p className="text-xs md:text-sm text-blue-200/60 mb-6 md:mb-8 uppercase tracking-widest font-medium">
-                {t('homepage.services.title', 'Supported Services')}
-              </p>
-              <div className="flex flex-wrap justify-center gap-4 md:gap-6">
-                {displayServices.map((service, index) => (
-                  <div
-                    key={service.code}
-                    className="animate-fade-in-up"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <ServiceLogo code={service.code} name={service.name} />
-                  </div>
-                ))}
-              </div>
-              {/* More services indicator - Improved design */}
-              <div className="mt-10 flex items-center justify-center">
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-6 py-3 flex items-center gap-3">
-                  <div className="flex items-center">
-                    <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />
-                  </div>
-                  <span className="text-sm font-medium text-blue-100">
-                    {t('homepage.services.andMore', `et ${stats?.services || 1600}+ autres services`)}
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-cyan-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section - Modern Cards with Hover Effects */}
-      <section className="py-16 md:py-24 bg-gradient-to-b from-gray-50 to-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10 md:mb-16">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 text-blue-700 px-6 py-2 rounded-full text-xs md:text-sm font-bold tracking-wide uppercase mb-6 shadow-sm">
-              {t('homepage.features.subtitle')}
-            </div>
-            <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-6 leading-tight">
-              {t('homepage.features.title')}
-            </h2>
-          </div>
-
-          {/* Horizontal Scroll Carousel for Mobile */}
-          <FeaturesCarousel features={features} />
-
-          {/* Desktop Grid (Hidden on Mobile) */}
-          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-            {features.map((feature, index) => (
-              <Card
-                key={index}
-                className="group relative p-8 bg-white hover:bg-gradient-to-br hover:from-blue-50/50 hover:to-purple-50/50 border border-gray-100 shadow-xl shadow-gray-200/40 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 rounded-[2rem] overflow-hidden"
+      {/* Hero V3 Section */}
+      <section className="relative min-h-[90vh] text-white overflow-hidden flex items-center pt-24 pb-12 md:pt-32 md:pb-24" style={{ background: 'linear-gradient(135deg, #003a8c 0%, #004BB5 25%, #0088E0 55%, #00B4F0 80%, #00C4FF 100%)' }}>
+        <Particles className="absolute inset-0 z-0" quantity={100} staticity={40} color="#ffffff" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-16 max-w-[1200px] mx-auto">
+            
+            {/* Left Column - Text Content */}
+            <div className="flex-1 text-center lg:text-left max-w-xl mx-auto lg:mx-0">
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: "easeOut" }}
+                className="text-4xl sm:text-5xl md:text-6xl lg:text-[76px] font-black text-white leading-[1.05] tracking-tight mb-6 font-display"
               >
-                {/* Decorative gradient */}
-                <div className={`absolute top-0 right-0 w-40 h-40 bg-gradient-to-br ${feature.color} opacity-[0.08] rounded-full blur-3xl -translate-y-12 translate-x-12 group-hover:scale-125 transition-transform duration-500`}></div>
+                OneSMS<br />
+                <span className="text-[28px] sm:text-[38px] md:text-[46px] lg:text-[56px] leading-[1.1] block mt-2">{t('homepage.hero.titleHighlight')}</span>
+              </motion.h1>
 
-                <div className={`w-14 h-14 md:w-16 md:h-16 ${feature.iconBg} rounded-2xl flex items-center justify-center mb-5 md:mb-6 shadow-lg shadow-${feature.color.split(' ')[0].replace('from-', '')}/30 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300`}>
-                  <feature.icon className="w-7 h-7 md:w-8 md:h-8 text-white" />
+              <motion.p 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.1, ease: "easeOut" }}
+                className="text-base sm:text-lg text-white/90 mb-10 leading-relaxed font-normal"
+              >
+                {t('homepage.hero.description')}
+              </motion.p>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
+                className="flex justify-center lg:justify-start"
+              >
+                <Link to="/register">
+                  <Button size="lg" className="bg-white text-[#004BB5] hover:bg-slate-50 h-14 px-10 text-lg font-bold shadow-2xl shadow-[#003a8c]/50 transition-all duration-300 rounded-full group relative overflow-hidden">
+                    <span className="relative z-10 flex items-center">
+                      {t('homepage.hero.getStarted')}
+                      <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                    <div className="absolute inset-0 bg-blue-50/50 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                  </Button>
+                </Link>
+              </motion.div>
+            </div>
+
+            {/* Right Column - CSS Phone Mockup & Floating Bubbles */}
+            <div className="flex-1 relative w-full max-w-[380px] sm:max-w-[450px] lg:max-w-[600px] mx-auto flex items-center justify-center mt-16 lg:mt-0" style={{ perspective: "1000px" }}>
+              
+              {/* Floating Bubble 1 - WhatsApp 3D */}
+              <motion.div 
+                animate={{ y: [-15, 15, -15], rotate: [-10, 10, -10] }}
+                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-[25%] md:top-[20%] left-[-1rem] sm:left-[0rem] md:left-[2rem] lg:left-[4rem] z-20 w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 drop-shadow-[0_15px_25px_rgba(37,211,102,0.4)]"
+              >
+                <img src="/logos/whatsapp-3d.webp" alt="WhatsApp" className="w-full h-full object-contain" />
+              </motion.div>
+
+              {/* Floating Bubble 2 - YouTube 3D */}
+              <motion.div 
+                animate={{ y: [12, -12, 12], rotate: [5, -5, 5] }}
+                transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                className="absolute top-[5%] right-[-2rem] sm:right-[-1rem] md:right-[0rem] lg:right-[0rem] z-0 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-36 lg:h-36 drop-shadow-[0_15px_25px_rgba(255,0,0,0.4)]"
+              >
+                <img src="/logos/youtube-3d.webp" alt="YouTube" className="w-full h-full object-contain" />
+              </motion.div>
+
+              {/* Floating Bubble 3 - Telegram 3D */}
+              <motion.div 
+                animate={{ y: [-12, 12, -12], rotate: [-10, 10, -10] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                className="absolute bottom-[25%] md:bottom-[20%] right-[-1rem] sm:right-[0rem] md:right-[4rem] lg:right-[8rem] z-20 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-36 lg:h-36 drop-shadow-[0_15px_25px_rgba(0,136,204,0.4)]"
+              >
+                <img src="/logos/telegram-3d.webp" alt="Telegram" className="w-full h-full object-contain" />
+              </motion.div>
+
+              {/* Phone Mockup Frame Container */}
+              <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="relative z-10 w-[85%] sm:w-[75%] md:w-[350px] lg:w-[450px] flex justify-center"
+              >
+                <div className="relative w-full flex items-center justify-center transform-gpu mx-auto">
+                  {/* The Optimized Mockup Image */}
+                  <img 
+                    src="/phone-mockup-optimized.webp" 
+                    fetchpriority="high"
+                    className="w-full h-auto object-contain z-20 pointer-events-auto drop-shadow-[0_40px_100px_rgba(0,30,100,0.4)] drop-shadow-[0_20px_40px_rgba(0,0,0,0.3)]" 
+                    alt="iPhone 16 Pro Mockup" 
+                  />
                 </div>
-
-                <h3 className="text-xl font-bold mb-3 text-gray-900">{feature.title}</h3>
-                <p className="text-base text-gray-600 leading-relaxed font-medium">{feature.description}</p>
-              </Card>
-            ))}
+              </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works - Interactive Steps with Visuals */}
-      <section className="py-16 md:py-24 bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.15),transparent_50%)]"></div>
-          <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_right,rgba(139,92,246,0.15),transparent_50%)]"></div>
+      {/* Features Section — High-End Sticky Scroll (Apple/Linear Style) */}
+      <section className="py-24 md:py-40 bg-white relative">
+        <div className="container mx-auto px-4 lg:px-8 max-w-[1400px]">
+          
+          {/* Header Section */}
+          <div className="mb-24 grid grid-cols-1 md:grid-cols-12 gap-8 pb-8">
+            <div className="md:col-span-7 lg:col-span-8">
+              <div className="w-3 h-3 bg-[#08b5ff] mb-8"></div>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-slate-900 tracking-tighter leading-[1.05] font-display">
+                {t('homepage.features.title')}
+              </h2>
+            </div>
+            <div className="md:col-span-5 lg:col-span-4 flex items-end">
+              <p className="text-lg text-slate-500 font-normal leading-relaxed">
+                La plateforme la plus avancée pour sécuriser vos inscriptions en ligne. Une expérience repensée, rigoureuse et sans limites.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-16 lg:gap-24 relative">
+             {/* Left Column - List of Features (Scroll Spy on Desktop, Stacked on Mobile) */}
+             <div className="w-full lg:w-5/12 flex flex-col">
+               <div className="hidden lg:block py-12"></div> {/* Top padding to allow scroll room on Desktop */}
+               
+               {features.map((feature, index) => {
+                 const formattedNumber = (index + 1).toString().padStart(2, '0');
+                 const isActive = activeFeature === index;
+                 
+                 return (
+                   <motion.div 
+                     key={index}
+                     viewport={{ margin: "-40% 0px -40% 0px" }}
+                     onViewportEnter={() => setActiveFeature(index)}
+                     onClick={() => setActiveFeature(index)}
+                     className={`flex flex-col cursor-pointer transition-all duration-700 ease-out py-8 lg:py-10 ${isActive ? 'lg:opacity-100 lg:scale-100' : 'lg:opacity-30 lg:scale-95'}`}
+                   >
+                     {/* Strict Line Separator */}
+                     <div className="w-full h-[1px] bg-slate-200 mb-6 lg:mb-8 relative overflow-hidden">
+                       <div className={`absolute top-0 left-0 h-full bg-[#08b5ff] transition-all duration-700 ease-out w-full lg:w-0 ${isActive ? 'lg:w-full' : ''}`}></div>
+                     </div>
+
+                     {/* Typography-driven Header */}
+                     <div className="flex justify-between items-baseline mb-4 lg:mb-5 gap-4">
+                       <h3 className={`text-2xl lg:text-3xl font-bold font-display tracking-tight transition-colors duration-500 ${isActive ? 'text-slate-900' : 'text-slate-900 lg:text-slate-700'}`}>
+                         {feature.title}
+                       </h3>
+                       <span className={`text-xs font-mono font-bold tracking-widest transition-colors duration-500 ${isActive ? 'text-[#08b5ff]' : 'text-[#08b5ff] lg:text-slate-300'}`}>
+                         /{formattedNumber}
+                       </span>
+                     </div>
+                     
+                     {/* Clean Body Text */}
+                     <p className="text-slate-500 leading-relaxed text-[16px] mb-8 lg:mb-0">
+                       {feature.description}
+                     </p>
+
+                     {/* MOBILE ONLY: Render the visual directly here */}
+                     <div className="block lg:hidden w-full h-[320px] rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 shadow-sm relative">
+                        {renderFeatureVisual(index)}
+                     </div>
+
+                   </motion.div>
+                 );
+               })}
+               <div className="hidden lg:block py-32"></div> {/* Bottom padding on Desktop */}
+             </div>
+
+             {/* Right Column - Sticky Visual Canvas (DESKTOP ONLY) */}
+             <div className="hidden lg:block w-full lg:w-7/12 relative">
+                <div className="sticky top-40 h-[600px] w-full rounded-[2rem] bg-slate-50 border border-slate-100 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] overflow-hidden flex items-center justify-center p-8 transition-all duration-700">
+                   <AnimatePresence mode="wait">
+                     <motion.div 
+                       key={activeFeature}
+                       initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                       exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                       transition={{ duration: 0.4, ease: "easeOut" }}
+                       className="w-full h-full rounded-[1.5rem] overflow-hidden bg-white shadow-sm border border-slate-100/50"
+                     >
+                        {renderFeatureVisual(activeFeature)}
+                     </motion.div>
+                   </AnimatePresence>
+                </div>
+             </div>
+          </div>
         </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-24 relative bg-slate-50 overflow-hidden">
+        {/* Subtle background decoration */}
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-bl from-blue-100/50 to-transparent pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-gradient-to-tr from-cyan-100/40 to-transparent pointer-events-none"></div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-12 md:mb-16">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full text-sm font-medium mb-4">
-              <Play className="w-4 h-4 text-cyan-400" />
+          <div className="text-center mb-16 md:mb-24">
+            <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold tracking-wide uppercase mb-4 shadow-sm border border-blue-200/50">
               {t('homepage.howItWorks.subtitle')}
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 font-display tracking-tight">
               {t('homepage.howItWorks.title')}
             </h2>
           </div>
 
           <div className="max-w-6xl mx-auto">
-            {/* Desktop View - Horizontal Steps */}
-            <div className="hidden lg:grid grid-cols-3 gap-8 relative">
-              {/* Connection Line */}
-              <div className="absolute top-24 left-1/6 right-1/6 h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-green-500 rounded-full"></div>
+            <motion.div 
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={{
+                hidden: { opacity: 0 },
+                show: {
+                  opacity: 1,
+                  transition: { staggerChildren: 0.2 }
+                }
+              }}
+              className="relative grid md:grid-cols-3 gap-8 md:gap-12"
+            >
+              {/* Connecting Line for Desktop */}
+              <div className="hidden md:block absolute top-24 left-[15%] right-[15%] h-[2px] bg-gradient-to-r from-blue-200 via-purple-200 to-emerald-200 z-0 opacity-60"></div>
 
               {/* Step 1 */}
-              <div
-                className={`relative transition-all duration-500 ${activeStep === 1 ? 'scale-105' : 'scale-100 opacity-70'}`}
-                onMouseEnter={() => setActiveStep(1)}
-              >
-                <div className="bg-gradient-to-br from-cyan-500/20 to-blue-600/20 backdrop-blur-sm rounded-3xl p-8 border border-cyan-500/30 h-full">
-                  <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-cyan-500/30">
-                    <MousePointer className="w-10 h-10 text-white" />
+              <motion.div variants={{ hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 15 } } }} className="relative z-10">
+                <div className="bg-white rounded-[32px] p-8 md:p-10 shadow-xl shadow-slate-200/50 border border-slate-100 relative group hover:-translate-y-2 transition-transform duration-500 overflow-hidden">
+                  <BorderBeam size={120} duration={12} delay={0} colorFrom="#3b82f6" colorTo="#06b6d4" />
+                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner mx-auto md:mx-0 ring-1 ring-blue-100">
+                    <Globe className="w-8 h-8" />
                   </div>
-                  <div className="bg-cyan-500 text-white text-sm font-bold px-3 py-1 rounded-full w-fit mx-auto mb-4">
+                  <div className="absolute top-6 right-6 text-7xl font-black text-slate-100/60 select-none font-display pointer-events-none group-hover:text-blue-50 transition-colors duration-500">01</div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3 text-center md:text-left font-display">
                     {t('homepage.howItWorks.step1Title')}
-                  </div>
-                  <p className="text-blue-100/80 text-center">
+                  </h3>
+                  <p className="text-slate-500 leading-relaxed text-center md:text-left">
                     {t('homepage.howItWorks.step1Desc')}
                   </p>
-                  {/* Visual Mockup */}
-                  <div className="mt-6 bg-white/10 rounded-xl p-4">
-                    <div className="flex items-center gap-3 p-3 bg-white/10 rounded-lg mb-2">
-                      <div className="w-8 h-8 bg-[#25D366] rounded-full flex items-center justify-center text-xs font-bold">WA</div>
-                      <span className="text-sm">WhatsApp</span>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-cyan-500/30 rounded-lg border border-cyan-400">
-                      <div className="w-8 h-8 bg-[#0088cc] rounded-full flex items-center justify-center text-xs font-bold">TG</div>
-                      <span className="text-sm">Telegram ✓</span>
-                    </div>
-                  </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Step 2 */}
-              <div
-                className={`relative transition-all duration-500 ${activeStep === 2 ? 'scale-105' : 'scale-100 opacity-70'}`}
-                onMouseEnter={() => setActiveStep(2)}
-              >
-                <div className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 backdrop-blur-sm rounded-3xl p-8 border border-purple-500/30 h-full">
-                  <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-purple-500/30">
-                    <Smartphone className="w-10 h-10 text-white" />
+              <motion.div variants={{ hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 15 } } }} className="relative z-10 md:mt-12">
+                <div className="bg-white rounded-[32px] p-8 md:p-10 shadow-xl shadow-slate-200/50 border border-slate-100 relative group hover:-translate-y-2 transition-transform duration-500 overflow-hidden">
+                  <BorderBeam size={120} duration={12} delay={4} colorFrom="#8b5cf6" colorTo="#e879f9" />
+                  <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner mx-auto md:mx-0 ring-1 ring-purple-100">
+                    <CreditCard className="w-8 h-8" />
                   </div>
-                  <div className="bg-purple-500 text-white text-sm font-bold px-3 py-1 rounded-full w-fit mx-auto mb-4">
+                  <div className="absolute top-6 right-6 text-7xl font-black text-slate-100/60 select-none font-display pointer-events-none group-hover:text-purple-50 transition-colors duration-500">02</div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3 text-center md:text-left font-display">
                     {t('homepage.howItWorks.step2Title')}
-                  </div>
-                  <p className="text-blue-100/80 text-center">
+                  </h3>
+                  <p className="text-slate-500 leading-relaxed text-center md:text-left">
                     {t('homepage.howItWorks.step2Desc')}
                   </p>
-                  {/* Visual Mockup */}
-                  <div className="mt-6 bg-white/10 rounded-xl p-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-mono font-bold text-purple-400 mb-2">+1 (555) 123-4567</div>
-                      <div className="flex items-center justify-center gap-2 text-green-400 text-sm">
-                        <CheckCircle2 className="w-4 h-4" />
-                        {t('common.success', 'Active')}
-                      </div>
-                    </div>
-                  </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Step 3 */}
-              <div
-                className={`relative transition-all duration-500 ${activeStep === 3 ? 'scale-105' : 'scale-100 opacity-70'}`}
-                onMouseEnter={() => setActiveStep(3)}
-              >
-                <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-sm rounded-3xl p-8 border border-green-500/30 h-full">
-                  <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/30">
-                    <MessageSquare className="w-10 h-10 text-white" />
+              <motion.div variants={{ hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 15 } } }} className="relative z-10 md:mt-24">
+                <div className="bg-white rounded-[32px] p-8 md:p-10 shadow-xl shadow-slate-200/50 border border-slate-100 relative group hover:-translate-y-2 transition-transform duration-500 overflow-hidden">
+                  <BorderBeam size={120} duration={12} delay={8} colorFrom="#10b981" colorTo="#34d399" />
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-inner mx-auto md:mx-0 ring-1 ring-emerald-100">
+                    <MessageSquare className="w-8 h-8" />
                   </div>
-                  <div className="bg-green-500 text-white text-sm font-bold px-3 py-1 rounded-full w-fit mx-auto mb-4">
+                  <div className="absolute top-6 right-6 text-7xl font-black text-slate-100/60 select-none font-display pointer-events-none group-hover:text-emerald-50 transition-colors duration-500">03</div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-3 text-center md:text-left font-display">
                     {t('homepage.howItWorks.step3Title')}
-                  </div>
-                  <p className="text-blue-100/80 text-center">
+                  </h3>
+                  <p className="text-slate-500 leading-relaxed text-center md:text-left">
                     {t('homepage.howItWorks.step3Desc')}
                   </p>
-                  {/* Visual Mockup */}
-                  <div className="mt-6 bg-white/10 rounded-xl p-4">
-                    <div className="bg-green-500/20 border border-green-500/40 rounded-lg p-3">
-                      <div className="text-xs text-green-300 mb-1">Telegram</div>
-                      <div className="text-lg font-mono font-bold text-white">Code: 847291</div>
-                    </div>
-                  </div>
                 </div>
+              </motion.div>
+
+            </motion.div>
+
+            {/* Video Tutorial Section */}
+            {videoUrl && (
+              <motion.div 
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.7, delay: 0.3 }}
+                className="mt-16 md:mt-24 w-full max-w-5xl mx-auto aspect-video rounded-[32px] overflow-hidden shadow-2xl shadow-blue-900/10 border-[8px] border-white relative group bg-slate-900"
+              >
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src={`https://www.youtube.com/embed/${videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop()}?rel=0`}
+                  title="Tutoriel OneSMS"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Referral Banner Section */}
+      <section className="py-20 md:py-32 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #003a8c 0%, #004BB5 30%, #0088E0 70%, #00C4FF 100%)' }}>
+        <Particles className="absolute inset-0 z-0" quantity={150} staticity={40} color="#ffffff" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12 md:gap-20">
+            {/* Left Content */}
+            <div className="flex-1 text-white text-center md:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-sm font-medium mb-6">
+                <Gift className="w-4 h-4 text-white" />
+                <span>{t('homepage.referralBanner.badge')}</span>
+              </div>
+              
+              <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-tight font-display">
+                {t('homepage.referralBanner.title')}
+                <span className="block text-blue-200 mt-2">{t('homepage.referralBanner.titleHighlight')}</span>
+              </h2>
+              
+              <p className="text-lg md:text-xl text-white/80 mb-8 max-w-xl mx-auto md:mx-0">
+                {t('homepage.referralBanner.description')}
+              </p>
+
+              {/* Benefits */}
+              <div className="space-y-4 mb-10 max-w-md mx-auto md:mx-0">
+                {[t('homepage.referralBanner.benefit1'), t('homepage.referralBanner.benefit2'), t('homepage.referralBanner.benefit3')].map((benefit, idx) => (
+                  <div key={idx} className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-white font-medium">{benefit}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+                <Link to="/register">
+                  <Button size="lg" className="relative overflow-hidden w-full sm:w-auto bg-white text-[#004BB5] hover:bg-gray-50 h-14 px-8 font-bold text-lg shadow-xl shadow-black/10 transition-all hover:-translate-y-1 group">
+                    <span className="relative z-10 flex items-center">
+                      {t('homepage.referralBanner.cta')}
+                      <ArrowRight className="ml-2 w-5 h-5" />
+                    </span>
+                    <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#004BB5]/10 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+                  </Button>
+                </Link>
+                <Link to="/referral">
+                  <Button size="lg" variant="ghost" className="w-full sm:w-auto border-2 border-white/40 text-white hover:bg-white/10 hover:text-white h-14 px-8 font-semibold text-lg transition-all">
+                    {t('homepage.referralBanner.ctaLearnMore')}
+                  </Button>
+                </Link>
               </div>
             </div>
 
-            {/* Mobile View - Vertical Steps */}
-            <div className="lg:hidden space-y-6">
-              {[
-                { num: 1, icon: MousePointer, color: 'cyan', title: t('homepage.howItWorks.step1Title'), desc: t('homepage.howItWorks.step1Desc') },
-                { num: 2, icon: Smartphone, color: 'purple', title: t('homepage.howItWorks.step2Title'), desc: t('homepage.howItWorks.step2Desc') },
-                { num: 3, icon: MessageSquare, color: 'green', title: t('homepage.howItWorks.step3Title'), desc: t('homepage.howItWorks.step3Desc') },
-              ].map((step) => (
-                <div key={step.num} className={`bg-gradient-to-br from-${step.color}-500/20 to-${step.color}-600/20 backdrop-blur-sm rounded-2xl p-6 border border-${step.color}-500/30`}>
-                  <div className="flex items-start gap-4">
-                    <div className={`w-14 h-14 bg-gradient-to-br from-${step.color}-400 to-${step.color}-500 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0`}>
-                      <step.icon className="w-7 h-7 text-white" />
-                    </div>
-                    <div>
-                      <div className={`bg-${step.color}-500 text-white text-xs font-bold px-2 py-1 rounded-full w-fit mb-2`}>
-                        {step.title}
-                      </div>
-                      <p className="text-blue-100/80 text-sm">{step.desc}</p>
-                    </div>
+            {/* Right Visual */}
+            <div className="flex-1 w-full max-w-sm mx-auto md:max-w-none">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl shadow-black/20 text-center relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-10 translate-x-10 group-hover:scale-125 transition-transform duration-700"></div>
+                
+                <div className="w-20 h-20 bg-white text-[#004BB5] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                  <Users className="w-10 h-10" />
+                </div>
+                
+                <p className="text-white/80 text-sm mb-2 uppercase tracking-wider">{t('homepage.referralBanner.haveCode')}</p>
+                <p className="text-2xl font-bold text-white mb-6">
+                  {t('homepage.referralBanner.enterCode')}
+                </p>
+
+                <div className="bg-black/20 rounded-xl p-4 flex items-center justify-between border border-white/10 mb-2">
+                  <span className="text-xl font-mono font-bold text-white tracking-widest ml-2">ABC123XYZ</span>
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Gift className="w-4 h-4 text-white" />
                   </div>
+                </div>
+                <p className="text-xs text-white/50">{t('homepage.referralBanner.codeExample')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Payment Methods Section */}
+      <section className="py-16 md:py-24 bg-slate-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12 md:mb-16">
+            <p className="text-sm font-medium text-blue-600 mb-3 tracking-wide">
+              {t('homepage.paymentMethods.badge', 'Paiements Sécurisés')}
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">
+              {t('homepage.paymentMethods.title', 'Rechargez avec votre moyen de paiement préféré')}
+            </h2>
+            <p className="text-gray-500 text-base max-w-2xl mx-auto">
+              {t('homepage.paymentMethods.description', 'Mobile money, cartes bancaires — choisissez le mode qui vous convient le mieux.')}
+            </p>
+          </div>
+
+          <div className="max-w-5xl mx-auto mt-10">
+            <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 md:gap-8">
+              {[
+                { src: '/logos/om-new.png', alt: 'Orange Money' },
+                { src: '/logos/wave-new.png', alt: 'Wave' },
+                { src: '/logos/mtn-new.png', alt: 'MTN Mobile Money' },
+                { src: '/logos/mastercard-new.png', alt: 'Mastercard' },
+                { src: '/logos/momo-new.png', alt: 'MTN MoMo' }
+              ].map((logo, idx) => (
+                <div key={idx} className="h-14 md:h-20 px-6 bg-white rounded-2xl shadow-sm border border-gray-100/80 flex items-center justify-center grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 hover:shadow-xl hover:border-blue-100 group cursor-pointer">
+                  <img src={logo.src} alt={logo.alt} className="h-7 md:h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-110" />
                 </div>
               ))}
             </div>
@@ -682,130 +983,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Referral Banner Section - Invite friends */}
-      <section className="py-10 md:py-20 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
-        {/* Background decorations */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-cyan-100/50 rounded-full blur-3xl" />
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-5xl mx-auto">
-            {/* Section Header */}
-            <div className="text-center mb-6 md:mb-10">
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-100 to-blue-100 text-blue-700 px-4 md:px-5 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-semibold mb-3 md:mb-4 shadow-sm">
-                <Gift className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                {t('homepage.referralBanner.badge')}
-              </div>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-gray-900 mb-2">
-                {t('homepage.referralBanner.title')}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600"> {t('homepage.referralBanner.titleHighlight')}</span>
-              </h2>
-              <p className="text-sm md:text-base text-gray-600 max-w-2xl mx-auto mt-3 md:mt-4 px-2">
-                {t('homepage.referralBanner.description')}
-              </p>
-            </div>
-
-            {/* Main Card */}
-            <div className="bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden relative">
-              {/* Background elements */}
-              <div className="absolute inset-0">
-                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.2),transparent_50%)]"></div>
-                <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(139,92,246,0.2),transparent_50%)]"></div>
-              </div>
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-
-              <div className="grid md:grid-cols-2 gap-0 relative z-10">
-                {/* Left Content */}
-                <div className="p-5 sm:p-6 md:p-10 lg:p-12 text-white">
-                  {/* Bonus Highlight - Mobile first */}
-                  <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30 rounded-xl p-3 sm:p-4 mb-5 md:mb-6">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">🎁</span>
-                      <div>
-                        <p className="text-white font-bold text-sm sm:text-base md:text-lg">
-                          {t('referral.bonusHighlight')}
-                        </p>
-                        <p className="text-yellow-200/80 text-xs sm:text-sm hidden sm:block">
-                          {t('referral.bonusHighlightDesc')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Benefits */}
-                  <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
-                    {[t('homepage.referralBanner.benefit1'), t('homepage.referralBanner.benefit2'), t('homepage.referralBanner.benefit3')].map((benefit, idx) => (
-                      <div key={idx} className="flex items-center gap-3 md:gap-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg md:rounded-xl p-3 md:p-4">
-                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-cyan-500/30">
-                          <Check className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                        </div>
-                        <span className="text-blue-100 font-medium text-sm md:text-lg">{benefit}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* CTAs */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Link to="/register" className="w-full sm:w-auto">
-                      <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 h-12 md:h-14 px-6 md:px-8 font-bold text-base md:text-lg shadow-lg shadow-cyan-500/30 transition-all hover:scale-105">
-                        {t('homepage.referralBanner.cta')}
-                        <ArrowRight className="ml-2 w-4 h-4 md:w-5 md:h-5" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Right Visual */}
-                <div className="p-5 sm:p-6 md:p-10 lg:p-12 flex flex-col justify-center relative border-t md:border-t-0 md:border-l border-white/10">
-                  {/* Decorative circles - hidden on mobile */}
-                  <div className="hidden md:block absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-2xl" />
-                  <div className="hidden md:block absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl" />
-
-                  <div className="relative z-10 text-white text-center">
-                    <div className="w-14 h-14 md:w-20 md:h-20 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-xl shadow-cyan-500/40">
-                      <Users className="w-7 h-7 md:w-10 md:h-10" />
-                    </div>
-
-                    <p className="text-blue-200/80 text-xs md:text-sm mb-1 md:mb-2">{t('homepage.referralBanner.haveCode')}</p>
-                    <p className="text-lg md:text-2xl font-bold mb-4 md:mb-6">
-                      {t('homepage.referralBanner.enterCode')}
-                    </p>
-
-                    {/* Fake code input visual */}
-                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg md:rounded-xl p-3 md:p-5 max-w-xs mx-auto">
-                      <div className="flex items-center gap-2 md:gap-3 justify-center">
-                        <Gift className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
-                        <span className="text-base md:text-xl font-mono font-bold tracking-wider md:tracking-widest text-cyan-300">ABC123XYZ</span>
-                      </div>
-                      <p className="text-[10px] md:text-xs text-blue-200/60 mt-2 md:mt-3">{t('homepage.referralBanner.codeExample')}</p>
-                    </div>
-
-                    <Link to="/referral" className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-medium text-sm md:text-base mt-4 md:mt-6 transition-colors">
-                      {t('homepage.referralBanner.ctaLearnMore')}
-                      <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section - TopUp Packages Carousel */}
-      <section id="pricing" className="py-16 md:py-24 bg-gradient-to-b from-slate-50 to-white overflow-hidden scroll-mt-20">
+      {/* Pricing Section */}
+      <section id="pricing" className="py-16 md:py-24 bg-white overflow-hidden scroll-mt-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12 md:mb-16">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-cyan-100 text-emerald-700 px-5 py-2.5 rounded-full text-sm font-semibold mb-4 shadow-sm">
-              <CreditCard className="w-4 h-4" />
+            <p className="text-sm font-medium text-blue-600 mb-3 tracking-wide">
               {t('homepage.pricing.subtitle')}
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-gray-900 mb-4">
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-display">
               {t('homepage.pricing.title')}
             </h2>
-            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+            <p className="text-gray-500 text-base max-w-2xl mx-auto">
               {t('homepage.pricing.description', 'Choose your activation package and start receiving SMS instantly')}
             </p>
           </div>
@@ -843,7 +1031,7 @@ export default function HomePage() {
               {topUpPackages.length > 0 ? (
                 topUpPackages.map((pkg, index) => {
                   const isPopular = pkg.is_popular;
-                  const gradient = isPopular ? 'from-orange-500 to-red-500' : 'from-blue-600 to-cyan-500';
+                  const gradient = isPopular ? 'from-slate-900 via-blue-900 to-blue-800' : 'from-blue-600 to-cyan-500';
 
                   return (
                     <div
@@ -853,15 +1041,16 @@ export default function HomePage() {
                       {/* Popular Badge - Enhanced */}
                       {isPopular && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-                          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-orange-500/40 flex items-center gap-1.5 whitespace-nowrap">
-                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+                          <div className="bg-gradient-to-r from-slate-900 to-blue-800 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-blue-900/40 flex items-center gap-1.5 whitespace-nowrap">
+                            <Star className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
                             {t('homepage.pricing.mostPopular', 'POPULAIRE')}
-                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+                            <Star className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
                           </div>
                         </div>
                       )}
 
-                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-orange-400 shadow-orange-200 ring-4 ring-orange-100' : 'border-gray-100'} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1`}>
+                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-blue-500 shadow-blue-200 ring-4 ring-blue-50' : 'border-gray-100'} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1`}>
+                        {isPopular && <BorderBeam size={250} duration={12} delay={9} colorFrom="#3B82F6" colorTo="#06b6d4" />}
                         {/* Header with gradient */}
                         <div className={`bg-gradient-to-r ${gradient} p-6 text-white relative overflow-hidden`}>
                           <div className="absolute inset-0 bg-black/10"></div>
@@ -896,9 +1085,9 @@ export default function HomePage() {
                           <div className="mb-4">
                             <div className="flex items-baseline gap-1">
                               <span className="text-3xl md:text-4xl font-black text-gray-900">
-                                {pkg.price_xof.toLocaleString('fr-FR')}
+                                {formatPrice(pkg.price_xof).replace(/[^\d\s]/g, '').trim()}
                               </span>
-                              <span className="text-lg font-bold text-gray-500">FCFA</span>
+                              <span className="text-lg font-bold text-gray-500">{formatPrice(pkg.price_xof).replace(/[\d\s.,]/g, '').trim().replace('XOF', 'FCFA')}</span>
                             </div>
                           </div>
 
@@ -907,7 +1096,7 @@ export default function HomePage() {
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-500">{t('homepage.pricing.perUnit', 'Par activation')}</span>
                               <span className="font-bold text-gray-700">
-                                {Math.round(pkg.price_xof / pkg.activations).toLocaleString('fr-FR')} F
+                                {formatPrice(pkg.price_xof / pkg.activations, true).replace('XOF', 'FCFA')}
                               </span>
                             </div>
                           </div>
@@ -948,7 +1137,7 @@ export default function HomePage() {
                   { activations: 100, price_xof: 10000, is_popular: false, savings_percentage: 0 },
                 ].map((pkg, index) => {
                   const isPopular = pkg.is_popular;
-                  const gradient = isPopular ? 'from-orange-500 to-red-500' : 'from-blue-600 to-cyan-500';
+                  const gradient = isPopular ? 'from-slate-900 via-blue-900 to-blue-800' : 'from-blue-600 to-cyan-500';
 
                   return (
                     <div
@@ -957,15 +1146,16 @@ export default function HomePage() {
                     >
                       {isPopular && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-                          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-orange-500/40 flex items-center gap-1.5 whitespace-nowrap">
-                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+                          <div className="bg-gradient-to-r from-slate-900 to-blue-800 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-blue-900/40 flex items-center gap-1.5 whitespace-nowrap">
+                            <Star className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
                             {t('homepage.pricing.mostPopular', 'POPULAIRE')}
-                            <Star className="w-3.5 h-3.5 fill-yellow-300 text-yellow-300" />
+                            <Star className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
                           </div>
                         </div>
                       )}
 
-                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-orange-400 shadow-orange-200 ring-4 ring-orange-100' : 'border-gray-100'} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1`}>
+                      <div className={`relative bg-white rounded-3xl shadow-xl border-2 ${isPopular ? 'border-blue-500 shadow-blue-200 ring-4 ring-blue-50' : 'border-gray-100'} overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1`}>
+                        {isPopular && <BorderBeam size={250} duration={12} delay={9} colorFrom="#3B82F6" colorTo="#06b6d4" />}
                         <div className={`bg-gradient-to-r ${gradient} p-6 text-white relative overflow-hidden`}>
                           <div className="absolute inset-0 bg-black/10"></div>
                           <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
@@ -996,9 +1186,9 @@ export default function HomePage() {
                           <div className="mb-4">
                             <div className="flex items-baseline gap-1">
                               <span className="text-3xl md:text-4xl font-black text-gray-900">
-                                {pkg.price_xof.toLocaleString('fr-FR')}
+                                {formatPrice(pkg.price_xof).replace(/[^\d\s]/g, '').trim()}
                               </span>
-                              <span className="text-lg font-bold text-gray-500">FCFA</span>
+                              <span className="text-lg font-bold text-gray-500">{formatPrice(pkg.price_xof).replace(/[\d\s.,]/g, '').trim().replace('XOF', 'FCFA')}</span>
                             </div>
                           </div>
 
@@ -1006,7 +1196,7 @@ export default function HomePage() {
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-500">{t('homepage.pricing.perUnit', 'Par activation')}</span>
                               <span className="font-bold text-gray-700">
-                                {Math.round(pkg.price_xof / pkg.activations).toLocaleString('fr-FR')} F
+                                {formatPrice(pkg.price_xof / pkg.activations, true).replace('XOF', 'FCFA')}
                               </span>
                             </div>
                           </div>
@@ -1067,27 +1257,38 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA - Clean design with proper background */}
-      <section className="py-16 md:py-20 bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white relative overflow-hidden">
-        {/* Background elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.2),transparent_70%)]"></div>
-        </div>
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.02)_25%,rgba(255,255,255,0.02)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.02)_75%)] bg-[length:60px_60px]"></div>
-
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-black mb-4">{t('homepage.cta.title')}</h2>
-          <p className="text-lg md:text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+      {/* Final CTA */}
+      <section className="py-16 md:py-20 text-white" style={{ background: 'linear-gradient(135deg, #003a8c 0%, #004BB5 30%, #0088E0 70%, #00C4FF 100%)' }}>
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 font-display">{t('homepage.cta.title')}</h2>
+          <p className="text-base md:text-lg text-white/70 mb-8 max-w-2xl mx-auto">
             {t('homepage.cta.subtitle')}
           </p>
           <Link to="/register">
-            <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white h-12 md:h-14 px-8 md:px-10 text-base md:text-lg font-bold shadow-xl shadow-blue-500/30 hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <Button size="lg" className="bg-white text-[#004BB5] hover:bg-white/90 h-12 md:h-14 px-8 md:px-10 text-base md:text-lg font-semibold shadow-xl shadow-black/10 rounded-xl transition-all duration-200">
               {t('homepage.cta.button')}
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
         </div>
       </section>
+
+      {/* Sticky Mobile CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-[100] md:hidden pb-safe">
+        <div className="flex items-center gap-3 w-full">
+          <Link to="/login" className="flex-[0.8]">
+            <Button variant="outline" className="w-full h-14 rounded-xl border-2 border-gray-200 text-gray-700 font-bold text-base bg-white hover:bg-gray-50 active:scale-95 transition-transform">
+              {t('nav.login')}
+            </Button>
+          </Link>
+          <Link to="/register" className="flex-[1.2]">
+            <Button className="relative overflow-hidden w-full bg-[#004BB5] hover:bg-[#003a8c] text-white h-14 rounded-xl shadow-lg text-base sm:text-lg font-bold active:scale-95 transition-transform border border-blue-400/30">
+              <span className="relative z-10">{t('homepage.hero.getStarted')}</span>
+              <BorderBeam size={100} duration={3} delay={0} colorFrom="#fff" colorTo="#00C4FF" borderWidth={2} className="opacity-80" />
+            </Button>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

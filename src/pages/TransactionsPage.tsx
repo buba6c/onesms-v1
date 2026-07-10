@@ -1,17 +1,16 @@
- 
+
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
-import paytech from '@/lib/api/paytech';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  CreditCard, 
-  Download, 
+import {
+  CreditCard,
+  Download,
   Filter,
   Plus,
   ArrowUpRight,
@@ -22,9 +21,12 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  Loader2,
+  ArrowRight
 } from 'lucide-react';
-import { formatDate, formatCurrency, generateRef } from '@/lib/utils';
+import { formatDate, formatCurrency, generateRef, cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -36,7 +38,7 @@ interface Transaction {
   amount: number;
   status: string;
   payment_method: string | null;
-  payment_ref: string | null;
+  reference: string | null; // Renamed from payment_ref
   description: string | null;
   created_at: string;
   related_activation_id?: string | null;
@@ -76,7 +78,8 @@ export default function TransactionsPage() {
 
       const { data, error } = await supabase
         .from('transactions')
-        .select('*')
+        // Explicitly select existing columns to avoid 400 errors with * if schema changed
+        .select('id, user_id, type, amount, status, payment_method, reference, description, created_at, related_activation_id, related_rental_id, metadata')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -91,12 +94,12 @@ export default function TransactionsPage() {
     queryKey: ['activations-for-transactions', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not authenticated');
-      
+
       const { data, error } = await supabase
         .from('activations')
         .select('id, status, expires_at')
         .eq('user_id', user.id);
-      
+
       if (error) throw error;
       return data;
     },
@@ -109,18 +112,18 @@ export default function TransactionsPage() {
     if (['completed', 'refunded', 'failed', 'cancelled'].includes(transaction.status)) {
       return transaction.status;
     }
-    
+
     // Si c'est un achat (purchase) avec pending, vérifier l'activation liée
     if (transaction.type === 'purchase' && transaction.status === 'pending') {
       const activationId = transaction.related_activation_id || transaction.metadata?.activation_id;
-      
+
       if (activationId && activations) {
         const activation = activations.find(a => a.id === activationId);
         if (activation) {
           // Vérifier si expirée
           const now = new Date();
           const expiresAt = new Date(activation.expires_at);
-          
+
           if (activation.status === 'received') {
             return 'completed';
           } else if (activation.status === 'cancelled' || activation.status === 'refunded') {
@@ -130,14 +133,14 @@ export default function TransactionsPage() {
           }
         }
       }
-      
+
       // Vérifier si la transaction est trop ancienne (plus de 30 min = expirée)
       const txnAge = (Date.now() - new Date(transaction.created_at).getTime()) / 1000 / 60;
       if (txnAge > 30) {
         return 'refunded'; // Probablement expirée et remboursée
       }
     }
-    
+
     return transaction.status;
   };
 
@@ -165,36 +168,29 @@ export default function TransactionsPage() {
       if (!user?.id) throw new Error('User not authenticated');
 
       const ref = generateRef('RECHARGE');
-      
-      // Request payment from PayTech
-      const payment = await paytech.requestPayment(
-        {
-          item_name: 'Rechargement crédits One SMS',
-          item_price: amount,
-          command_name: ref,
-          ref_command: ref,
-        },
-        import.meta.env.VITE_PAYTECH_IPN_URL,
-        import.meta.env.VITE_PAYTECH_SUCCESS_URL,
-        import.meta.env.VITE_PAYTECH_CANCEL_URL
-      );
 
-      // Save transaction
-      const { error } = await (supabase
-        .from('transactions') as any)
-        .insert({
-          user_id: user.id,
-          type: 'recharge',
+      // Call Edge Function to securely generate PayTech URL and insert transaction
+      const { data, error } = await supabase.functions.invoke('paytech-create-payment', {
+        body: {
           amount: amount,
-          status: 'pending',
-          payment_method: 'paytech',
-          payment_ref: ref,
-          description: `Rechargement de ${amount} XOF`,
-        });
+          item_name: 'Rechargement crédits One SMS',
+          command_name: ref,
+          ipn_url: import.meta.env.VITE_PAYTECH_IPN_URL || 'https://api.sms-activate.org/api/ipn', // Fallback, update in Edge Function for prod
+          success_url: import.meta.env.VITE_PAYTECH_SUCCESS_URL || window.location.origin + '/dashboard/transactions',
+          cancel_url: import.meta.env.VITE_PAYTECH_CANCEL_URL || window.location.origin + '/dashboard/transactions'
+        }
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Erreur lors de la création du paiement');
+      }
+      
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Erreur lors de la création du paiement');
+      }
 
-      return payment;
+      return data;
     },
     onSuccess: (payment) => {
       // Verify payment response
@@ -226,7 +222,7 @@ export default function TransactionsPage() {
       t.type,
       t.amount.toString(),
       t.status,
-      t.payment_ref || '-',
+      t.reference || '-', // Corrected
       t.description || '-',
     ]);
 
@@ -253,7 +249,7 @@ export default function TransactionsPage() {
     if (!transactions || transactions.length === 0) return;
 
     const doc = new jsPDF();
-    
+
     // Header
     doc.setFontSize(20);
     doc.text('ONE SMS - Historique des Transactions', 14, 20);
@@ -270,7 +266,7 @@ export default function TransactionsPage() {
         t.type,
         t.amount.toLocaleString(),
         t.status,
-        t.payment_ref || '-',
+        t.reference || '-', // Corrected
       ]),
       theme: 'striped',
       headStyles: { fillColor: [59, 130, 246] },
@@ -290,7 +286,7 @@ export default function TransactionsPage() {
     const realStatus = getRealTransactionStatus(t);
     const matchesStatus = filterStatus === 'all' || realStatus === filterStatus;
     const matchesDate = (!dateRange.start || new Date(t.created_at) >= new Date(dateRange.start)) &&
-                       (!dateRange.end || new Date(t.created_at) <= new Date(dateRange.end));
+      (!dateRange.end || new Date(t.created_at) <= new Date(dateRange.end));
     return matchesType && matchesStatus && matchesDate;
   });
 
@@ -433,23 +429,21 @@ export default function TransactionsPage() {
             // Obtenir le statut réel basé sur l'activation liée
             const realStatus = getRealTransactionStatus(transaction);
             const statusConfig = getStatusBadge(realStatus);
-            
+
             // Déterminer si c'est un crédit ou débit
             const isCredit = ['recharge', 'topup', 'credit', 'refund', 'bonus'].includes(transaction.type);
             const isRefunded = realStatus === 'refunded';
-            
+
             return (
-              <Card key={transaction.id} className={`hover:shadow-md transition-shadow ${
-                isRefunded ? 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10' : ''
-              }`}>
+              <Card key={transaction.id} className={`hover:shadow-md transition-shadow ${isRefunded ? 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10' : ''
+                }`}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       {/* Icon */}
-                      <div className={`p-2.5 rounded-full flex-shrink-0 ${
-                        isRefunded ? 'bg-orange-100 dark:bg-orange-900/30' :
-                        isCredit ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
-                      }`}>
+                      <div className={`p-2.5 rounded-full flex-shrink-0 ${isRefunded ? 'bg-orange-100 dark:bg-orange-900/30' :
+                          isCredit ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+                        }`}>
                         {isRefunded ? (
                           <RefreshCw className="h-4 w-4 text-orange-600" />
                         ) : isCredit ? (
@@ -458,41 +452,39 @@ export default function TransactionsPage() {
                           <ArrowUpRight className="h-4 w-4 text-red-600" />
                         )}
                       </div>
-                      
+
                       {/* Details */}
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-sm capitalize truncate">
-                          {transaction.description || transaction.type}
+                          {transaction.description ? transaction.description.replace(/\s*\([^)]*\)/g, '').trim() : transaction.type}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className="text-xs text-gray-500 dark:text-gray-400">
                             {formatDate(transaction.created_at)}
                           </span>
-                          {transaction.payment_ref && (
+                          {transaction.reference && ( // Corrected from payment_ref
                             <span className="text-[10px] text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                              {transaction.payment_ref.slice(0, 15)}...
+                              {transaction.reference.slice(0, 15)}...
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Amount + Status */}
                     <div className="text-right flex-shrink-0">
-                      <p className={`text-base font-bold ${
-                        isRefunded ? 'text-orange-600' :
-                        isCredit ? 'text-green-600' : 'text-red-600'
-                      }`}>
+                      <p className={`text-base font-bold ${isRefunded ? 'text-orange-600' :
+                          isCredit ? 'text-green-600' : 'text-red-600'
+                        }`}>
                         {isCredit ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount), 'XOF')}
                       </p>
-                      <Badge 
+                      <Badge
                         variant={statusConfig.variant}
-                        className={`mt-1 text-xs ${
-                          realStatus === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                          realStatus === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                          realStatus === 'refunded' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                          ''
-                        }`}
+                        className={`mt-1 text-xs ${realStatus === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            realStatus === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                              realStatus === 'refunded' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                                ''
+                          }`}
                       >
                         <span className="flex items-center">
                           {statusConfig.icon}
@@ -516,65 +508,92 @@ export default function TransactionsPage() {
         </Card>
       )}
 
-      {/* Recharge Modal */}
+      {/* Recharge Modal - PREMIUM REDESIGN */}
       {showRechargeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Recharger mes crédits</CardTitle>
-              <CardDescription>Choisissez le montant à recharger</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Montant (XOF)</label>
-                <Input
-                  type="number"
-                  value={rechargeAmount}
-                  onChange={(e) => setRechargeAmount(Number(e.target.value))}
-                  min={500}
-                  step={500}
-                />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+          <Card className="w-full max-w-md overflow-hidden border-0 shadow-[0_0_50px_-12px_rgba(37,99,235,0.5)] animate-in zoom-in-95 duration-300">
+            {/* Header avec Dégradé */}
+            <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-8 text-white text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-full bg-white/5 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30"></div>
+              
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl border border-white/20">
+                  <Wallet className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-black tracking-tight">Recharger mes crédits</h2>
+                <p className="text-blue-100 font-medium mt-1 text-sm">Ajoutez du solde pour acheter vos numéros</p>
+              </div>
+            </div>
+
+            <CardContent className="p-6 space-y-6 bg-white dark:bg-gray-950">
+              {/* Input du montant */}
+              <div className="text-center space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Montant (XOF)</label>
+                <div className="relative max-w-[200px] mx-auto group">
+                  <Input
+                    type="number"
+                    value={rechargeAmount || ''}
+                    onChange={(e) => setRechargeAmount(Number(e.target.value))}
+                    min={500}
+                    step={500}
+                    className="text-5xl font-black text-center h-20 border-b-2 border-t-0 border-l-0 border-r-0 rounded-none border-gray-200 focus-visible:ring-0 focus-visible:border-blue-600 p-0 transition-colors bg-transparent"
+                  />
+                  <span className="absolute -right-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">XOF</span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              {/* Raccourcis de prix */}
+              <div className="grid grid-cols-3 gap-3">
                 {[2000, 5000, 10000, 20000, 50000, 100000].map(amount => (
-                  <Button
+                  <button
                     key={amount}
-                    variant={rechargeAmount === amount ? 'default' : 'outline'}
-                    size="sm"
                     onClick={() => setRechargeAmount(amount)}
+                    className={cn(
+                      "py-2.5 px-1 rounded-xl text-sm font-bold transition-all duration-200 border-2",
+                      rechargeAmount === amount 
+                        ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/30 scale-[1.02]" 
+                        : "bg-transparent border-gray-100 text-gray-600 hover:border-gray-200 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-400 dark:hover:bg-gray-900"
+                    )}
                   >
-                    {amount / 1000}k
-                  </Button>
+                    {amount >= 1000 ? `${amount / 1000}k` : amount}
+                  </button>
                 ))}
               </div>
 
-              <div className="pt-4 border-t">
-                <div className="flex justify-between mb-2">
-                  <span>Montant:</span>
-                  <span className="font-bold">{formatCurrency(rechargeAmount, 'XOF')}</span>
+              {/* Récapitulatif */}
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-4 space-y-3 border border-gray-100 dark:border-gray-800">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-500">Total à payer:</span>
+                  <span className="font-black text-xl text-gray-900 dark:text-white">{formatCurrency(rechargeAmount || 0, 'XOF')}</span>
                 </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Méthode:</span>
-                  <span>PayTech (Wave, Orange Money, etc.)</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-500">Moyens acceptés:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-600 px-2 py-1 rounded-md">Orange</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-600 px-2 py-1 rounded-md">Wave</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
                   onClick={() => setShowRechargeModal(false)}
-                  className="flex-1"
+                  className="px-6 py-4 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   Annuler
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={() => rechargeMutation.mutate(rechargeAmount)}
-                  disabled={rechargeMutation.isPending}
-                  className="flex-1"
+                  disabled={rechargeMutation.isPending || !rechargeAmount || rechargeAmount < 500}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-xl py-4 shadow-xl shadow-blue-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex justify-center items-center gap-2"
                 >
-                  {rechargeMutation.isPending ? 'Traitement...' : 'Continuer'}
-                </Button>
+                  {rechargeMutation.isPending ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" /> Traitement...</>
+                  ) : (
+                    <>Payer maintenant <ArrowRight className="w-5 h-5" /></>
+                  )}
+                </button>
               </div>
             </CardContent>
           </Card>

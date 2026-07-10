@@ -125,25 +125,29 @@ export default function AdminPricing() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{t('admin.pricing')}</h1>
-          <p className="text-gray-500">
-            Prix en temps réel via SMS-Activate API
-          </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-6">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-cyan-600" />
+            </div>
+            {t('admin.pricing')}
+          </h1>
         </div>
-        <Button 
-          variant="outline"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          {isFetching ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4 mr-2" />
-          )}
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button 
+            onClick={() => refetch()} 
+            disabled={isFetching}
+            className="h-10 rounded-full px-4 bg-gray-900 text-white hover:bg-black shadow-sm gap-2"
+          >
+            {isFetching ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Info Banner */}
@@ -221,13 +225,13 @@ export default function AdminPricing() {
       </div>
 
       {/* Pricing Table */}
-      <Card>
+      <Card className="overflow-hidden shadow-sm border-0 ring-1 ring-gray-100">
         {error ? (
           <div className="p-12 text-center">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
             <p className="text-red-600 font-medium mb-2">Erreur de chargement</p>
             <p className="text-gray-500 text-sm mb-4">{(error as Error).message}</p>
-            <Button onClick={() => refetch()} variant="outline">
+            <Button onClick={() => refetch()} variant="outline" className="rounded-full">
               <RefreshCw className="w-4 h-4 mr-2" />
               Réessayer
             </Button>
@@ -249,20 +253,20 @@ export default function AdminPricing() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pays</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coût API</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix Vente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marge</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disponibles</th>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Service</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Pays</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Coût API</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Prix Vente</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Marge</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Disponibles</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border">
                 {filteredPrices.map((price, index) => (
-                  <tr key={`${price.service_code}-${index}`} className="hover:bg-gray-50">
+                  <tr key={`${price.service_code}-${index}`} className="hover:bg-gray-50/50 transition-colors group border-b border-gray-50 last:border-0">
                     <td className="px-6 py-4">
                       <div className="font-medium uppercase">{price.service_code}</div>
                     </td>

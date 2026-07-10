@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contactMessagesApi, ContactMessage } from '@/lib/api/contactMessages';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr } from 'date-fns/locale/fr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,

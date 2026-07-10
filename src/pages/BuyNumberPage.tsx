@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, Loader2, ShoppingCart, Shield, ChevronRight, Home } from 'lucide-react';
+import { Search, ChevronLeft, Loader2, ShoppingCart, Shield, ChevronRight, Home, CheckCircle2, Activity, Trophy, TrendingUp, Sparkles, Award, Copy, Check, Clock, Smartphone, ArrowRight, Info } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,9 @@ import { supabase, cloudFunctions } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { getServiceLogo, getCountryFlag, getFlagEmoji } from '@/lib/logo-service';
 import { getSetting } from '@/lib/settings';
-import { get5simProductName } from '@/lib/service-mapping';
+import { get5simProductName, get5simCountryName } from '@/lib/service-mapping';
+import { RentOnboardingModal } from '@/components/ui/RentOnboardingModal';
+import { computeServiceCountrySuccessRate, sortCountriesByReliability, getRealServiceCountryStats, getAnchorCompletedSms } from '@/lib/country-scoring';
 import {
     Dialog,
     DialogContent,
@@ -20,7 +22,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { AlertTriangle, Wallet } from 'lucide-react';
-
+import { motion, AnimatePresence } from 'framer-motion';
 // --- Types ---
 type Service = {
     id: string;
@@ -76,6 +78,9 @@ export default function BuyNumberPage() {
     const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
 
     const [buying, setBuying] = useState(false);
+    const [purchaseState, setPurchaseState] = useState<'idle' | 'loading' | 'smart_routing' | 'success'>('idle');
+    const [purchasedNumber, setPurchasedNumber] = useState<string | null>(null);
+    const [copiedNumber, setCopiedNumber] = useState(false);
     const [showInsufficientBalanceDialog, setShowInsufficientBalanceDialog] = useState(false);
     const [insufficientBalanceData, setInsufficientBalanceData] = useState<{ needed: number, available: number, missing: number } | null>(null);
 
@@ -85,16 +90,14 @@ export default function BuyNumberPage() {
     const { data: services = [], isLoading: loadingServices } = useQuery({
         queryKey: ['available-services-sync', mode], // Unique key to avoid conflicts
         queryFn: async () => {
-            // Fetch from DB just like Dashboard
+            // Fetch from DB
             const { data, error } = await supabase
                 .from('services')
                 .select('*')
-                .eq('active', true)
-                .gt('total_available', 0);
+                .eq('active', true);
 
             if (error) throw error;
 
-            // Filter by category if we had one, but here we show all
             let filtered: any[] = data || [];
 
             // Hide 'ot'/'any' for activation/rent
@@ -102,17 +105,44 @@ export default function BuyNumberPage() {
                 filtered = filtered.filter(s => s.code !== 'ot' && s.code !== 'any');
             }
 
-            // Sort by priority then availability (Dashboard Logic)
-            return filtered.map((s: any) => ({
+            let servicesWithCounts = filtered.map((s: any) => ({
                 id: s.code,
                 name: s.display_name || s.name,
                 code: s.code,
                 count: s.total_available || 0,
                 _priority: getServicePriority(s.code)
-            })).sort((a, b) => {
+            }));
+
+            // If rent mode, fetch real rent quantities
+            if (mode === 'rent') {
+                try {
+                    const rentTimeMap: Record<string, string> = {
+                        '4hours': '4', '1day': '24', '1week': '168', '1month': '720'
+                    };
+                    const { data: rentData } = await cloudFunctions.invoke('get-sms-activate-rent-services', {
+                        body: { time: rentTimeMap[rentDuration], getServices: true }
+                    });
+                    
+                    const availableQuantities = new Map(
+                        (rentData?.availableServices || []).map((s: any) => [s.code, s.available || 0])
+                    );
+
+                    servicesWithCounts = servicesWithCounts.map(s => ({
+                        ...s,
+                        count: availableQuantities.get(s.code) || 0
+                    }));
+                } catch (e) {
+                    console.error('Failed to fetch rent services', e);
+                }
+            }
+
+            // Sort by priority then availability (Dashboard Logic)
+            return servicesWithCounts.sort((a, b) => {
+                if (a.count > 0 && b.count === 0) return -1;
+                if (a.count === 0 && b.count > 0) return 1;
                 if (a._priority !== b._priority) return b._priority - a._priority;
                 return b.count - a.count;
-            }); // Removed .map to keep cleaner code, we use .code/.name in render
+            });
         },
         staleTime: 60000 // 1 min cache
     });
@@ -129,17 +159,21 @@ export default function BuyNumberPage() {
         queryFn: async () => {
             if (!selectedService) return [];
 
+            // 1. Fetch local DB stats first (Deep Analysis) & Real Activations Auto-Learning
+            const { data: dbCountries } = await supabase
+                .from('countries')
+                .select('code, success_rate')
+                .eq('active', true);
+
+            const successRateMap = new Map(
+                dbCountries?.map((c: any) => [c.code.toLowerCase(), c.success_rate]) || []
+            );
+
+            // 🧠 Auto-Apprentissage : Récupérer le vrai ratio de succès de la table activations
+            const realStatsMap = await getRealServiceCountryStats(selectedService.code, supabase);
+
             // ✅ ACTIVATION MODE
             if (mode === 'activation') {
-                // 1. Fetch local DB stats first (Deep Analysis)
-                const { data: dbCountries } = await supabase
-                    .from('countries')
-                    .select('code, success_rate')
-                    .eq('active', true);
-
-                const successRateMap = new Map(
-                    dbCountries?.map((c: any) => [c.code.toLowerCase(), c.success_rate]) || []
-                );
 
                 // 2. Fetch API data
                 const { data, error } = await cloudFunctions.invoke('get-top-countries-by-service', {
@@ -148,17 +182,25 @@ export default function BuyNumberPage() {
 
                 if (error) throw error;
 
-                return (data?.countries || [])
+                const mapped = (data?.countries || [])
                     .filter((c: any) => c.count > 0 && c.price > 0)
                     .map((c: any) => {
-                        // Deep Analysis Merging
                         const localRate = successRateMap.get(c.countryCode.toLowerCase());
-                        const finalSuccessRate = localRate || c.successRate || null;
+                        const realStat = realStatsMap.get(c.countryCode?.toLowerCase()) ||
+                                         realStatsMap.get(c.countryName?.toLowerCase()) ||
+                                         realStatsMap.get(c.countryId?.toString());
+                        const finalSuccessRate = computeServiceCountrySuccessRate(
+                            c.countryCode,
+                            c.countryName,
+                            selectedService.code,
+                            localRate,
+                            c.successRate,
+                            realStat
+                        );
 
-                        // Detect Premium/High Quality
                         const isPremium = c.countryCode.toLowerCase() === 'us' ||
                             c.countryCode.toLowerCase() === 'gb' ||
-                            (c.price > 30); // Heuristic for premium routes
+                            (c.price > 30);
 
                         return {
                             id: c.countryId.toString(),
@@ -166,14 +208,17 @@ export default function BuyNumberPage() {
                             code: c.countryCode,
                             flag: getFlagEmoji(c.countryCode) || '🌍',
                             flagUrl: getCountryFlag(c.countryCode),
-                            isPremium: isPremium, // New field
-                            successRate: finalSuccessRate ? Number(finalSuccessRate.toFixed(1)) : null,
+                            isPremium: isPremium,
+                            successRate: finalSuccessRate,
+                            completedSms: realStat ? realStat.completed : getAnchorCompletedSms(selectedService.code, c.countryCode, c.countryName),
                             count: c.count,
                             price: Number(c.price.toFixed(2)),
                             operator: 'any',
                             _compositeScore: c.compositeScore
                         };
                     });
+
+                return sortCountriesByReliability(mapped);
             }
 
             // ✅ RENT MODE
@@ -187,9 +232,9 @@ export default function BuyNumberPage() {
                 };
                 const rentTime = rentTimeMap[rentDuration];
 
-                const { data: rentData, error } = await cloudFunctions.invoke('get-rent-services', {
+                const { data: rentData, error } = await cloudFunctions.invoke('get-sms-activate-rent-services', {
                     body: {
-                        rentTime,
+                        time: rentTime,
                         getCountries: true,
                         serviceCode: selectedService.code
                     }
@@ -203,37 +248,35 @@ export default function BuyNumberPage() {
 
                 const availableCountries = countriesArray.map((c: any) => {
                     const sellingPrice = c.sellingPrice || MIN_PRICE_COINS;
+                    const dbRate = successRateMap.get(c.code.toLowerCase());
+                    const realStat = realStatsMap.get(c.code?.toLowerCase()) ||
+                                     realStatsMap.get(c.name?.toLowerCase()) ||
+                                     realStatsMap.get(c.id?.toString());
+                    const rate = computeServiceCountrySuccessRate(c.code, c.name, selectedService.code, dbRate, null, realStat);
+
                     return {
                         id: `rent-${c.id}`,
                         name: c.name,
                         code: c.code,
                         flag: getFlagEmoji(c.code) || '🌍',
                         flagUrl: getCountryFlag(c.code),
-                        isPremium: false, // Rent mode is typically standard pricing
-                        successRate: 85,
+                        isPremium: false,
+                        successRate: rate,
                         count: c.quantity || 0,
                         price: sellingPrice,
                         operator: 'any'
                     };
                 });
 
-                // Sort: stock first
-                availableCountries.sort((a: any, b: any) => {
-                    if ((a.count || 0) > 0 && (b.count || 0) === 0) return -1;
-                    if ((a.count || 0) === 0 && (b.count || 0) > 0) return 1;
-                    if ((a.count || 0) > 0 && (b.count || 0) > 0) return (b.count || 0) - (a.count || 0);
-                    return a.name.localeCompare(b.name);
-                });
-
-                return availableCountries;
+                return sortCountriesByReliability(availableCountries);
             }
         },
         enabled: !!selectedService && currentStep === 'country'
     });
 
     // Filter countries
-    const filteredCountries = countries.filter((c: Country) =>
-        c.name.toLowerCase().includes(searchCountry.toLowerCase())
+    const filteredCountries = ((countries as Country[]) || []).filter((c: Country) =>
+        c.name?.toLowerCase().includes(searchCountry.toLowerCase())
     );
 
 
@@ -322,17 +365,22 @@ export default function BuyNumberPage() {
                         adaptiveVeto = prediction.veto;
                         console.log('🧠 [ADAPTIVE] Overriding provider to:', adaptiveProvider, 'Reason:', prediction.reasoning);
 
-                        let reasonMsg = `Passage sur ${adaptiveProvider}`;
-                        if (prediction.reasoning?.includes('Avoid') || prediction.veto) {
-                            reasonMsg += " (Échec précédent évité 🛡️)";
-                        } else if (prediction.reasoning?.includes('Global')) {
-                            reasonMsg += " (Meilleur choix global 🏆)";
-                        }
+                        let reasonMsg = "Optimisation de la route... ⚡";
+                        // if (prediction.reasoning?.includes('Avoid') || prediction.veto) {
+                        //     reasonMsg += " (Échec précédent évité 🛡️)";
+                        // } else if (prediction.reasoning?.includes('Global')) {
+                        //     reasonMsg += " (Meilleur choix global 🏆)";
+                        // }
+
+                        // HIDE PROVIDER NAMES FROM USER UI
+                        // But keep logging for debugging
+
 
                         toast({
-                            title: "🧠 Smart Routing",
-                            description: reasonMsg,
-                            duration: 3000
+                            title: "Smart Routing Actif",
+                            description: "Sélection intelligente du réseau le plus performant en cours",
+                            variant: "smart" as any,
+                            duration: 3500
                         });
                     }
                 } catch (predErr) {
@@ -348,12 +396,12 @@ export default function BuyNumberPage() {
 
             const productCode = (selectedCountry as any)._service || selectedService.code;
 
-            let functionName = '';
+            let functionName = 'buy-number-intelligent';
             let requestBody: any = {};
 
             if (isRent) {
-                // RENTAL: Use OnlineSIM (Fixed)
-                functionName = 'buy-onlinesim-rent';
+                // RENTAL: Use HeroSMS (SMS-Activate)
+                functionName = 'buy-sms-activate-rent';
 
                 // Convert duration label to hours
                 const rentTimeMap: Record<string, string> = {
@@ -364,11 +412,11 @@ export default function BuyNumberPage() {
                 };
 
                 requestBody = {
-                    product: productCode, // Backend expects 'product'
                     country: countryId,
+                    product: productCode,
                     userId: user.id,
-                    rentHours: parseInt(rentTimeMap[rentDuration] || '4'),
-                    // expectedPrice: finalPrice // Optional validation
+                    duration: rentDuration, // Pass the original string label, backend maps it or handles it
+                    expectedPrice: finalPrice
                 };
             } else {
                 // ACTIVATION: Check Provider
@@ -385,23 +433,22 @@ export default function BuyNumberPage() {
                     console.log('⚠️ [BuyNumberPage] TextVerified is US-only, falling back to sms-activate for:', countryId);
                     targetProvider = 'sms-activate';
                     toast({
-                        title: "🔄 Provider Ajusté",
-                        description: `TextVerified (US uniquement) → SMS-Activate pour ${selectedCountry.name}`,
-                        duration: 4000
+                        title: "Routage Optimisé",
+                        description: `Basculement automatique sur la ligne optimale pour ${selectedCountry.name}`,
+                        variant: "smart" as any,
+                        duration: 3500
                     });
                 }
 
                 if (targetProvider === '5sim') {
-                    functionName = 'buy-5sim-number';
+                    requestBody.providerOverride = '5sim';
 
-                    // Map ID to Name (5sim needs 'england', 'russia' etc.)
-                    let countryName = selectedCountry.name.toLowerCase();
-                    if (countryName === 'united kingdom') countryName = 'england';
-
+                    // Convert Country and Product for 5sim
+                    const country5sim = get5simCountryName(selectedCountry.name);
                     const product5sim = get5simProductName(productCode);
 
                     requestBody = {
-                        country: countryName,
+                        country: country5sim,
                         operator: 'any',
                         product: product5sim,
                         userId: user.id,
@@ -409,7 +456,7 @@ export default function BuyNumberPage() {
                     };
                 } else if (targetProvider === 'smspva') {
                     // 🟢 USE SMSPVA
-                    functionName = 'buy-smspva-number';
+                    requestBody.providerOverride = 'smspva';
                     requestBody = {
                         country: countryId,
                         operator: 'any',
@@ -419,7 +466,7 @@ export default function BuyNumberPage() {
                     };
                 } else if (targetProvider === 'onlinesim') {
                     // 🟠 USE ONLINESIM
-                    functionName = 'buy-onlinesim-number';
+                    requestBody.providerOverride = 'onlinesim';
                     requestBody = {
                         country: countryId,
                         operator: 'any',
@@ -429,7 +476,7 @@ export default function BuyNumberPage() {
                     };
                 } else if (targetProvider === 'grizzly') {
                     // 🐻 USE GRIZZLY SMS
-                    functionName = 'buy-grizzly-number';
+                    requestBody.providerOverride = 'grizzly';
                     requestBody = {
                         country: countryId,
                         operator: 'any',
@@ -440,7 +487,7 @@ export default function BuyNumberPage() {
                     };
                 } else if (targetProvider === 'textverified') {
                     // 💎 USE TEXTVERIFIED (Premium/Reliable)
-                    functionName = 'buy-textverified-number';
+                    requestBody.providerOverride = 'textverified';
                     requestBody = {
                         country: countryId,
                         product: productCode,
@@ -450,7 +497,8 @@ export default function BuyNumberPage() {
                     };
                 } else if (targetProvider === 'smspool') {
                     // 🌊 USE SMSPOOL (Premium Global)
-                    functionName = 'buy-smspool-number';
+                    functionName = 'buy-number-intelligent';
+          requestBody.providerOverride = 'smspool';
                     requestBody = {
                         country: countryId,
                         product: productCode,
@@ -460,7 +508,7 @@ export default function BuyNumberPage() {
                     };
                 } else if (targetProvider === 'intelligent' || targetProvider === 'smart') {
                     // 🧠 INTELLIGENT MODE (Default Start): Try HeroSMS first
-                    functionName = 'buy-sms-activate-number';
+                    requestBody.providerOverride = 'sms-activate';
                     requestBody = {
                         country: countryId,
                         operator: 'any',
@@ -470,7 +518,8 @@ export default function BuyNumberPage() {
                     };
                 } else {
                     // Default / fallback / sms-activate
-                    functionName = 'buy-sms-activate-number';
+                    functionName = 'buy-number-intelligent';
+          requestBody.providerOverride = 'sms-activate';
                     requestBody = {
                         country: countryId,
                         operator: 'any',
@@ -482,10 +531,7 @@ export default function BuyNumberPage() {
             }
 
             // Show purchase in progress
-            toast({
-                title: `🔄 Achat en cours`,
-                description: `Connexion en cours...`,
-            });
+            setPurchaseState('loading');
 
             let { data: buyData, error: buyError } = await cloudFunctions.invoke(functionName, {
                 body: requestBody
@@ -516,9 +562,15 @@ export default function BuyNumberPage() {
                     errorMessage.toUpperCase().includes('NO_BALANCE') ||
                     errorMessage.toUpperCase().includes('TOO MANY REQUESTS') ||
                     errorMessage.toLowerCase().includes('not available') ||
+                    errorMessage.toLowerCase().includes('couldn\'t find') ||  // SMSPool: "couldn't find an available phone number"
+                    errorMessage.toLowerCase().includes('no numbers available') ||  // SMSPool: "No numbers available"
+                    errorMessage.toLowerCase().includes('out_of_stock') ||  // SMSPool: OUT_OF_STOCK
                     errorMessage.includes('SMSPool Error') ||
+                    errorMessage.includes('Connection Error') || // Matches "SMSPool Connection Error"
+                    errorMessage.includes('Unexpected end of JSON input') || // Matches upstream API temporary failures
                     errorMessage.includes('not found') ||
-                    errorMessage.includes('Price not found');
+                    errorMessage.includes('Price not found') ||
+                    errorMessage.toLowerCase().includes('no product'); // 5sim: "no product"
 
                 if (isSmartMode && isNoNumbers) {
                     console.log('🧠 [FALLBACK START]', {
@@ -529,11 +581,12 @@ export default function BuyNumberPage() {
 
                     // Helper to try a provider and throw if fails
                     const tryProvider = async (providerName: string, funcName: string, body: any) => {
+                        body.providerOverride = providerName.toLowerCase().replace(/\s|-/g, '');
+                        if (providerName === 'SMS-Activate') body.providerOverride = 'sms-activate';
+                        if (providerName === 'Grizzly SMS') body.providerOverride = 'grizzlysms';
                         console.log(`🧠 Smart mode: Trying ${providerName}...`);
-                        toast({
-                            title: "🧠 Smart Routing",
-                            description: `Tentative via ${providerName}...`,
-                        });
+                        // Hide provider name from UI
+                        setPurchaseState('smart_routing');
 
                         const { data: pData, error: pError } = await cloudFunctions.invoke(funcName, { body });
 
@@ -552,19 +605,14 @@ export default function BuyNumberPage() {
                     console.log('check 5sim', { successData: !!successData, isCurrent: functionName === 'buy-5sim-number', veto: adaptiveVeto === '5sim' });
                     if (!successData && functionName !== 'buy-5sim-number' && adaptiveVeto !== '5sim') {
                         try {
-                            let countryName = selectedCountry.name.toLowerCase();
-                            if (countryName === 'united kingdom') countryName = 'england';
-                            if (countryName === 'united states' || countryName === 'usa') countryName = 'usa';
-                            if (countryName === 'russia') countryName = 'russia';
-
                             const body = {
-                                country: countryName,
+                                country: get5simCountryName(selectedCountry.name),
                                 operator: 'any',
                                 product: get5simProductName(productCode),
                                 userId: user?.id,
                                 expectedPrice: finalPrice
                             };
-                            successData = await tryProvider('5sim', 'buy-5sim-number', body);
+                            successData = await tryProvider('5sim', 'buy-number-intelligent', body);
                             console.log('✅ 5sim fallback succeeded');
                         } catch (e) {
                             console.warn('⚠️ 5sim fallback failed:', e);
@@ -572,8 +620,8 @@ export default function BuyNumberPage() {
                     }
 
                     // 2. Try SMS-Activate (Backup 2 - Huge Inventory)
-                    console.log('check activ', { successData: !!successData, isCurrent: functionName === 'buy-sms-activate-number' });
-                    if (!successData && functionName !== 'buy-sms-activate-number') {
+                    console.log('check activ', { successData: !!successData, isCurrent: functionName === 'buy-number-intelligent' });
+                    if (!successData && functionName !== 'buy-number-intelligent') {
                         try {
                             const body = {
                                 country: countryId, // SMS-Activate ID
@@ -582,7 +630,7 @@ export default function BuyNumberPage() {
                                 userId: user?.id,
                                 expectedPrice: finalPrice
                             };
-                            successData = await tryProvider('SMS-Activate', 'buy-sms-activate-number', body);
+                            successData = await tryProvider('SMS-Activate', 'buy-number-intelligent', body);
                             console.log('✅ SMS-Activate fallback succeeded');
                         } catch (e) {
                             console.warn('⚠️ SMS-Activate fallback failed:', e);
@@ -601,7 +649,7 @@ export default function BuyNumberPage() {
                                 userId: user?.id,
                                 expectedPrice: finalPrice
                             };
-                            successData = await tryProvider('Grizzly SMS', 'buy-grizzly-number', body);
+                            successData = await tryProvider('Grizzly SMS', 'buy-number-intelligent', body);
                             console.log('✅ Grizzly fallback succeeded');
                         } catch (e) {
                             console.warn('⚠️ Grizzly fallback failed:', e);
@@ -618,7 +666,7 @@ export default function BuyNumberPage() {
                                 userId: user?.id,
                                 expectedPrice: finalPrice
                             };
-                            successData = await tryProvider('OnlineSIM', 'buy-onlinesim-number', body);
+                            successData = await tryProvider('OnlineSIM', 'buy-number-intelligent', body);
                             console.log('✅ OnlineSIM fallback succeeded');
                         } catch (e) {
                             console.warn('⚠️ OnlineSIM fallback failed:', e);
@@ -713,56 +761,113 @@ export default function BuyNumberPage() {
                 }, 1000);
             }
 
-            toast({
-                title: isRent ? t('toasts.numberRented', 'Number Rented') : t('toasts.numberActivated', 'Number Activated'),
-                description: isRent
-                    ? `${buyData.data.phone || 'New Number'} - ${t('toasts.rentalSuccess', 'Rental active')}`
-                    : `${buyData.data.phone || 'New Number'} - ${t('toasts.activationSuccess', 'Ready to receive SMS')}`,
-            });
+            setPurchasedNumber(buyData.data.phone || 'Nouveau Numéro');
+            setPurchaseState('success');
 
-            // Redirect to Dashboard
-            navigate('/dashboard');
+            // Redirect to Dashboard after a 12s delay to allow copying number & reading instructions
+            setTimeout(() => {
+                navigate('/dashboard');
+                setPurchaseState('idle');
+                setBuying(false);
+            }, 12000);
+
+            // Don't setBuying(false) yet to keep the UI in success state
+            return;
 
         } catch (err: any) {
+            setPurchaseState('idle');
             toast({
                 title: t('common.error'),
                 description: err.message || t('toasts.orderError'),
                 variant: 'destructive'
             });
-        } finally {
-            setBuying(false);
+            if (purchaseState !== 'success') {
+                setBuying(false);
+                setPurchaseState('idle');
+            }
         }
     };
 
 
 
-    return (
-        <div className="min-h-screen bg-slate-50 pb-20 font-sans">
-            <div className="p-4 max-w-lg mx-auto space-y-4">
+    // Animations
+    const stepVariants: any = {
+        hidden: { opacity: 0, y: 15 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+        exit: { opacity: 0, y: -15, transition: { duration: 0.2, ease: 'easeIn' } }
+    };
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.05
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 10 },
+        visible: { opacity: 1, y: 0 }
+    };
+
+    return (
+        <div className="min-h-screen bg-slate-50 pb-20 font-sans overflow-x-hidden">
+            <RentOnboardingModal />
+            <div className="p-4 max-w-lg mx-auto space-y-4">
+                <AnimatePresence mode="wait">
                 {currentStep === 'service' && (
-                    <>
-                        {/* Mode Toggle */}
-                        <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
+                    <motion.div
+                        key="step-service"
+                        variants={stepVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                    >
+                        {/* Mode Toggle - Magic UI / 21st style segment control with Logo Colors */}
+                        <div className="relative flex bg-gray-100/80 backdrop-blur-sm rounded-[20px] p-1.5 mb-6 shadow-inner border border-gray-200/50">
+                            {/* Sliding Pill Background */}
+                            <div 
+                                className={`absolute inset-y-1.5 left-1.5 rounded-[16px] shadow-md transition-all duration-400 cubic-bezier(0.4, 0, 0.2, 1) ${
+                                    mode === 'activation' 
+                                        ? 'bg-gradient-to-r from-blue-600 to-blue-500 shadow-blue-500/30' 
+                                        : 'bg-gradient-to-r from-cyan-400 to-blue-500 shadow-cyan-500/30'
+                                }`}
+                                style={{
+                                    width: 'calc(50% - 6px)',
+                                    transform: mode === 'activation' ? 'translateX(0)' : 'translateX(100%)',
+                                }}
+                            />
                             <button
                                 onClick={() => setMode('activation')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'activation' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}
+                                className={`relative z-10 flex-1 py-3 text-[15px] font-extrabold tracking-wide rounded-[16px] transition-colors duration-300 ${mode === 'activation'
+                                    ? 'text-white'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                                    }`}
                             >
                                 {t('common.activation')}
                             </button>
                             <button
                                 onClick={() => setMode('rent')}
-                                className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'rent' ? 'bg-white shadow-sm text-purple-600' : 'text-gray-500'}`}
+                                className={`relative z-10 flex-1 py-3 text-[15px] font-extrabold tracking-wide rounded-[16px] transition-colors duration-300 ${mode === 'rent'
+                                    ? 'text-white'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                                    }`}
                             >
+                                {/* Nouveau Badge */}
+                                <span className="absolute -top-2 right-2 sm:right-6 md:right-8 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 border border-white/20 animate-bounce">
+                                    Nouveau
+                                </span>
                                 {t('common.rent')}
                             </button>
                         </div>
 
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <div className="relative mb-5">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
-                                placeholder="Search service..."
-                                className="pl-9 h-12 bg-white rounded-xl border-gray-200 shadow-sm focus:border-blue-500 transition-all text-base"
+                                placeholder="Rechercher un service (ex: WhatsApp, Telegram, Google...)"
+                                className="pl-10 h-12 bg-white rounded-xl border-gray-200 shadow-2xs focus:border-[#00A3FF] transition-all text-sm"
                                 value={searchService}
                                 onChange={(e) => setSearchService(e.target.value)}
                             />
@@ -770,76 +875,94 @@ export default function BuyNumberPage() {
 
                         {loadingServices ? (
                             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                                <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                                <p className="text-sm">Loading services...</p>
+                                <Loader2 className="h-8 w-8 animate-spin mb-2 text-[#0055FF]" />
+                                <p className="text-sm">Chargement des services...</p>
                             </div>
                         ) : (
                             <>
                                 {/* Special Service for Rent Mode - Location complète */}
                                 {mode === 'rent' && (
-                                    <div className="mb-4">
-                                        <p className="text-[10px] text-purple-600 font-black uppercase tracking-widest mb-2 px-1 flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse"></span>
-                                            Exclusivité
-                                        </p>
+                                    <div className="mb-6 relative">
+                                        <div className="flex items-center gap-2 mb-3 px-1">
+                                            <div className="w-2 h-2 rounded-full bg-[#0055FF] shadow-[0_0_8px_rgba(0,85,255,0.8)] animate-pulse" />
+                                            <p className="text-[11px] text-[#0055FF] uppercase tracking-widest font-extrabold">
+                                                Exclusivité
+                                            </p>
+                                        </div>
+                                        
+                                        {/* Location complète - Full Blue Premium */}
                                         <div
                                             onClick={() => handleServiceSelect({ id: 'full', name: 'Location complète', code: 'full', count: 999 })}
-                                            className="bg-white border-2 border-purple-100 p-4 rounded-2xl flex items-center gap-4 cursor-pointer hover:border-purple-500 hover:shadow-xl hover:shadow-purple-500/10 transition-all active:scale-[0.98] group relative overflow-hidden"
+                                            className="relative group cursor-pointer overflow-hidden rounded-[1.2rem] shadow-lg hover:shadow-[0_8px_30px_rgba(0,85,255,0.3)] transition-all duration-300 transform hover:-translate-y-0.5"
                                         >
-                                            <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 blur-2xl rounded-full -mr-10 -mt-10"></div>
+                                            {/* Full Blue Background Gradient */}
+                                            <div className="absolute inset-0 bg-gradient-to-br from-[#0055FF] via-blue-600 to-[#00A3FF]" />
+                                            
+                                            {/* Inner Glow / Highlights */}
+                                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.3)_0%,transparent_50%)]" />
+                                            <div className="absolute -inset-[1.5px] bg-gradient-to-r from-cyan-300 via-blue-300 to-indigo-300 rounded-[1.2rem] opacity-0 group-hover:opacity-40 blur-sm transition-opacity duration-500" />
+                                            
+                                            {/* Shimmer sweep effect */}
+                                            <div className="absolute inset-0 overflow-hidden rounded-2xl z-10 pointer-events-none">
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                                            </div>
 
-                                            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm">
-                                                <Home className="w-6 h-6" />
-                                            </div>
-                                            <div className="flex-1 z-10">
-                                                <h3 className="font-black text-gray-900 text-lg">Location Complète</h3>
-                                                <p className="text-xs text-gray-500 group-hover:text-purple-600 transition-colors">Recevoir les SMS de <strong>tous les services</strong></p>
-                                            </div>
-                                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-purple-100 group-hover:text-purple-600 transition-all">
-                                                <ChevronRight className="w-5 h-5" />
+                                            {/* Card Content */}
+                                            <div className="relative z-20 p-4 flex items-center gap-4">
+                                                
+                                                {/* Premium Icon Container - White Glassmorphism */}
+                                                <div className="relative w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 bg-white/20 backdrop-blur-md border border-white/30 group-hover:bg-white/30 transition-colors">
+                                                    <Home className="w-7 h-7 text-white drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
+                                                </div>
+                                                
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-extrabold text-lg text-white drop-shadow-sm">
+                                                        Location Complète
+                                                    </p>
+                                                    <p className="text-sm font-medium text-blue-50/90 drop-shadow-sm">
+                                                        Recevoir les SMS de <strong>tous les services</strong>
+                                                    </p>
+                                                </div>
+                                                
+                                                {/* Chevron */}
+                                                <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white group-hover:bg-white group-hover:text-[#0055FF] group-hover:translate-x-1 transition-all duration-300 shadow-sm">
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                <div className="grid gap-2 pb-24">
-                                    {/* 🔙 BACK CARD (Base on "on the cards" request) */}
-                                    <div
-                                        onClick={() => navigate('/dashboard')}
-                                        className="bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-400 p-3 rounded-2xl shadow-lg shadow-blue-500/20 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-all group border border-white/10"
-                                    >
-                                        <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner border border-white/20">
-                                            <ChevronLeft className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-white text-lg">{t('common.home', 'Accueil')}</h3>
-                                            <p className="text-xs text-blue-50 font-medium opacity-90">Retour au tableau de bord</p>
-                                        </div>
-                                    </div>
-
+                                <div className="grid gap-2.5 pb-24">
                                     {filteredServices.map((service: any) => (
                                         <div
                                             key={service.id}
-                                            onClick={() => handleServiceSelect(service)}
-                                            className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-all hover:border-blue-500 hover:shadow-md group"
+                                            onClick={() => {
+                                                if (service.count > 0) handleServiceSelect(service);
+                                            }}
+                                            className={`bg-white p-3.5 rounded-2xl border transition-all flex items-center justify-between group ${service.count > 0 ? 'border-gray-200/80 shadow-2xs cursor-pointer hover:border-[#00A3FF] hover:shadow-sm active:scale-[0.99]' : 'border-gray-100 opacity-50 grayscale cursor-not-allowed'}`}
                                         >
-                                            <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-xl shadow-inner border border-gray-100 group-hover:bg-blue-50 transition-colors">
-                                                <img
-                                                    src={getServiceLogo(service.code)}
-                                                    className="w-7 h-7 object-contain drop-shadow-sm"
-                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                    alt=""
-                                                />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{service.name}</h3>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
-                                                        {service.count} available
-                                                    </span>
+                                            <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                                                <div className="w-11 h-11 rounded-xl bg-gray-50 flex items-center justify-center p-2 shadow-2xs border border-gray-200/60 group-hover:bg-[#00A3FF]/10 transition-colors flex-shrink-0">
+                                                    <img
+                                                        src={getServiceLogo(service.code)}
+                                                        className="w-6 h-6 object-contain"
+                                                        loading="lazy"
+                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                        alt=""
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className={`font-bold text-sm tracking-tight text-gray-900 truncate transition-colors ${service.count > 0 ? 'group-hover:text-[#0055FF]' : ''}`}>{service.name}</h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${service.count > 0 ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                                                            {service.count > 0 ? `${service.count.toLocaleString()} disponibles` : 'Rupture de stock'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-all">
+                                            <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-[#0055FF] group-hover:text-white transition-all flex-shrink-0">
                                                 <ChevronRight className="w-4 h-4" />
                                             </div>
                                         </div>
@@ -847,16 +970,23 @@ export default function BuyNumberPage() {
                                 </div>
                             </>
                         )}
-                    </>
+                    </motion.div>
                 )}
 
                 {currentStep === 'country' && selectedService && (
-                    <>
+                    <motion.div
+                        key="step-country"
+                        variants={stepVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                    >
                         <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-blue-100">
                                 <img
                                     src={getServiceLogo(selectedService.code)}
                                     className="w-6 h-6 object-contain"
+                                    loading="lazy"
                                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                     alt=""
                                 />
@@ -884,181 +1014,489 @@ export default function BuyNumberPage() {
                             </div>
                         ) : (
                             <div className="grid gap-2 pb-24">
-                                {/* 🔙 BACK CARD (Base on "on the cards" request) */}
-                                <div
-                                    onClick={() => handleBack()}
-                                    className="bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-400 p-3 rounded-2xl shadow-lg shadow-blue-500/20 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-all group border border-white/10"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-xl shadow-inner border border-white/20">
-                                        <ChevronLeft className="w-6 h-6 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-white text-lg">Changer de service</h3>
-                                        <p className="text-xs text-blue-50 font-medium opacity-90">Retour à la liste</p>
+                                {/* BANDEAU TOP PAYS PAR RÉUSSITE SMS */}
+                                {/* BANDEAU TOP PAYS AUDITÉ PAR SERVICE */}
+                                {/* BANDEAU CLASSEMENT PAR RÉUSSITE SMS */}
+                                <div className="p-4 bg-white border border-gray-200/80 rounded-2xl flex items-center justify-between shadow-2xs">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0055FF] to-[#00A3FF] flex items-center justify-center text-white shadow-sm flex-shrink-0">
+                                            <Trophy className="w-4 h-4 text-white" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-black text-gray-900 tracking-wide uppercase">
+                                                Classement par Réussite SMS
+                                            </h4>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">
+                                                Ordre d'activation optimisé pour <span className="font-bold text-gray-900">{selectedService?.name}</span>
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {filteredCountries.map(country => (
-                                    <div
-                                        key={country.id}
-                                        onClick={() => handleCountrySelect(country)}
-                                        className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-all hover:border-blue-500 hover:shadow-md group"
-                                    >
-                                        <div className="w-12 h-10 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden shadow-sm border border-gray-200 group-hover:shadow-md transition-all relative">
-                                            {/* fallback emoji underneath */}
-                                            <span className="absolute text-2xl opacity-0">{country.flag}</span>
-                                            <img
-                                                src={country.flagUrl || getCountryFlag(country.code)}
-                                                alt={country.name}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; (e.target as HTMLImageElement).parentElement!.innerText = country.flag; }}
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors flex items-center gap-2">
-                                                {country.name}
-                                                {country.isPremium && (
-                                                    <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-transparent border border-purple-200 text-purple-600 shadow-sm bg-gradient-to-r from-purple-50 to-white">
-                                                        Premium
-                                                    </span>
-                                                )}
-                                                {country.successRate && country.successRate > 80 && (
-                                                    <span className="px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 text-[9px] font-black uppercase tracking-wider">
-                                                        {t('buyNumber.top', 'Top')}
-                                                    </span>
-                                                )}
-                                            </h3>
-                                            <div className="flex items-center gap-3 mt-1">
-                                                {/* REMOVED DUPLICATE HARDCODED LINE */}
-                                                {country.successRate ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-xs text-gray-500 font-medium">{country.count.toLocaleString()} {t('buyNumber.available', 'available')}</span>
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse ml-2" />
-                                                        <span className="text-[11px] text-green-700 font-bold">
-                                                            {country.successRate}{t('buyNumber.success', '% Success')}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    // Fallback if no success rate, just show available
-                                                    <span className="text-xs text-gray-500 font-medium">{country.count.toLocaleString()} {t('buyNumber.available', 'available')}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 group-hover:bg-blue-600 group-hover:border-blue-600 transition-all">
-                                                <span className="block font-black text-blue-600 text-sm group-hover:text-white">{country.price} <span className="text-[10px] font-normal opacity-80">Ⓐ</span></span>
-                                            </div>
-                                        </div>
+                                {/* 🔙 BACK CARD */}
+                                <div
+                                    onClick={() => handleBack()}
+                                    className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs flex items-center gap-3.5 cursor-pointer transition-all group hover:border-[#00A3FF] hover:shadow-sm active:scale-[0.99]"
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 group-hover:bg-[#00A3FF]/10 group-hover:text-[#0055FF] transition-colors">
+                                        <ChevronLeft className="w-5 h-5" />
                                     </div>
-                                ))}
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-gray-900 text-sm">Changer de service</h3>
+                                        <p className="text-xs text-gray-500">Retour à la liste des services</p>
+                                    </div>
+                                </div>
+
+                                {filteredCountries.map((country, idx) => {
+                                    const hasStock = country.count > 0;
+                                    const rankPos = (country as any).rank || (idx + 1);
+                                    const isTop1 = rankPos === 1 && hasStock;
+                                    const isTop3 = rankPos <= 3 && hasStock;
+
+                                    return (
+                                        <div
+                                            key={country.id}
+                                            onClick={() => {
+                                                if (hasStock) handleCountrySelect(country);
+                                            }}
+                                            className={`p-4 rounded-2xl border transition-all flex items-center gap-4 ${hasStock
+                                                ? isTop1
+                                                    ? 'bg-gradient-to-r from-[#00A3FF]/5 via-white to-white border-[#00A3FF]/40 shadow-2xs cursor-pointer hover:border-[#0055FF] hover:shadow-sm active:scale-[0.99]'
+                                                    : 'bg-white border-gray-200/80 shadow-2xs cursor-pointer hover:border-gray-300 hover:shadow-sm active:scale-[0.99]'
+                                                : 'bg-gray-50/60 border-gray-100 opacity-50 grayscale cursor-not-allowed'}`}
+                                        >
+                                            {/* Rank Indicator */}
+                                            <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-extrabold flex-shrink-0 ${isTop1
+                                                ? 'bg-[#0055FF] text-white shadow-2xs'
+                                                : isTop3
+                                                    ? 'bg-gray-900 text-white'
+                                                    : 'bg-gray-100 text-gray-500'
+                                                }`}>
+                                                #{rankPos}
+                                            </div>
+
+                                            {/* Country Flag Container */}
+                                            <div className="w-11 h-8 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200/80 shadow-2xs flex-shrink-0">
+                                                <img
+                                                    src={country.flagUrl || getCountryFlag(country.code)}
+                                                    alt={country.name}
+                                                    loading="lazy"
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                    }}
+                                                />
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className={`font-bold text-sm tracking-tight text-gray-900 ${hasStock ? 'group-hover:text-[#0055FF] transition-colors' : ''}`}>
+                                                        {country.name}
+                                                    </h3>
+                                                    {isTop1 && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00A3FF]/10 border border-[#00A3FF]/20 text-[#0055FF] text-[10px] font-black uppercase tracking-wider">
+                                                            <Award className="w-3 h-3 text-[#0055FF]" />
+                                                            1er Rang
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                                    <span className="text-xs text-gray-500 font-medium">
+                                                        {hasStock ? `${country.count.toLocaleString()} disponibles` : <span className="text-red-600 font-semibold">Rupture de stock</span>}
+                                                    </span>
+                                                    {hasStock && (
+                                                        country.successRate !== null && country.successRate !== undefined ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/90 px-1.5 py-0.5 rounded border border-emerald-200/60">
+                                                                <TrendingUp className="w-3 h-3 text-emerald-600" />
+                                                                {country.successRate}% Réussite
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                                --% Réussite
+                                                            </span>
+                                                        )
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right flex-shrink-0">
+                                                <div className={`px-3.5 py-2 rounded-xl font-bold transition-all ${country.count > 0 ? 'bg-gradient-to-r from-[#0055FF] to-[#00A3FF] text-white shadow-sm shadow-[#00A3FF]/25 group-hover:from-[#0044CC] group-hover:to-[#0088CC] group-hover:shadow-md' : 'bg-gray-100 border border-gray-200 text-gray-400'}`}>
+                                                    <span className="text-sm font-black tracking-tight">{country.price}</span>
+                                                    <span className="text-xs ml-0.5 font-normal opacity-90">Ⓐ</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
-                    </>
+                    </motion.div>
                 )}
 
                 {currentStep === 'confirm' && selectedService && selectedCountry && (
-                    <div className="pt-4">
-                        <div className="bg-white rounded-3xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100 text-center space-y-6">
+                    <motion.div 
+                        key="step-confirm"
+                        variants={{
+                            hidden: { opacity: 0, scale: 0.95, y: 20 },
+                            visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } },
+                            exit: { opacity: 0, scale: 0.95, y: -20, transition: { duration: 0.2 } }
+                        }}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                        className="pt-4"
+                    >
+                        <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-gray-100 text-center space-y-8 relative overflow-hidden">
+                            {purchaseState !== 'idle' ? (
+                                <div className="py-6 flex flex-col items-center justify-center min-h-[350px]">
+                                    <AnimatePresence mode="wait">
+                                        {purchaseState === 'loading' && (
+                                            <motion.div
+                                                key="loading"
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.9 }}
+                                                className="flex flex-col items-center space-y-6"
+                                            >
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 rounded-full animate-pulse" />
+                                                    <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-blue-50 to-blue-100/50 flex items-center justify-center border border-blue-200 shadow-inner relative overflow-hidden">
+                                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
+                                                        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-bold text-gray-900">Attribution de votre numéro...</h3>
+                                                    <p className="text-sm text-gray-500 mt-2 font-medium">Connexion sécurisée aux serveurs pour {selectedService.name}</p>
+                                                </div>
+                                            </motion.div>
+                                        )}
 
-                            <div className="w-20 h-20 bg-blue-50 rounded-full mx-auto flex items-center justify-center animate-bounce-slow">
-                                <ShoppingCart className="w-10 h-10 text-blue-600" />
-                            </div>
+                                        {purchaseState === 'smart_routing' && (
+                                            <motion.div
+                                                key="smart_routing"
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -20 }}
+                                                className="flex flex-col items-center space-y-6"
+                                            >
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 bg-purple-500 blur-2xl opacity-20 rounded-full animate-pulse" />
+                                                    <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-purple-50 to-purple-100/50 flex items-center justify-center border border-purple-200 shadow-inner relative overflow-hidden">
+                                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
+                                                        <Activity className="w-12 h-12 text-purple-600 animate-bounce" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-bold text-gray-900">Algorithme de Routage</h3>
+                                                    <p className="text-sm text-gray-500 mt-2 font-medium">Sélection de la ligne avec le meilleur taux de réception...</p>
+                                                </div>
+                                            </motion.div>
+                                        )}
 
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900">{t('buyNumber.confirmOrder', 'Confirm Order')}</h2>
-                                <p className="text-gray-500 mt-2">{t('buyNumber.confirmDesc', 'You are about to purchase a number.')}</p>
-                            </div>
+                                        {purchaseState === 'success' && (
+                                            <motion.div
+                                                key="success"
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1, transition: { type: 'spring', damping: 22 } }}
+                                                className="flex flex-col items-center w-full max-w-lg mx-auto text-left"
+                                            >
+                                                {/* Header success */}
+                                                <div className="w-full text-center mb-6">
+                                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-extrabold uppercase tracking-wider mb-3">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                                        Ligne Active & Prête
+                                                    </div>
+                                                    <h3 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                                                        Votre Numéro {selectedService.name} est prêt !
+                                                    </h3>
+                                                    <p className="text-gray-500 text-sm font-medium mt-1">
+                                                        Copiez le numéro ci-dessous et collez-le dans l'application pour recevoir votre SMS.
+                                                    </p>
+                                                </div>
 
-                            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-left">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-500 text-sm">{t('buyNumber.service', 'Service')}</span>
-                                    <div className="flex items-center gap-2 font-bold text-gray-900">
-                                        {selectedService.name}
-                                    </div>
-                                </div>
-                                <div className="bg-gray-200 h-px w-full" />
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-500 text-sm">{t('buyNumber.country', 'Country')}</span>
-                                    <div className="flex items-center gap-2 font-bold text-gray-900">
-                                        <img
-                                            src={selectedCountry.flagUrl || getCountryFlag(selectedCountry.code)}
-                                            className="w-5 h-3.5 object-cover rounded-sm shadow-sm"
-                                            onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }} // Fallback to transparent pixel if fails
-                                        />
-                                        {selectedCountry.name}
-                                    </div>
-                                </div>
+                                                {/* Phone Number Display Card */}
+                                                <div className="bg-gradient-to-br from-blue-50/80 via-white to-blue-50/40 border-2 border-[#0055FF]/20 rounded-3xl p-6 sm:p-7 w-full shadow-lg shadow-blue-500/5 relative overflow-hidden mb-6">
+                                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                                        <div>
+                                                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-1">Numéro attribué ({selectedCountry.name})</span>
+                                                            <span className="text-2xl sm:text-3xl font-black text-[#0055FF] tracking-tight font-mono select-all">
+                                                                {purchasedNumber}
+                                                            </span>
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (purchasedNumber) {
+                                                                    navigator.clipboard.writeText(purchasedNumber);
+                                                                    setCopiedNumber(true);
+                                                                    setTimeout(() => setCopiedNumber(false), 2500);
+                                                                }
+                                                            }}
+                                                            className={`h-12 px-5 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 ${copiedNumber ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#0055FF] hover:bg-[#0044CC] text-white'}`}
+                                                        >
+                                                            {copiedNumber ? (
+                                                                <>
+                                                                    <Check className="w-4 h-4" />
+                                                                    <span>Copié !</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Copy className="w-4 h-4" />
+                                                                    <span>Copier</span>
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                </div>
 
-                                {/* Rent Duration Selector */}
-                                {mode === 'rent' && (
-                                    <>
-                                        <div className="bg-gray-200 h-px w-full" />
-                                        <div className="py-2">
-                                            <span className="text-gray-500 text-sm block mb-2">{t('buyNumber.duration', 'Duration')}</span>
-                                            <div className="grid grid-cols-4 gap-1">
-                                                {[
-                                                    { v: '4hours', l: '4H' }, { v: '1day', l: '1D' },
-                                                    { v: '1week', l: '1W' }, { v: '1month', l: '1M' }
-                                                ].map(opt => (
-                                                    <button
-                                                        key={opt.v}
-                                                        onClick={() => setRentDuration(opt.v as any)}
-                                                        className={`py-1 rounded-md text-xs font-bold transition-all ${rentDuration === opt.v ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+                                                {/* Step-by-Step Live Guide */}
+                                                <div className="w-full bg-gray-50/90 border border-gray-100 rounded-2xl p-5 space-y-4 mb-6">
+                                                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                                                        Déroulement de la réception
+                                                    </h4>
+
+                                                    <div className="space-y-3">
+                                                        {/* Step 1 */}
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
+                                                                ✓
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900">Numéro attribué avec succès</p>
+                                                                <p className="text-xs text-gray-500">Prêt à intercepter le SMS de {selectedService.name}.</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Step 2 */}
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-6 h-6 rounded-full bg-[#0055FF] text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
+                                                                2
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900">Entrez ce numéro sur {selectedService.name}</p>
+                                                                <p className="text-xs text-gray-500">Collez le numéro et demandez l'envoi du code par SMS.</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Step 3 */}
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-6 h-6 rounded-full bg-blue-100 text-[#0055FF] flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold animate-pulse">
+                                                                ⏳
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-bold text-gray-900">Le code s'affichera en direct (15 à 60s)</p>
+                                                                <p className="text-xs text-gray-500">Consultez votre SMS instantanément depuis votre tableau de bord.</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Guarantee Banner */}
+                                                <div className="w-full bg-emerald-50/80 border border-emerald-200/60 rounded-2xl p-4 flex items-start gap-3 mb-6">
+                                                    <Shield className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                                                    <p className="text-xs text-emerald-800 font-medium leading-relaxed">
+                                                        <span className="font-bold">Garantie Zéro Risque :</span> Si aucun SMS ne vous parvient dans les 5 minutes, vous pouvez annuler d'un simple clic et être remboursé instantanément à 100%.
+                                                    </p>
+                                                </div>
+
+                                                {/* Actions */}
+                                                <div className="w-full flex flex-col sm:flex-row gap-3">
+                                                    <Button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            navigate('/dashboard');
+                                                            setPurchaseState('idle');
+                                                            setBuying(false);
+                                                        }}
+                                                        className="flex-1 h-14 text-base font-bold rounded-2xl shadow-xl shadow-[#0055FF]/25 bg-gradient-to-r from-[#0055FF] to-[#00A3FF] hover:from-[#0044CC] hover:to-[#0088CC] text-white border-0 flex items-center justify-center gap-2"
                                                     >
-                                                        {opt.l}
-                                                    </button>
-                                                ))}
+                                                        <span>📥 Aller voir mon SMS en direct</span>
+                                                        <ArrowRight className="w-5 h-5" />
+                                                    </Button>
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setPurchaseState('idle');
+                                                            setPurchasedNumber(null);
+                                                            setBuying(false);
+                                                        }}
+                                                        className="h-14 px-6 text-sm font-bold rounded-2xl border border-gray-200 hover:bg-gray-50 text-gray-700"
+                                                    >
+                                                        + Autre numéro
+                                                    </Button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Decorative background gradients */}
+                                    <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00A3FF]/10 to-white/0 opacity-70 pointer-events-none" />
+
+                                    {/* Icon Header */}
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-[#00A3FF] blur-2xl opacity-20 scale-150 rounded-full" />
+                                        <div className="relative w-20 h-20 bg-gradient-to-br from-[#0055FF] to-[#00A3FF] rounded-[1.5rem] mx-auto flex items-center justify-center shadow-lg shadow-[#00A3FF]/30 transform rotate-3">
+                                            <ShoppingCart className="w-10 h-10 text-white -rotate-3" />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#0055FF] text-xs font-bold uppercase tracking-wider mb-3">
+                                            <Sparkles className="w-3.5 h-3.5" />
+                                            Prêt pour activation
+                                        </span>
+                                        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                                            {t('buyNumber.confirmOrder', 'Confirmer la commande')}
+                                        </h2>
+                                        <p className="text-gray-500 mt-1 text-sm font-medium">
+                                            {t('buyNumber.confirmDesc', 'Vérifiez le service sélectionné avant de valider votre achat.')}
+                                        </p>
+                                    </div>
+
+                                    {/* Summary Card */}
+                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-left">
+                                        <div className="p-5 space-y-4">
+                                            {/* Service */}
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-500 text-sm font-semibold uppercase tracking-wider">{t('buyNumber.service', 'Service')}</span>
+                                                <div className="flex items-center gap-2.5 font-black text-gray-900 text-base">
+                                                    {selectedService.icon && (
+                                                        <img
+                                                            src={selectedService.icon}
+                                                            alt={selectedService.name}
+                                                            className="w-6 h-6 object-contain rounded-md"
+                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                        />
+                                                    )}
+                                                    <span>{selectedService.name}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent w-full" />
+
+                                            {/* Country */}
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-500 text-sm font-semibold uppercase tracking-wider">{t('buyNumber.country', 'Pays')}</span>
+                                                <div className="flex items-center gap-2 font-bold text-gray-900">
+                                                    <img
+                                                        src={selectedCountry.flagUrl || getCountryFlag(selectedCountry.code)}
+                                                        className="w-6 h-4 object-cover rounded-sm shadow-sm"
+                                                        alt="flag"
+                                                        loading="lazy"
+                                                        onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }}
+                                                    />
+                                                    <span>{selectedCountry.name}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Rent Duration Selector */}
+                                            {mode === 'rent' && (
+                                                <>
+                                                    <div className="h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent w-full" />
+                                                    <div className="pt-2">
+                                                        <span className="text-gray-500 text-sm font-semibold uppercase tracking-wider block mb-3">{t('buyNumber.duration', 'Durée')}</span>
+                                                        <div className="bg-gray-50 p-1.5 rounded-xl flex gap-1">
+                                                            {[
+                                                                { v: '4hours', l: '4H' }, { v: '1day', l: '1 Jour' },
+                                                                { v: '1week', l: '1 Sem' }, { v: '1month', l: '1 Mois' }
+                                                            ].map(opt => (
+                                                                <button
+                                                                    key={opt.v}
+                                                                    onClick={() => setRentDuration(opt.v as any)}
+                                                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${rentDuration === opt.v ? 'bg-gradient-to-r from-[#0055FF] to-[#00A3FF] text-white shadow-md border-0' : 'text-gray-500 hover:bg-gray-200/50 hover:text-gray-900'}`}
+                                                                >
+                                                                    {opt.l}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* Total Footer */}
+                                        <div className="bg-gray-50/80 p-5 flex justify-between items-center border-t border-gray-100">
+                                            <span className="text-gray-700 text-sm font-bold uppercase tracking-wider">{t('buyNumber.totalPrice', 'Prix Total')}</span>
+                                            <span className="font-black text-2xl text-[#0055FF]">
+                                                {mode === 'rent'
+                                                    ? Math.ceil(selectedCountry.price * (rentDuration === '4hours' ? 1 : rentDuration === '1day' ? 3 : rentDuration === '1week' ? 15 : 50))
+                                                    : Math.ceil(selectedCountry.price)
+                                                } 
+                                                <span className="text-sm font-bold text-[#00A3FF] ml-1">Ⓐ</span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Process summary steps */}
+                                    <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 text-left space-y-2">
+                                        <p className="text-xs font-extrabold uppercase tracking-wider text-[#0055FF] flex items-center gap-1.5">
+                                            <Info className="w-4 h-4" />
+                                            Déroulement de la commande
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-700 font-medium pt-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">1</span>
+                                                <span>Attribution instantanée</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">2</span>
+                                                <span>Collez dans {selectedService.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">3</span>
+                                                <span>SMS reçu en direct</span>
                                             </div>
                                         </div>
-                                    </>
-                                )}
+                                    </div>
 
-                                <div className="bg-gray-200 h-px w-full" />
-                                <div className="flex justify-between items-center text-lg">
-                                    <span className="text-gray-500 text-sm">Total Price</span>
-                                    <span className="font-black text-blue-600">
-                                        {mode === 'rent'
-                                            ? Math.ceil(selectedCountry.price * (rentDuration === '4hours' ? 1 : rentDuration === '1day' ? 3 : rentDuration === '1week' ? 15 : 50))
-                                            : Math.ceil(selectedCountry.price)
-                                        } Ⓐ
-                                    </span>
-                                </div>
-                            </div>
+                                    {/* Trust Indicator / Guarantee */}
+                                    <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-100/60 p-4 rounded-2xl text-left">
+                                        <div className="bg-emerald-100/80 p-1.5 rounded-lg flex-shrink-0 mt-0.5">
+                                            <Shield className="w-5 h-5 text-emerald-600" />
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-emerald-800 font-medium leading-relaxed">
+                                            {t('buyNumber.refundWarning', 'Garantie Zéro Risque : Si vous ne recevez aucun SMS durant les 5 premières minutes, vous pouvez annuler et être remboursé instantanément. Attention, passé ce délai ou si un SMS est reçu, aucun remboursement ne sera possible.')}
+                                        </p>
+                                    </div>
 
-                            <div className="flex items-start gap-3 bg-blue-50 p-3 rounded-xl text-left">
-                                <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                                <p className="text-xs text-blue-700 leading-relaxed">
-                                    If you don't receive an SMS within 20 minutes, the money will be automatically refunded to your balance.
-                                </p>
-                            </div>
+                                    {/* Actions */}
+                                    <div className="space-y-3 pt-2">
+                                        <Button
+                                            className="w-full h-14 text-lg font-bold rounded-2xl shadow-xl shadow-[#00A3FF]/25 bg-gradient-to-r from-[#0055FF] to-[#00A3FF] hover:from-[#0044CC] hover:to-[#0088CC] hover:scale-[1.01] active:scale-[0.99] transition-all text-white border-0"
+                                            onClick={handleBuy}
+                                            disabled={buying}
+                                        >
+                                            {buying ? (
+                                                <>
+                                                    <Loader2 className="w-5 h-5 mr-2 animate-spin text-white" />
+                                                    <span className="text-white">{t('buyNumber.purchasing', 'Achat en cours...')}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-white">{t('buyNumber.confirmPurchase', 'Confirmer l\'achat')}</span>
+                                            )}
+                                        </Button>
 
-                            <Button
-                                className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-blue-500/30 bg-blue-600 hover:bg-blue-700 hover:scale-[1.02] transition-all"
-                                onClick={handleBuy}
-                                disabled={buying}
-                            >
-                                {buying ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                                        Purchasing...
-                                    </>
-                                ) : (
-                                    t('buyNumber.confirmPurchase', 'Confirm Purchase')
-                                )}
-                            </Button>
-
-                            <button
-                                onClick={handleBack}
-                                className="text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors"
-                                disabled={buying}
-                            >
-                                {t('buyNumber.cancel', 'Cancel')}
-                            </button>
-
+                                        <button
+                                            onClick={handleBack}
+                                            className="text-gray-400 text-xs font-bold hover:text-gray-600 transition-colors uppercase tracking-widest py-2"
+                                            disabled={buying}
+                                        >
+                                            {t('buyNumber.cancel', 'Annuler')}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
-                    </div>
+                    </motion.div>
                 )}
-
+                </AnimatePresence>
             </div>
 
             {/* Insufficient Balance Dialog */}
