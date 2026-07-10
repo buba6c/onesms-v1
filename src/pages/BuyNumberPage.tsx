@@ -83,6 +83,7 @@ export default function BuyNumberPage() {
     const [purchasedNumber, setPurchasedNumber] = useState<string | null>(null);
     const [copiedNumber, setCopiedNumber] = useState(false);
     const [showInsufficientBalanceDialog, setShowInsufficientBalanceDialog] = useState(false);
+    const [showOrderSteps, setShowOrderSteps] = useState(false);
     const [insufficientBalanceData, setInsufficientBalanceData] = useState<{ needed: number, available: number, missing: number } | null>(null);
 
     // --- Queries ---
@@ -1360,160 +1361,166 @@ export default function BuyNumberPage() {
                                 </div>
                             ) : (
                                 <>
-                                    {/* Decorative background gradients */}
-                                    <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#00A3FF]/10 to-white/0 opacity-70 pointer-events-none" />
-
-                                    {/* Icon Header */}
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-[#00A3FF] blur-2xl opacity-20 scale-150 rounded-full" />
-                                        <div className="relative w-20 h-20 bg-gradient-to-br from-[#0055FF] to-[#00A3FF] rounded-[1.5rem] mx-auto flex items-center justify-center shadow-lg shadow-[#00A3FF]/30 transform rotate-3">
-                                            <ShoppingCart className="w-10 h-10 text-white -rotate-3" />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#0055FF] text-xs font-bold uppercase tracking-wider mb-3">
-                                            <Sparkles className="w-3.5 h-3.5" />
-                                            Prêt pour activation
-                                        </span>
-                                        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                                            {t('buyNumber.confirmOrder', 'Confirmer la commande')}
-                                        </h2>
-                                        <p className="text-gray-500 mt-1 text-sm font-medium">
-                                            {t('buyNumber.confirmDesc', 'Vérifiez le service sélectionné avant de valider votre achat.')}
-                                        </p>
-                                    </div>
-
-                                    {/* Summary Card */}
-                                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-left">
-                                        <div className="p-5 space-y-4">
-                                            {/* Service */}
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-500 text-sm font-semibold uppercase tracking-wider">{t('buyNumber.service', 'Service')}</span>
-                                                <div className="flex items-center gap-2.5 font-black text-gray-900 text-base">
-                                                    {selectedService.icon && (
-                                                        <img
-                                                            src={selectedService.icon}
-                                                            alt={selectedService.name}
-                                                            className="w-6 h-6 object-contain rounded-md"
-                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                        />
-                                                    )}
-                                                    <span>{selectedService.name}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent w-full" />
-
-                                            {/* Country */}
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-500 text-sm font-semibold uppercase tracking-wider">{t('buyNumber.country', 'Pays')}</span>
-                                                <div className="flex items-center gap-2 font-bold text-gray-900">
+                                    {/* Header Compact et Moderne */}
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4 text-left">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative">
+                                                {selectedService.icon ? (
+                                                    <img
+                                                        src={selectedService.icon}
+                                                        alt={selectedService.name}
+                                                        className="w-11 h-11 object-contain rounded-xl bg-gray-50 p-1 border border-gray-200/60"
+                                                    />
+                                                ) : (
+                                                    <div className="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center font-bold text-[#0055FF]">
+                                                        {selectedService.name.slice(0, 2).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white overflow-hidden shadow-2xs flex items-center justify-center bg-white">
                                                     <img
                                                         src={selectedCountry.flagUrl || getCountryFlag(selectedCountry.code)}
-                                                        className="w-6 h-4 object-cover rounded-sm shadow-sm"
-                                                        alt="flag"
-                                                        loading="lazy"
-                                                        onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; }}
+                                                        alt={selectedCountry.name}
+                                                        className="w-full h-full object-cover"
                                                     />
-                                                    <span>{selectedCountry.name}</span>
                                                 </div>
                                             </div>
+                                            <div>
+                                                <h2 className="text-lg sm:text-xl font-black text-gray-900 leading-tight">
+                                                    {t('buyNumber.confirmOrder', 'Confirmer la commande')}
+                                                </h2>
+                                                <p className="text-xs text-gray-500 font-semibold">
+                                                    {selectedService.name} ({selectedCountry.name})
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-[#0055FF] text-[11px] font-black uppercase">
+                                            Prêt
+                                        </span>
+                                    </div>
 
-                                            {/* Rent Duration Selector */}
-                                            {mode === 'rent' && (
-                                                <>
-                                                    <div className="h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent w-full" />
-                                                    <div className="pt-2">
-                                                        <span className="text-gray-500 text-sm font-semibold uppercase tracking-wider block mb-3">{t('buyNumber.duration', 'Durée')}</span>
-                                                        <div className="bg-gray-50 p-1.5 rounded-xl flex gap-1">
-                                                            {[
-                                                                { v: '4hours', l: '4H' }, { v: '1day', l: '1 Jour' },
-                                                                { v: '1week', l: '1 Sem' }, { v: '1month', l: '1 Mois' }
-                                                            ].map(opt => (
-                                                                <button
-                                                                    key={opt.v}
-                                                                    onClick={() => setRentDuration(opt.v as any)}
-                                                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-300 ${rentDuration === opt.v ? 'bg-gradient-to-r from-[#0055FF] to-[#00A3FF] text-white shadow-md border-0' : 'text-gray-500 hover:bg-gray-200/50 hover:text-gray-900'}`}
-                                                                >
-                                                                    {opt.l}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            )}
+                                    {/* Summary Card Compacte */}
+                                    <div className="bg-gray-50/80 rounded-xl border border-gray-200/60 p-3.5 space-y-2.5 text-left mb-3">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-semibold uppercase">{t('buyNumber.service', 'Service')}</span>
+                                            <span className="font-extrabold text-gray-900">{selectedService.name}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="text-gray-500 font-semibold uppercase">{t('buyNumber.country', 'Pays')}</span>
+                                            <span className="font-extrabold text-gray-900">{selectedCountry.name}</span>
                                         </div>
 
-                                        {/* Total Footer */}
-                                        <div className="bg-gray-50/80 p-5 flex justify-between items-center border-t border-gray-100">
-                                            <span className="text-gray-700 text-sm font-bold uppercase tracking-wider">{t('buyNumber.totalPrice', 'Prix Total')}</span>
-                                            <span className="font-black text-2xl text-[#0055FF]">
+                                        {mode === 'rent' && (
+                                            <div className="pt-2 border-t border-gray-200/60">
+                                                <div className="flex justify-between items-center mb-1.5">
+                                                    <span className="text-gray-500 text-xs font-semibold uppercase">Durée</span>
+                                                </div>
+                                                <div className="bg-white p-1 rounded-lg flex gap-1 border border-gray-200/60">
+                                                    {[
+                                                        { v: '4hours', l: '4H' }, { v: '1day', l: '1 Jour' },
+                                                        { v: '1week', l: '1 Sem' }, { v: '1month', l: '1 Mois' }
+                                                    ].map(opt => (
+                                                        <button
+                                                            key={opt.v}
+                                                            onClick={() => setRentDuration(opt.v as any)}
+                                                            className={`flex-1 py-1.5 rounded-md text-[11px] font-bold transition-all ${rentDuration === opt.v ? 'bg-[#0055FF] text-white shadow-2xs' : 'text-gray-500 hover:text-gray-900'}`}
+                                                        >
+                                                            {opt.l}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="pt-2 border-t border-gray-200/80 flex justify-between items-center">
+                                            <span className="text-gray-700 text-xs font-black uppercase tracking-wider">{t('buyNumber.totalPrice', 'Prix Total')}</span>
+                                            <span className="font-black text-xl text-[#0055FF]">
                                                 {mode === 'rent'
                                                     ? Math.ceil(selectedCountry.price * (rentDuration === '4hours' ? 1 : rentDuration === '1day' ? 3 : rentDuration === '1week' ? 15 : 50))
                                                     : Math.ceil(selectedCountry.price)
                                                 } 
-                                                <span className="text-sm font-bold text-[#00A3FF] ml-1">Ⓐ</span>
+                                                <span className="text-xs font-bold text-[#00A3FF] ml-1">Ⓐ</span>
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Process summary steps */}
-                                    <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 text-left space-y-2">
-                                        <p className="text-xs font-extrabold uppercase tracking-wider text-[#0055FF] flex items-center gap-1.5">
-                                            <Info className="w-4 h-4" />
-                                            Déroulement de la commande
-                                        </p>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-700 font-medium pt-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">1</span>
-                                                <span>Attribution instantanée</span>
+                                    {/* Déroulement de la commande - Cliquable pour afficher (Accordéon) */}
+                                    <div className="bg-blue-50/50 border border-blue-200/60 rounded-xl overflow-hidden text-left mb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowOrderSteps(!showOrderSteps)}
+                                            className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs font-bold text-[#0055FF] hover:bg-blue-100/50 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-1.5">
+                                                <Info className="w-3.5 h-3.5" />
+                                                <span>Comment ça marche ? (Déroulement)</span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">2</span>
-                                                <span>Collez dans {selectedService.name}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">3</span>
-                                                <span>SMS reçu en direct</span>
-                                            </div>
-                                        </div>
+                                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-white text-[#0055FF] border border-blue-200/60">
+                                                {showOrderSteps ? 'Masquer ▲' : 'Voir les étapes ▼'}
+                                            </span>
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {showOrderSteps && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="px-3.5 pb-3 border-t border-blue-100 space-y-1.5 text-xs text-gray-700 pt-2"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-4 h-4 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">1</span>
+                                                        <span>Attribution instantanée du numéro de téléphone</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-4 h-4 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">2</span>
+                                                        <span>Collez le numéro dans votre application {selectedService.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-4 h-4 rounded-full bg-[#0055FF] text-white flex items-center justify-center text-[10px] font-bold">3</span>
+                                                        <span>Recevez le code SMS en direct ici et sur le Dashboard</span>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
 
-                                    {/* Trust Indicator / Guarantee */}
-                                    <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-100/60 p-4 rounded-2xl text-left">
-                                        <div className="bg-emerald-100/80 p-1.5 rounded-lg flex-shrink-0 mt-0.5">
-                                            <Shield className="w-5 h-5 text-emerald-600" />
-                                        </div>
-                                        <p className="text-xs sm:text-sm text-emerald-800 font-medium leading-relaxed">
-                                            {t('buyNumber.refundWarning', 'Garantie Zéro Risque : Si vous ne recevez aucun SMS durant les 5 premières minutes, vous pouvez annuler et être remboursé instantanément. Attention, passé ce délai ou si un SMS est reçu, aucun remboursement ne sera possible.')}
+                                    {/* Guarantee Ligne Compacte */}
+                                    <div className="flex items-center gap-2 bg-emerald-50/80 border border-emerald-200/70 px-3.5 py-2.5 rounded-xl text-left mb-4">
+                                        <Shield className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                                        <p className="text-[11px] text-emerald-800 font-medium">
+                                            <span className="font-bold">Garantie Zéro Risque :</span> Remboursé 100% si aucun SMS reçu en 5 min.
                                         </p>
                                     </div>
 
-                                    {/* Actions */}
-                                    <div className="space-y-3 pt-2">
+                                    {/* Actions Compactes */}
+                                    <div className="flex items-center gap-2.5">
+                                        <button
+                                            type="button"
+                                            onClick={handleBack}
+                                            className="px-4 h-12 rounded-xl text-xs font-bold border border-gray-200 hover:bg-gray-100 text-gray-600 transition-colors"
+                                            disabled={buying}
+                                        >
+                                            {t('buyNumber.cancel', 'Annuler')}
+                                        </button>
+
                                         <Button
-                                            className="w-full h-14 text-lg font-bold rounded-2xl shadow-xl shadow-[#00A3FF]/25 bg-gradient-to-r from-[#0055FF] to-[#00A3FF] hover:from-[#0044CC] hover:to-[#0088CC] hover:scale-[1.01] active:scale-[0.99] transition-all text-white border-0"
+                                            className="flex-1 h-12 text-sm font-extrabold rounded-xl shadow-lg shadow-[#0055FF]/20 bg-[#0055FF] hover:bg-[#0044CC] text-white border-0"
                                             onClick={handleBuy}
                                             disabled={buying}
                                         >
                                             {buying ? (
                                                 <>
-                                                    <Loader2 className="w-5 h-5 mr-2 animate-spin text-white" />
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin text-white" />
                                                     <span className="text-white">{t('buyNumber.purchasing', 'Achat en cours...')}</span>
                                                 </>
                                             ) : (
-                                                <span className="text-white">{t('buyNumber.confirmPurchase', 'Confirmer l\'achat')}</span>
+                                                <span className="text-white">
+                                                    Confirmer l&apos;achat ({mode === 'rent'
+                                                        ? Math.ceil(selectedCountry.price * (rentDuration === '4hours' ? 1 : rentDuration === '1day' ? 3 : rentDuration === '1week' ? 15 : 50))
+                                                        : Math.ceil(selectedCountry.price)} Ⓐ)
+                                                </span>
                                             )}
                                         </Button>
-
-                                        <button
-                                            onClick={handleBack}
-                                            className="text-gray-400 text-xs font-bold hover:text-gray-600 transition-colors uppercase tracking-widest py-2"
-                                            disabled={buying}
-                                        >
-                                            {t('buyNumber.cancel', 'Annuler')}
-                                        </button>
                                     </div>
                                 </>
                             )}
