@@ -81,10 +81,14 @@ function convertPrice(priceUSD: number, countryCode: string = '', serviceCode: s
       finalPrice = 45 + (hash % 26) // 45 à 70
   }
 
-  // 4. Jitter Déterministe pour variété visuelle sur tous les pays
+  // 4. Distribution intelligente : certains pays restent à 10 Ⓐ, d'autres s'échelonnent entre 10 et 50 Ⓐ
   if (!isPremium && finalPrice <= 25) {
-      const jitter = hash % 36 // 0 à 35
-      finalPrice = Math.min(70, Math.max(10, 15 + jitter))
+      const h = (countryCode.charCodeAt(0) * 11 + serviceCode.length * 13)
+      if (h % 3 === 0) {
+          finalPrice = 10 // Exactement 10 Ⓐ
+      } else {
+          finalPrice = 10 + (h % 41) // Varié intelligemment entre 10 et 50 Ⓐ
+      }
   }
 
   return finalPrice

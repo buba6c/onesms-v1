@@ -229,10 +229,14 @@ serve(async (req) => {
             finalPrice = 45 + (cid % 26) // 45 à 70
         }
 
-        // 4. Jitter Déterministe pour variété visuelle sur tous les pays
+        // 4. Distribution intelligente : certains pays restent à 10 Ⓐ, d'autres s'échelonnent entre 10 et 50 Ⓐ
         if (!isPremium && finalPrice <= 25) {
-            const jitter = (cid + service.length * 7) % 36 // 0 à 35
-            finalPrice = Math.min(70, Math.max(10, 15 + jitter))
+            const h = (cid * 11 + service.length * 13)
+            if (h % 3 === 0) {
+                finalPrice = 10 // Exactement 10 Ⓐ
+            } else {
+                finalPrice = 10 + (h % 41) // Varié intelligemment entre 10 et 50 Ⓐ
+            }
         }
 
         const price = finalPrice
@@ -394,10 +398,14 @@ serve(async (req) => {
           finalPrice = 45 + (countryId % 26) // 45 à 70
       }
 
-      // 4. Jitter Déterministe pour variété visuelle sur tous les pays
+      // 4. Distribution intelligente : certains pays restent à 10 Ⓐ, d'autres s'échelonnent entre 10 et 50 Ⓐ
       if (!isPremium && finalPrice <= 25) {
-          const jitter = (countryId + service.length * 7) % 36 // 0 à 35
-          finalPrice = Math.min(70, Math.max(10, 15 + jitter))
+          const h = (countryId * 11 + service.length * 13)
+          if (h % 3 === 0) {
+              finalPrice = 10 // Exactement 10 Ⓐ
+          } else {
+              finalPrice = 10 + (h % 41) // Varié intelligemment entre 10 et 50 Ⓐ
+          }
       }
 
       const price = finalPrice
