@@ -2886,12 +2886,22 @@ export default function DashboardPage() {
                       {/* GAUCHE: Logo + Service + Numéro copiable en 1 clic */}
                       <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <img
-                            src={getServiceLogo(num.service.toLowerCase())}
-                            alt={num.service}
-                            className="w-8 h-8 rounded-lg object-contain bg-gray-50 p-0.5 border border-gray-200/60 flex-shrink-0"
-                            onError={(e) => handleLogoError(e, num.service.toLowerCase())}
-                          />
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={getServiceLogo(num.service.toLowerCase())}
+                              alt={num.service}
+                              className="w-9 h-9 rounded-xl object-contain bg-gray-50 p-1 border border-gray-200/60"
+                              onError={(e) => handleLogoError(e, num.service.toLowerCase())}
+                            />
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border border-white overflow-hidden shadow-2xs flex items-center justify-center bg-white">
+                              <img
+                                src={getCountryFlag(num.country)}
+                                alt={num.country}
+                                className="w-full h-full object-cover"
+                                onError={(e) => handleFlagError(e)}
+                              />
+                            </div>
+                          </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="font-extrabold text-gray-900 text-xs truncate">
