@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase, cloudFunctions } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { getServiceLogo, getCountryFlag, getFlagEmoji } from '@/lib/logo-service';
+import { getServiceLogo, getServiceLogoFallback, getCountryFlag, getFlagEmoji } from '@/lib/logo-service';
 import { getSetting } from '@/lib/settings';
 import { get5simProductName, get5simCountryName } from '@/lib/service-mapping';
 import { RentOnboardingModal } from '@/components/ui/RentOnboardingModal';
@@ -1365,17 +1365,19 @@ export default function BuyNumberPage() {
                                     <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4 text-left">
                                         <div className="flex items-center gap-3">
                                             <div className="relative">
-                                                {selectedService.icon ? (
+                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0055FF]/10 via-blue-50 to-[#00A3FF]/15 border border-[#0055FF]/20 p-2 shadow-sm flex items-center justify-center">
                                                     <img
-                                                        src={selectedService.icon}
+                                                        src={getServiceLogo(selectedService.code)}
+                                                        onError={(e) => {
+                                                            const target = e.currentTarget;
+                                                            if (target.dataset.fallbackLoaded === 'true') return;
+                                                            target.dataset.fallbackLoaded = 'true';
+                                                            target.src = getServiceLogoFallback(selectedService.code);
+                                                        }}
                                                         alt={selectedService.name}
-                                                        className="w-11 h-11 object-contain rounded-xl bg-gray-50 p-1 border border-gray-200/60"
+                                                        className="w-full h-full object-contain"
                                                     />
-                                                ) : (
-                                                    <div className="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center font-bold text-[#0055FF]">
-                                                        {selectedService.name.slice(0, 2).toUpperCase()}
-                                                    </div>
-                                                )}
+                                                </div>
                                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white overflow-hidden shadow-2xs flex items-center justify-center bg-white">
                                                     <img
                                                         src={selectedCountry.flagUrl || getCountryFlag(selectedCountry.code)}
