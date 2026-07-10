@@ -484,6 +484,7 @@ export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all'); // Afficher tous les services (triés par popularity_score comme SMS-Activate)
   const [searchService, setSearchService] = useState('');
   const [searchCountry, setSearchCountry] = useState('');
+  const [sortByPrice, setSortByPrice] = useState(false);
   const [activeNumbers, setActiveNumbers] = useState<ActiveNumber[]>([]);
 
   // State pour le popup de solde insuffisant
@@ -1593,9 +1594,12 @@ export default function DashboardPage() {
     s.name.toLowerCase().includes(searchService.toLowerCase())
   );
 
-  const filteredCountries = countries.filter(c =>
-    c.name.toLowerCase().includes(searchCountry.toLowerCase())
-  );
+  const filteredCountries = countries
+    .filter(c => c.name.toLowerCase().includes(searchCountry.toLowerCase()))
+    .sort((a, b) => {
+      if (!sortByPrice) return 0;
+      return (a.price || 0) - (b.price || 0);
+    });
 
   const [purchaseLock, setPurchaseLock] = useState(false); // Prevent double-click
 
@@ -2400,19 +2404,35 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <>
-                          <div className="mb-4 p-4 bg-white border border-gray-200/80 rounded-2xl flex items-center justify-between shadow-2xs">
+                          <div className="mb-4 p-4 bg-white border border-gray-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0055FF] to-[#00A3FF] flex items-center justify-center text-white shadow-sm flex-shrink-0">
                                 <Trophy className="w-4 h-4 text-white" />
                               </div>
                               <div>
                                 <h4 className="text-xs font-black text-gray-900 tracking-wide uppercase">
-                                  Classement par Réussite SMS
+                                  {sortByPrice ? 'Tri par Prix (Le Moins Cher)' : 'Classement par Réussite SMS'}
                                 </h4>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
-                                  Ordre d'activation optimisé pour <span className="font-bold text-gray-900">{selectedService?.name}</span>
+                                  Optimisé pour <span className="font-bold text-gray-900">{selectedService?.name}</span>
                                 </p>
                               </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl self-start sm:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => setSortByPrice(false)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${!sortByPrice ? 'bg-white text-[#0055FF] shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                              >
+                                🏆 Réussite
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSortByPrice(true)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${sortByPrice ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                              >
+                                💰 Prix (Ⓐ)
+                              </button>
                             </div>
                           </div>
 

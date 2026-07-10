@@ -75,6 +75,7 @@ export default function BuyNumberPage() {
     const [selectedService, setSelectedService] = useState<Service | null>(null);
 
     const [searchCountry, setSearchCountry] = useState('');
+    const [sortByPrice, setSortByPrice] = useState(false);
     const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
 
     const [buying, setBuying] = useState(false);
@@ -274,10 +275,13 @@ export default function BuyNumberPage() {
         enabled: !!selectedService && currentStep === 'country'
     });
 
-    // Filter countries
-    const filteredCountries = ((countries as Country[]) || []).filter((c: Country) =>
-        c.name?.toLowerCase().includes(searchCountry.toLowerCase())
-    );
+    // Filter and optionally sort countries by price
+    const filteredCountries = ((countries as Country[]) || [])
+        .filter((c: Country) => c.name?.toLowerCase().includes(searchCountry.toLowerCase()))
+        .sort((a: Country, b: Country) => {
+            if (!sortByPrice) return 0; // Conserver le tri par Réussite SMS par défaut
+            return (a.price || 0) - (b.price || 0);
+        });
 
 
     // --- Handlers ---
@@ -1017,19 +1021,35 @@ export default function BuyNumberPage() {
                                 {/* BANDEAU TOP PAYS PAR RÉUSSITE SMS */}
                                 {/* BANDEAU TOP PAYS AUDITÉ PAR SERVICE */}
                                 {/* BANDEAU CLASSEMENT PAR RÉUSSITE SMS */}
-                                <div className="p-4 bg-white border border-gray-200/80 rounded-2xl flex items-center justify-between shadow-2xs">
+                                <div className="p-4 bg-white border border-gray-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0055FF] to-[#00A3FF] flex items-center justify-center text-white shadow-sm flex-shrink-0">
                                             <Trophy className="w-4 h-4 text-white" />
                                         </div>
                                         <div>
                                             <h4 className="text-xs font-black text-gray-900 tracking-wide uppercase">
-                                                Classement par Réussite SMS
+                                                {sortByPrice ? 'Tri par Prix (Le Moins Cher)' : 'Classement par Réussite SMS'}
                                             </h4>
                                             <p className="text-[11px] text-gray-500 mt-0.5">
-                                                Ordre d'activation optimisé pour <span className="font-bold text-gray-900">{selectedService?.name}</span>
+                                                Optimisé pour <span className="font-bold text-gray-900">{selectedService?.name}</span>
                                             </p>
                                         </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl self-start sm:self-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSortByPrice(false)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${!sortByPrice ? 'bg-white text-[#0055FF] shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                        >
+                                            🏆 Réussite
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSortByPrice(true)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${sortByPrice ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                        >
+                                            💰 Prix (Ⓐ)
+                                        </button>
                                     </div>
                                 </div>
 
