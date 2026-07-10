@@ -48,7 +48,7 @@ function getCountryId(country: string): string {
 const USD_TO_FCFA = 600
 const FCFA_TO_COINS = 10
 const MARGIN_PERCENTAGE = 10
-const MIN_PRICE_COINS = 5
+const MIN_PRICE_COINS = 10
 
 interface PriceResult {
   serviceCode: string
@@ -60,11 +60,34 @@ interface PriceResult {
   type: 'activation' | 'rental'
 }
 
-function convertPrice(priceUSD: number): number {
+function convertPrice(priceUSD: number, countryCode: string = '', serviceCode: string = ''): number {
   const priceFCFA = priceUSD * USD_TO_FCFA
-  const priceCoins = priceFCFA / FCFA_TO_COINS
-  const priceWithMargin = priceCoins * (1 + MARGIN_PERCENTAGE / 100)
-  return Math.max(MIN_PRICE_COINS, Math.ceil(priceWithMargin))
+  const baseCoins = (priceFCFA / FCFA_TO_COINS) * (1 + MARGIN_PERCENTAGE / 100)
+
+  // 1. Minimum logique (jamais sous 10)
+  let finalPrice = Math.max(10, Math.ceil(baseCoins))
+
+  // 2. Scaling pour étirer entre 10 et 70
+  if (finalPrice < 70) {
+      const perceivedMarkup = Math.ceil(baseCoins * 3.5)
+      finalPrice = Math.max(10, Math.min(70, 10 + perceivedMarkup))
+  }
+
+  // 3. Modificateur Pays Premium
+  const isPremium = ['usa', 'united states', 'us', 'uk', 'united kingdom', 'gb', 'france', 'fr', 'germany', 'de', 'canada', 'ca', 'spain', 'es', 'italy', 'it', 'netherlands', 'nl'].includes(countryCode.toLowerCase())
+  const hash = (countryCode.charCodeAt(0) || 0) + (serviceCode.length * 7 || 0)
+
+  if (isPremium && finalPrice < 45) {
+      finalPrice = 45 + (hash % 26) // 45 à 70
+  }
+
+  // 4. Jitter Déterministe pour variété visuelle sur tous les pays
+  if (!isPremium && finalPrice <= 25) {
+      const jitter = hash % 36 // 0 à 35
+      finalPrice = Math.min(70, Math.max(10, 15 + jitter))
+  }
+
+  return finalPrice
 }
 
 serve(async (req) => {
@@ -117,7 +140,7 @@ serve(async (req) => {
 
     // Get Grizzly API key from DB (prioritized over Grizzly)
     let GRIZZLY_API_KEY = Deno.env.get('GRIZZLY_API_KEY')
-    const { data: apiKeySetting } = await supabase.from('system_settings').select('value').eq('key', 'grizzly_api_key').single()
+    const { data: apiKeySetting } = await supabase.from('system_settings').select('value').eq('key', 'grizzly_api_key').maybeSingle()
     if (apiKeySetting?.value) GRIZZLY_API_KEY = apiKeySetting.value
 
     if (!GRIZZLY_API_KEY) {
@@ -142,11 +165,11 @@ serve(async (req) => {
               const priceData = countryData[serviceCode]
               const priceUSD = parseFloat(priceData.cost || priceData.price || 0)
               const count = parseInt(priceData.count || 0)
-              results.push({ serviceCode, countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD), count, type: 'activation' })
+              results.push({ serviceCode, countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD, countryCodeParam || countryId, serviceCode), count, type: 'activation' })
             } else if (countryData.cost) {
               const priceUSD = parseFloat(countryData.cost)
               const count = parseInt(countryData.count || 0)
-              results.push({ serviceCode: serviceCode || 'unknown', countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD), count, type: 'activation' })
+              results.push({ serviceCode: serviceCode || 'unknown', countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD, countryCodeParam || countryId, serviceCode || 'unknown'), count, type: 'activation' })
             }
           }
         } catch (e) { console.error('❌ [GET-PRICES] Grizzly error:', e) }
@@ -158,7 +181,7 @@ serve(async (req) => {
 
         // 5sim fallback
         const FIVESIM_API_KEY = Deno.env.get('FIVESIM_API_KEY')
-        const { data: fivesimKeySetting } = await supabase.from('system_settings').select('value').eq('key', '5sim_api_key').single()
+        const { data: fivesimKeySetting } = await supabase.from('system_settings').select('value').eq('key', '5sim_api_key').maybeSingle()
         const final5simKey = fivesimKeySetting?.value || FIVESIM_API_KEY
 
         if (final5simKey) {
@@ -201,7 +224,7 @@ serve(async (req) => {
                       countryCode: country,
                       priceUSD,
                       priceFCFA: priceUSD * USD_TO_FCFA,
-                      priceCoins: convertPrice(priceUSD),
+                      priceCoins: convertPrice(priceUSD, country, serviceCode),
                       count,
                       type: 'activation'
                     })
@@ -228,7 +251,7 @@ serve(async (req) => {
               const priceUSD = parseFloat(priceData.cost || priceData.price || 0)
               const count = parseInt(priceData.count || 0)
               if (priceUSD > 0) {
-                results.push({ serviceCode: svc, countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD), count, type: 'activation' })
+                results.push({ serviceCode: svc, countryCode: countryCodeParam || countryId, priceUSD, priceFCFA: priceUSD * USD_TO_FCFA, priceCoins: convertPrice(priceUSD, countryCodeParam || countryId, svc), count, type: 'activation' })
               }
             }
           }
@@ -257,7 +280,7 @@ serve(async (req) => {
                 countryCode: countryCode || (data.countries && data.countries[0]) || 'unknown',
                 priceUSD,
                 priceFCFA: priceUSD * USD_TO_FCFA,
-                priceCoins: convertPrice(priceUSD),
+                priceCoins: convertPrice(priceUSD, countryCode || (data.countries && data.countries[0]) || 'unknown', svc),
                 count,
                 type: 'rental'
               })
