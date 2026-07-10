@@ -46,7 +46,8 @@ import {
   TrendingUp,
   Sparkles,
   Check,
-  Activity
+  Activity,
+  Coins
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -2418,20 +2419,22 @@ export default function DashboardPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl self-start sm:self-auto">
+                            <div className="flex items-center p-1 bg-gray-100/90 border border-gray-200/60 rounded-xl">
                               <button
                                 type="button"
                                 onClick={() => setSortByPrice(false)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${!sortByPrice ? 'bg-white text-[#0055FF] shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-tight transition-all duration-200 flex items-center gap-1.5 ${!sortByPrice ? 'bg-white text-gray-900 shadow-xs border border-gray-200/50' : 'text-gray-500 hover:text-gray-800'}`}
                               >
-                                🏆 Réussite
+                                <Trophy className={`w-3.5 h-3.5 ${!sortByPrice ? 'text-[#0055FF]' : 'text-gray-400'}`} />
+                                <span>Fiabilité</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setSortByPrice(true)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${sortByPrice ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+                                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-tight transition-all duration-200 flex items-center gap-1.5 ${sortByPrice ? 'bg-white text-gray-900 shadow-xs border border-gray-200/50' : 'text-gray-500 hover:text-gray-800'}`}
                               >
-                                💰 Prix (Ⓐ)
+                                <Coins className={`w-3.5 h-3.5 ${sortByPrice ? 'text-emerald-600' : 'text-gray-400'}`} />
+                                <span>Prix le plus bas</span>
                               </button>
                             </div>
                           </div>
