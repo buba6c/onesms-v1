@@ -84,6 +84,7 @@ export default function BuyNumberPage() {
     const [copiedNumber, setCopiedNumber] = useState(false);
     const [showInsufficientBalanceDialog, setShowInsufficientBalanceDialog] = useState(false);
     const [showOrderSteps, setShowOrderSteps] = useState(false);
+    const [showReceptionSteps, setShowReceptionSteps] = useState(false);
     const [insufficientBalanceData, setInsufficientBalanceData] = useState<{ needed: number, available: number, missing: number } | null>(null);
 
     // --- Queries ---
@@ -1228,25 +1229,27 @@ export default function BuyNumberPage() {
                                                 animate={{ opacity: 1, scale: 1, transition: { type: 'spring', damping: 22 } }}
                                                 className="flex flex-col items-center w-full max-w-lg mx-auto text-left"
                                             >
-                                                {/* Header success */}
-                                                <div className="w-full text-center mb-6">
-                                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-extrabold uppercase tracking-wider mb-3">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                                {/* Header success compact */}
+                                                <div className="w-full text-center mb-4">
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                                                         Ligne Active & Prête
                                                     </div>
-                                                    <h3 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                                                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight leading-tight">
                                                         Votre Numéro {selectedService.name} est prêt !
                                                     </h3>
-                                                    <p className="text-gray-500 text-sm font-medium mt-1">
+                                                    <p className="text-gray-500 text-xs font-medium mt-1">
                                                         Copiez le numéro ci-dessous et collez-le dans l'application pour recevoir votre SMS.
                                                     </p>
                                                 </div>
 
-                                                {/* Phone Number Display Card */}
-                                                <div className="bg-gradient-to-br from-blue-50/80 via-white to-blue-50/40 border-2 border-[#0055FF]/20 rounded-3xl p-6 sm:p-7 w-full shadow-lg shadow-blue-500/5 relative overflow-hidden mb-6">
-                                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                                                        <div>
-                                                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-1">Numéro attribué ({selectedCountry.name})</span>
+                                                {/* Phone Number Display Card Compacte */}
+                                                <div className="bg-gradient-to-br from-blue-50/90 via-white to-blue-50/50 border-2 border-[#0055FF]/25 rounded-2xl p-4 sm:p-5 w-full shadow-md shadow-[#0055FF]/5 relative overflow-hidden mb-3">
+                                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                                        <div className="text-center sm:text-left">
+                                                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block mb-0.5">
+                                                                Numéro attribué ({selectedCountry.name})
+                                                            </span>
                                                             <span className="text-2xl sm:text-3xl font-black text-[#0055FF] tracking-tight font-mono select-all">
                                                                 {purchasedNumber}
                                                             </span>
@@ -1260,7 +1263,7 @@ export default function BuyNumberPage() {
                                                                     setTimeout(() => setCopiedNumber(false), 2500);
                                                                 }
                                                             }}
-                                                            className={`h-12 px-5 rounded-xl font-bold transition-all shadow-md flex items-center gap-2 ${copiedNumber ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#0055FF] hover:bg-[#0044CC] text-white'}`}
+                                                            className={`h-11 px-5 rounded-xl font-bold transition-all shadow-sm flex items-center gap-2 ${copiedNumber ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#0055FF] hover:bg-[#0044CC] text-white'}`}
                                                         >
                                                             {copiedNumber ? (
                                                                 <>
@@ -1277,58 +1280,70 @@ export default function BuyNumberPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Step-by-Step Live Guide */}
-                                                <div className="w-full bg-gray-50/90 border border-gray-100 rounded-2xl p-5 space-y-4 mb-6">
-                                                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                                                        Déroulement de la réception
-                                                    </h4>
-
-                                                    <div className="space-y-3">
-                                                        {/* Step 1 */}
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
-                                                                ✓
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-gray-900">Numéro attribué avec succès</p>
-                                                                <p className="text-xs text-gray-500">Prêt à intercepter le SMS de {selectedService.name}.</p>
-                                                            </div>
+                                                {/* Déroulement de la réception Accordéon Compact */}
+                                                <div className="w-full bg-gray-50/90 rounded-xl border border-gray-200/60 overflow-hidden mb-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowReceptionSteps(!showReceptionSteps)}
+                                                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-left hover:bg-gray-100/60 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <Info className="w-4 h-4 text-[#0055FF]" />
+                                                            <span className="text-xs font-extrabold text-gray-900 uppercase tracking-wide">
+                                                                Déroulement de la réception
+                                                            </span>
                                                         </div>
-
-                                                        {/* Step 2 */}
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="w-6 h-6 rounded-full bg-[#0055FF] text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
-                                                                2
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-gray-900">Entrez ce numéro sur {selectedService.name}</p>
-                                                                <p className="text-xs text-gray-500">Collez le numéro et demandez l'envoi du code par SMS.</p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Step 3 */}
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="w-6 h-6 rounded-full bg-blue-100 text-[#0055FF] flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold animate-pulse">
-                                                                ⏳
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-bold text-gray-900">Le code s'affichera en direct (15 à 60s)</p>
-                                                                <p className="text-xs text-gray-500">Consultez votre SMS instantanément depuis votre tableau de bord.</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                        <span className="text-[11px] font-bold text-[#0055FF]">
+                                                            {showReceptionSteps ? 'Masquer ▲' : 'Voir les étapes ▼'}
+                                                        </span>
+                                                    </button>
+                                                    <AnimatePresence>
+                                                        {showReceptionSteps && (
+                                                            <motion.div
+                                                                initial={{ height: 0, opacity: 0 }}
+                                                                animate={{ height: 'auto', opacity: 1 }}
+                                                                exit={{ height: 0, opacity: 0 }}
+                                                                className="px-3.5 pb-3 border-t border-gray-200/50 space-y-2.5 text-xs text-left pt-2.5"
+                                                            >
+                                                                {/* Step 1 */}
+                                                                <div className="flex items-start gap-2.5">
+                                                                    <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">✓</span>
+                                                                    <div>
+                                                                        <p className="font-bold text-gray-900">Numéro attribué avec succès</p>
+                                                                        <p className="text-gray-500 text-[11px]">Prêt à intercepter le SMS de {selectedService.name}.</p>
+                                                                    </div>
+                                                                </div>
+                                                                {/* Step 2 */}
+                                                                <div className="flex items-start gap-2.5">
+                                                                    <span className="w-5 h-5 rounded-full bg-[#0055FF] text-white flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">2</span>
+                                                                    <div>
+                                                                        <p className="font-bold text-gray-900">Entrez ce numéro sur {selectedService.name}</p>
+                                                                        <p className="text-gray-500 text-[11px]">Collez le numéro et demandez l'envoi du code par SMS.</p>
+                                                                    </div>
+                                                                </div>
+                                                                {/* Step 3 */}
+                                                                <div className="flex items-start gap-2.5">
+                                                                    <span className="w-5 h-5 rounded-full bg-blue-100 text-[#0055FF] flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">⏳</span>
+                                                                    <div>
+                                                                        <p className="font-bold text-gray-900">Le code s'affichera en direct (15 à 60s)</p>
+                                                                        <p className="text-gray-500 text-[11px]">Consultez votre SMS instantanément depuis votre tableau de bord.</p>
+                                                                    </div>
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
                                                 </div>
 
-                                                {/* Guarantee Banner */}
-                                                <div className="w-full bg-emerald-50/80 border border-emerald-200/60 rounded-2xl p-4 flex items-start gap-3 mb-6">
-                                                    <Shield className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                                                    <p className="text-xs text-emerald-800 font-medium leading-relaxed">
-                                                        <span className="font-bold">Garantie Zéro Risque :</span> Si aucun SMS ne vous parvient dans les 5 minutes, vous pouvez annuler d'un simple clic et être remboursé instantanément à 100%.
+                                                {/* Guarantee Ligne Fine */}
+                                                <div className="w-full flex items-center gap-2 bg-emerald-50/80 border border-emerald-200/70 px-3 py-2 rounded-xl text-left mb-4">
+                                                    <Shield className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                                    <p className="text-[11px] text-emerald-800 font-medium">
+                                                        <span className="font-bold">Garantie Zéro Risque :</span> Remboursé 100% si aucun SMS reçu en 5 min.
                                                     </p>
                                                 </div>
 
-                                                {/* Actions */}
-                                                <div className="w-full flex flex-col sm:flex-row gap-3">
+                                                {/* Actions Compactes */}
+                                                <div className="w-full flex flex-col sm:flex-row gap-2.5">
                                                     <Button
                                                         type="button"
                                                         onClick={() => {
@@ -1336,10 +1351,10 @@ export default function BuyNumberPage() {
                                                             setPurchaseState('idle');
                                                             setBuying(false);
                                                         }}
-                                                        className="flex-1 h-14 text-base font-bold rounded-2xl shadow-xl shadow-[#0055FF]/25 bg-gradient-to-r from-[#0055FF] to-[#00A3FF] hover:from-[#0044CC] hover:to-[#0088CC] text-white border-0 flex items-center justify-center gap-2"
+                                                        className="flex-1 h-12 text-sm font-extrabold rounded-xl shadow-lg shadow-[#0055FF]/20 bg-gradient-to-r from-[#0055FF] to-[#00A3FF] hover:from-[#0044CC] hover:to-[#0088CC] text-white border-0 flex items-center justify-center gap-2"
                                                     >
                                                         <span>📥 Aller voir mon SMS en direct</span>
-                                                        <ArrowRight className="w-5 h-5" />
+                                                        <ArrowRight className="w-4 h-4" />
                                                     </Button>
 
                                                     <Button
@@ -1350,7 +1365,7 @@ export default function BuyNumberPage() {
                                                             setPurchasedNumber(null);
                                                             setBuying(false);
                                                         }}
-                                                        className="h-14 px-6 text-sm font-bold rounded-2xl border border-gray-200 hover:bg-gray-50 text-gray-700"
+                                                        className="h-12 px-5 text-xs font-extrabold rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700"
                                                     >
                                                         + Autre numéro
                                                     </Button>
