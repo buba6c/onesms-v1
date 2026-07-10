@@ -8,6 +8,20 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const SERVICE_NAMES: Record<string, string> = {
+  'wa': 'WhatsApp', 'tg': 'Telegram', 'ig': 'Instagram', 'fb': 'Facebook',
+  'tw': 'Twitter/X', 'ds': 'Discord', 'fu': 'Snapchat', 'lf': 'TikTok',
+  'vi': 'Viber', 'wb': 'WeChat', 'vk': 'VKontakte', 'ok': 'Odnoklassniki',
+  'tn': 'LinkedIn', 'go': 'Google', 'mm': 'Microsoft', 'wx': 'Apple',
+  'dr': 'OpenAI/ChatGPT', 'mb': 'Yahoo', 'am': 'Amazon', 'ot': 'Service SMS',
+};
+
+const formatServiceName = (code?: string) => {
+  if (!code) return 'Service SMS';
+  const lower = code.toLowerCase();
+  return SERVICE_NAMES[lower] || lower.toUpperCase();
+};
+
 export function SmsRevealPopup() {
   const { smsRevealOpen, smsData, hideSmsReveal } = useUIStore();
   const { t } = useTranslation();
@@ -92,15 +106,22 @@ export function SmsRevealPopup() {
               <div className="flex justify-center mb-4">
                 <div className="w-16 h-16 bg-white border border-gray-100 rounded-2xl shadow-sm p-3">
                   <img 
-                    src={getServiceLogo(smsData.service_code || '')} 
-                    onError={(e) => getServiceLogoFallback(e, smsData.service_code || '')}
-                    alt={smsData.service_code}
+                    src={getServiceLogo((smsData.service_code || 'ot').toLowerCase())} 
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.dataset.fallbackLoaded === 'true') return;
+                      target.dataset.fallbackLoaded = 'true';
+                      target.src = getServiceLogoFallback((smsData.service_code || 'ot').toLowerCase());
+                    }}
+                    alt={smsData.service_code || 'service'}
                     className="w-full h-full object-contain"
                   />
                 </div>
               </div>
               
-              <p className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-widest">{smsData.service_code}</p>
+              <p className="text-base font-extrabold text-gray-800 mb-2 tracking-wide">
+                {formatServiceName(smsData.service_code)}
+              </p>
               
               <div 
                 onClick={handleCopy}

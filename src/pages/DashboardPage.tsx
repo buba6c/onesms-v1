@@ -1138,7 +1138,7 @@ export default function DashboardPage() {
         setSmsReceivedTimestamps(prev => new Map(prev).set(num.id, Date.now()));
         // Afficher le popup SMS premium
         const code = num.smsCode.includes('STATUS_OK:') ? num.smsCode.split(':')[1] : num.smsCode;
-        showSmsReveal({ id: num.id, service_code: num.serviceCode, sms_code: code, phone: num.phone });
+        showSmsReveal({ id: num.id, service_code: num.service || 'ot', sms_code: code, phone: num.phone });
       }
 
       // Détecter les timeouts / expirations automatiques pour afficher le feedback premium
