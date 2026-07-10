@@ -3041,30 +3041,72 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Modal des messages de rental - Design Minimaliste et Propre */}
+      {/* Modal des messages de rental - Design Distinctif Location (Améthyste / Violet) & Menu 3 points */}
       <Dialog open={showRentMessagesModal} onOpenChange={setShowRentMessagesModal}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl">
-          {/* Header Minimaliste */}
-          <div className="px-5 py-4 border-b bg-white">
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl border-purple-500/30">
+          {/* Header Distinctif Location (Améthyste) */}
+          <div className="px-5 py-4 border-b border-purple-400/30 bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-700 text-white">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30 flex-shrink-0">
                   <img
                     src={getServiceLogo(selectedRentalForMessages?.service?.toLowerCase() || '')}
                     alt={selectedRentalForMessages?.service}
-                    className="w-6 h-6 object-contain"
+                    className="w-7 h-7 object-contain"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
-                      target.parentElement!.innerHTML = '<span class="text-lg">📨</span>';
+                      target.parentElement!.innerHTML = '<span class="text-lg">🔑</span>';
                     }}
                   />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{getServiceName(selectedRentalForMessages?.service || '')}</h3>
-                  <p className="text-sm text-gray-500 font-mono">{formatPhoneNumber(selectedRentalForMessages?.phone || '')}</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-white text-base truncate">
+                      {getServiceName(selectedRentalForMessages?.service || '')}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-white/25 text-white text-[10px] font-black uppercase tracking-wider">
+                      Location
+                    </span>
+                  </div>
+                  <p className="text-xs text-purple-100 font-mono font-bold truncate">
+                    {formatPhoneNumber(selectedRentalForMessages?.phone || '')}
+                  </p>
                 </div>
               </div>
+
+              {/* Menu 3 points pour actions rapides */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-8 h-8 rounded-full hover:bg-white/20 text-white flex items-center justify-center transition-colors flex-shrink-0"
+                    title="Actions"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border border-gray-200 p-1">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (selectedRentalForMessages?.phone) {
+                        copyToClipboard(selectedRentalForMessages.phone, 'phone');
+                      }
+                    }}
+                    className="flex items-center gap-2 text-xs font-semibold cursor-pointer py-2 rounded-lg"
+                  >
+                    <Copy className="w-4 h-4 text-[#0055FF]" />
+                    <span>Copier le numéro</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowRentMessagesModal(false)}
+                    className="flex items-center gap-2 text-xs font-semibold cursor-pointer py-2 rounded-lg text-red-600 focus:text-red-600"
+                  >
+                    <X className="w-4 h-4 text-red-500" />
+                    <span>Fermer le modal</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
