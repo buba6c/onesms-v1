@@ -2942,7 +2942,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      {/* DROITE: Code Reçu OU Statut en attente + actions */}
+                      {/* DROITE: Code Reçu OU Statut en attente + menu 3 points */}
                       <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                         {hasCode ? (
                           /* CODE REÇU MINI PILULE VERTE */
@@ -2969,68 +2969,145 @@ export default function DashboardPage() {
                             </Button>
                           </div>
                         ) : (
-                          /* EN ATTENTE COMPACT AVEC BOUTON VÉRIFIER ET ANNULER */
+                          /* EN ATTENTE COMPACT AVEC BOUTON VÉRIFIER */
                           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                             <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
                               <Loader2 className="w-3.5 h-3.5 text-[#0055FF] animate-spin" />
                               <span className="text-[11px] text-gray-700">En attente...</span>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    const { data, error } = await cloudFunctions.invoke(`check-${num.provider}-status`, {
-                                      body: { activationId: num.id, userId: user?.id }
-                                    });
-                                    if (error) throw error;
-                                    if (data?.smsCode) {
-                                      toast({ title: 'SMS Reçu !', description: 'Le code SMS est maintenant disponible.', variant: 'success' });
-                                    } else {
-                                      toast({ title: 'En attente...', description: 'Aucun SMS pour l\'instant.', variant: 'info' });
-                                    }
-                                    refetchActivations();
-                                  } catch (e: any) {
-                                    toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const { data, error } = await cloudFunctions.invoke(`check-${num.provider}-status`, {
+                                    body: { activationId: num.id, userId: user?.id }
+                                  });
+                                  if (error) throw error;
+                                  if (data?.smsCode) {
+                                    toast({ title: 'SMS Reçu !', description: 'Le code SMS est maintenant disponible.', variant: 'success' });
+                                  } else {
+                                    toast({ title: 'En attente...', description: 'Aucun SMS pour l\'instant.', variant: 'info' });
                                   }
-                                }}
-                                className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-[#0055FF]/10 hover:bg-[#0055FF]/20 text-[#0055FF] transition-all flex items-center gap-1"
-                              >
-                                <RefreshCw className="w-3 h-3" />
-                                <span>Vérifier</span>
-                              </button>
+                                  refetchActivations();
+                                } catch (e: any) {
+                                  toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                }
+                              }}
+                              className="h-7 px-2.5 rounded-lg text-[11px] font-bold bg-[#0055FF]/10 hover:bg-[#0055FF]/20 text-[#0055FF] transition-all flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              <span>Vérifier</span>
+                            </button>
+                          </div>
+                        )}
 
-                              {canCancelActivation(num.expiresAt) && (
-                                <button
-                                  type="button"
+                        {/* BOUTON 3 POINTS (MoreVertical) D'ANCIENNE VERSION */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="p-2 hover:bg-gray-100 rounded-xl transition-all flex-shrink-0 group/menu text-gray-400 hover:text-gray-700"
+                              title="Plus d'actions"
+                            >
+                              <MoreVertical className="h-5 w-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 rounded-xl border border-gray-200 shadow-xl p-1">
+                            {num.type === 'rental' ? (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service)}
+                                  className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold"
+                                >
+                                  <MessageSquare className="w-4 h-4 text-[#0055FF]" />
+                                  <span>Voir les SMS reçus</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => copyToClipboard(num.phone, 'phone')}
+                                  className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold"
+                                >
+                                  <Copy className="w-4 h-4 text-emerald-600" />
+                                  <span>Copier le numéro</span>
+                                </DropdownMenuItem>
+                                <div className="border-t border-gray-100 my-1" />
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setRentalToFinish({ rentalId: num.rentalId || '', phone: num.phone });
+                                    setShowFinishRentalDialog(true);
+                                  }}
+                                  className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold text-red-600 focus:text-red-600"
+                                >
+                                  <X className="w-4 h-4 text-red-500" />
+                                  <span>Terminer la location</span>
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => copyToClipboard(num.phone, 'phone')}
+                                  className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold"
+                                >
+                                  <Copy className="w-4 h-4 text-emerald-600" />
+                                  <span>Copier le numéro</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   onClick={async () => {
                                     try {
-                                      let cancelFunction = 'cancel-sms-activate-order';
-                                      if (num.provider === '5sim') cancelFunction = 'cancel-5sim-order';
-                                      else if (num.provider === 'grizzly') cancelFunction = 'cancel-grizzly-order';
-                                      else if (num.provider === 'textverified') cancelFunction = 'cancel-textverified-order';
-                                      else if (num.provider === 'onlinesim') cancelFunction = 'cancel-onlinesim-order';
-                                      else if (num.provider === 'smspva') cancelFunction = 'cancel-smspva-order';
-                                      else if (num.provider === 'smspool') cancelFunction = 'cancel-smspool-order';
-                                      const { data, error } = await cloudFunctions.invoke(cancelFunction, {
-                                        body: { activationId: num.id, orderId: num.orderId, userId: user?.id }
+                                      const { data, error } = await cloudFunctions.invoke(`check-${num.provider}-status`, {
+                                        body: { activationId: num.id, userId: user?.id }
                                       });
-                                      if (error || !data?.success) throw new Error(data?.error || error?.message);
-                                      showStatusFeedback('cancelled');
+                                      if (error) throw error;
+                                      if (data?.smsCode) {
+                                        toast({ title: 'SMS Reçu !', description: 'Le code SMS est maintenant disponible.', variant: 'success' });
+                                      } else {
+                                        toast({ title: 'En attente...', description: 'Aucun SMS pour l\'instant.', variant: 'info' });
+                                      }
                                       refetchActivations();
                                     } catch (e: any) {
                                       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                     }
                                   }}
-                                  className="h-7 px-2 rounded-lg text-[11px] font-bold text-red-600 hover:bg-red-50 transition-all flex items-center gap-1"
+                                  className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold"
                                 >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                                  <RefreshCw className="w-4 h-4 text-[#0055FF]" />
+                                  <span>Actualiser le statut SMS</span>
+                                </DropdownMenuItem>
+
+                                {canCancelActivation(num.expiresAt) && (
+                                  <>
+                                    <div className="border-t border-gray-100 my-1" />
+                                    <DropdownMenuItem
+                                      onClick={async () => {
+                                        try {
+                                          let cancelFunction = 'cancel-sms-activate-order';
+                                          if (num.provider === '5sim') cancelFunction = 'cancel-5sim-order';
+                                          else if (num.provider === 'grizzly') cancelFunction = 'cancel-grizzly-order';
+                                          else if (num.provider === 'textverified') cancelFunction = 'cancel-textverified-order';
+                                          else if (num.provider === 'onlinesim') cancelFunction = 'cancel-onlinesim-order';
+                                          else if (num.provider === 'smspva') cancelFunction = 'cancel-smspva-order';
+                                          else if (num.provider === 'smspool') cancelFunction = 'cancel-smspool-order';
+                                          const { data, error } = await cloudFunctions.invoke(cancelFunction, {
+                                            body: { activationId: num.id, orderId: num.orderId, userId: user?.id }
+                                          });
+                                          if (error || !data?.success) throw new Error(data?.error || error?.message);
+                                          showStatusFeedback('cancelled');
+                                          refetchActivations();
+                                        } catch (e: any) {
+                                          toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+                                        }
+                                      }}
+                                      className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold text-red-600 focus:text-red-600"
+                                    >
+                                      <X className="w-4 h-4 text-red-500" />
+                                      <span>Annuler et rembourser</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>
