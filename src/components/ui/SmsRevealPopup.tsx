@@ -22,6 +22,24 @@ const formatServiceName = (code?: string) => {
   return SERVICE_NAMES[lower] || lower.toUpperCase();
 };
 
+// Helper pour formater le temps en heures et minutes ("écrit en heure et mn")
+const formatTimeHoursAndMinutes = (expiresAt?: string | number) => {
+  if (!expiresAt) return '';
+  const expiresTimestamp = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt).getTime();
+  if (isNaN(expiresTimestamp)) return '';
+  const remainingSeconds = Math.max(0, Math.floor((expiresTimestamp - Date.now()) / 1000));
+  const hours = Math.floor(remainingSeconds / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
+  const seconds = remainingSeconds % 60;
+  if (hours > 0) {
+    return `${hours} h ${minutes} mn`;
+  }
+  if (minutes > 0) {
+    return `${minutes} mn`;
+  }
+  return `${seconds} s`;
+};
+
 export function SmsRevealPopup() {
   const { smsRevealOpen, smsData, hideSmsReveal } = useUIStore();
   const { t } = useTranslation();
@@ -33,6 +51,7 @@ export function SmsRevealPopup() {
   const [isPaused, setIsPaused] = useState(false);
 
   const isRent = Boolean(smsData?.is_rent || smsData?.type === 'rent' || smsData?.type === 'rental');
+  const rentRemainingFormatted = formatTimeHoursAndMinutes(smsData?.expires_at);
 
   // Auto-hide after 8 seconds (paused if user opens history or actions)
   useEffect(() => {
@@ -43,26 +62,37 @@ export function SmsRevealPopup() {
       setShowActionsMenu(false);
       setIsPaused(false);
       
-      const startTime = Date.now();
       const duration = 8000;
-      
-      const interval = setInterval(() => {
-        if (showHistory || showActionsMenu || isPaused) {
-          return; // ne pas fermer automatiquement si l'utilisateur interagit
-        }
-        const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
-        setProgress(remaining);
-        
-        if (remaining <= 0) {
-          clearInterval(interval);
-          hideSmsReveal();
-        }
-      }, 16); // 60fps
+      const interval = 50;
+      const steps = duration / interval;
+      let currentStep = 0;
 
-      return () => clearInterval(interval);
+      const timer = setInterval(() => {
+        if (!isPaused && !showHistory && !showActionsMenu) {
+          currentStep++;
+          setProgress(Math.max(0, 100 - (currentStep / steps) * 100));
+          if (currentStep >= steps) {
+            clearInterval(timer);
+            hideSmsReveal();
+          }
+        }
+      }, interval);
+
+      return () => clearInterval(timer);
     }
-  }, [smsRevealOpen, hideSmsReveal, showHistory, showActionsMenu, isPaused]);
+  }, [smsRevealOpen, hideSmsReveal, isPaused, showHistory, showActionsMenu]);
+
+  const copyCode = () => {
+    if (smsData?.sms_code) {
+      navigator.clipboard.writeText(smsData.sms_code);
+      setIsCopied(true);
+      toast({
+        title: "Code copié !",
+        description: "Prêt à être collé dans votre application",
+      });
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
 
   const handleCopy = () => {
     if (smsData?.sms_code) {
@@ -90,7 +120,6 @@ export function SmsRevealPopup() {
     <AnimatePresence>
       {smsRevealOpen && smsData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop blur */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -99,7 +128,6 @@ export function SmsRevealPopup() {
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
           />
 
-          {/* Modal Content */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -108,16 +136,16 @@ export function SmsRevealPopup() {
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
             className={cn(
-              "relative w-full max-w-md backdrop-blur-xl border shadow-2xl rounded-[2rem] overflow-hidden transition-colors",
+              "relative w-full max-w-md backdrop-blur-xl rounded-[2rem] overflow-hidden transition-all",
               isRent
-                ? "bg-gradient-to-b from-purple-950/95 via-white/95 to-white/95 border-purple-500/30 shadow-purple-500/20"
-                : "bg-white/95 border-white/60 shadow-blue-500/10"
+                ? "bg-gradient-to-b from-rose-950/95 via-white/95 to-white/95 border-2 border-rose-400/80 shadow-[0_0_35px_-5px_rgba(244,63,94,0.5)]"
+                : "bg-white/95 border border-white/60 shadow-blue-500/10"
             )}
           >
-            {/* Header avec distinction instinctive pour la location */}
+            {/* Header avec contour rose lumineux et temps en h et mn pour la location */}
             <div className={cn(
               "flex items-center justify-between px-6 py-4 border-b",
-              isRent ? "bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-700 text-white border-purple-400/30" : "border-gray-100 text-gray-900"
+              isRent ? "bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 text-white border-rose-400/40 shadow-sm" : "border-gray-100 text-gray-900"
             )}>
               <div className="flex items-center gap-3">
                 <div className={cn(
@@ -136,13 +164,13 @@ export function SmsRevealPopup() {
                       {isRent ? 'Nouveau SMS (Location)' : 'Nouveau SMS'}
                     </h3>
                     {isRent && (
-                      <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black uppercase tracking-wider">
+                      <span className="px-2 py-0.5 rounded-full bg-white/25 text-white text-[10px] font-black uppercase tracking-wider">
                         Rent
                       </span>
                     )}
                   </div>
-                  <p className={cn("text-xs font-medium", isRent ? "text-purple-100" : "text-gray-500")}>
-                    {isRent ? 'Ligne active de location' : 'Reçu instantanément'}
+                  <p className={cn("text-xs font-medium", isRent ? "text-rose-100" : "text-gray-500")}>
+                    {isRent && rentRemainingFormatted ? `⏳ Expire dans : ${rentRemainingFormatted}` : isRent ? 'Ligne active de location' : 'Reçu instantanément'}
                   </p>
                 </div>
               </div>

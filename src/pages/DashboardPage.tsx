@@ -502,9 +502,28 @@ export default function DashboardPage() {
     rentalId: string;
     phone: string;
     service: string;
+    expiresAt?: string;
   } | null>(null);
   const [rentMessagesCache, setRentMessagesCache] = useState<RentMessagesCache>({});
   const [isLoadingRentMessages, setIsLoadingRentMessages] = useState(false);
+
+  // Helper pour formater le temps de location en heures et minutes ("en heure et mn")
+  const formatTimeHoursAndMinutes = (expiresAt?: string | number) => {
+    if (!expiresAt) return '';
+    const expiresTimestamp = typeof expiresAt === 'number' ? expiresAt : new Date(expiresAt).getTime();
+    if (isNaN(expiresTimestamp)) return '';
+    const remainingSeconds = Math.max(0, Math.floor((expiresTimestamp - Date.now()) / 1000));
+    const hours = Math.floor(remainingSeconds / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    const seconds = remainingSeconds % 60;
+    if (hours > 0) {
+      return `${hours} h ${minutes} mn`;
+    }
+    if (minutes > 0) {
+      return `${minutes} mn`;
+    }
+    return `${seconds} s`;
+  };
 
   // State pour le modal d'attente SMS (activations)
   const [showSmsWaitingModal, setShowSmsWaitingModal] = useState(false);
@@ -575,8 +594,8 @@ export default function DashboardPage() {
   };
 
   // Helper pour ouvrir le modal et charger les messages
-  const openRentMessagesModal = async (rentalId: string, phone: string, service: string) => {
-    setSelectedRentalForMessages({ rentalId, phone, service });
+  const openRentMessagesModal = async (rentalId: string, phone: string, service: string, expiresAt?: string) => {
+    setSelectedRentalForMessages({ rentalId, phone, service, expiresAt });
     setShowRentMessagesModal(true);
 
     // Charger les messages depuis l'API
@@ -2879,6 +2898,8 @@ export default function DashboardPage() {
                     className={`rounded-2xl border transition-all overflow-hidden ${
                       isReceived
                         ? 'bg-emerald-50/70 border-emerald-400 shadow-sm'
+                        : num.type === 'rental'
+                        ? 'bg-gradient-to-br from-rose-50/50 via-white to-pink-50/40 border-2 border-rose-300 shadow-[0_0_22px_-4px_rgba(244,63,94,0.35)] hover:border-rose-400'
                         : 'bg-white border-gray-200/80 shadow-2xs hover:border-[#0055FF]/40'
                     }`}
                   >
@@ -2910,6 +2931,11 @@ export default function DashboardPage() {
                               <span className="text-[10px] font-bold text-gray-400 uppercase">
                                 ({getCountryName(num.country)})
                               </span>
+                              {num.type === 'rental' && (
+                                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-md">
+                                  ⏳ {formatTimeHoursAndMinutes(num.expiresAt)}
+                                </span>
+                              )}
                             </div>
 
                             {/* LE NUMÉRO EN BLEU ONE SMS COPIABLE EN 1 CLIC */}
@@ -2937,8 +2963,12 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Badge chrono mobile en haut à droite */}
-                        <div className="flex sm:hidden items-center text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                          {remainingMinutes > 0 ? `${remainingMinutes}m` : `${remainingSeconds}s`}
+                        <div className={`flex sm:hidden items-center text-[10px] font-bold px-2 py-1 rounded-md ${
+                          num.type === 'rental' ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'text-gray-500 bg-gray-100'
+                        }`}>
+                          {num.type === 'rental'
+                            ? `⏳ ${formatTimeHoursAndMinutes(num.expiresAt)}`
+                            : remainingMinutes > 0 ? `${remainingMinutes}m` : `${remainingSeconds}s`}
                         </div>
                       </div>
 
@@ -3017,7 +3047,7 @@ export default function DashboardPage() {
                             {num.type === 'rental' ? (
                               <>
                                 <DropdownMenuItem
-                                  onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service)}
+                                  onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service, num.expiresAt)}
                                   className="flex items-center gap-2.5 cursor-pointer py-2 rounded-lg text-xs font-semibold"
                                 >
                                   <MessageSquare className="w-4 h-4 text-[#0055FF]" />
@@ -3118,11 +3148,11 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Modal des messages de rental - Design Distinctif Location (Améthyste / Violet) & Menu 3 points */}
+      {/* Modal des messages de rental - Design Distinctif Location (Rose Lumineux comme auparavant) & Menu 3 points */}
       <Dialog open={showRentMessagesModal} onOpenChange={setShowRentMessagesModal}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl border-purple-500/30">
-          {/* Header Distinctif Location (Améthyste) */}
-          <div className="px-5 py-4 border-b border-purple-400/30 bg-gradient-to-r from-purple-600 via-indigo-600 to-violet-700 text-white">
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl border-2 border-rose-400/80 shadow-[0_0_35px_-5px_rgba(244,63,94,0.45)]">
+          {/* Header Distinctif Location (Rose / Pink Lumineux) */}
+          <div className="px-5 py-4 border-b border-rose-400/30 bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-11 h-11 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30 flex-shrink-0">
@@ -3146,9 +3176,16 @@ export default function DashboardPage() {
                       Location
                     </span>
                   </div>
-                  <p className="text-xs text-purple-100 font-mono font-bold truncate">
-                    {formatPhoneNumber(selectedRentalForMessages?.phone || '')}
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-rose-100 font-mono font-bold truncate">
+                      {formatPhoneNumber(selectedRentalForMessages?.phone || '')}
+                    </p>
+                    {selectedRentalForMessages?.expiresAt && (
+                      <span className="text-[11px] font-extrabold text-white bg-white/20 px-2 py-0.5 rounded-md">
+                        ⏳ {formatTimeHoursAndMinutes(selectedRentalForMessages.expiresAt)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
