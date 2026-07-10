@@ -2940,134 +2940,121 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    {/* Phone Number Banner (Ultra-Visible & One-Click Copy) */}
-                    <div className="p-4 sm:p-5 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="text-center sm:text-left">
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400 block mb-1">
-                          Numéro de téléphone attribué
+                    {/* Phone Number Bar (Compact, Sleek & One-Click Copy) */}
+                    <div
+                      onClick={() => {
+                        copyToClipboard(num.phone, 'phone');
+                        setCopiedPhoneId(num.id);
+                        setTimeout(() => setCopiedPhoneId(null), 2500);
+                      }}
+                      className="px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white flex items-center justify-between gap-3 cursor-pointer transition-all border-b border-gray-800"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
+                          Numéro :
                         </span>
-                        <span className="text-xl sm:text-2xl font-mono font-black tracking-wider select-all text-white">
+                        <span className="text-lg sm:text-xl font-mono font-black tracking-wider text-white select-all">
                           {formatPhoneNumber(num.phone)}
                         </span>
                       </div>
 
-                      <Button
+                      <button
                         type="button"
-                        onClick={() => {
-                          copyToClipboard(num.phone, 'phone');
-                          setCopiedPhoneId(num.id);
-                          setTimeout(() => setCopiedPhoneId(null), 2500);
-                        }}
-                        className={`h-11 px-5 rounded-xl font-extrabold transition-all shadow-md flex items-center gap-2 ${
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
                           copiedPhoneId === num.id
-                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                            : 'bg-[#0055FF] hover:bg-[#0044CC] text-white'
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-[#0055FF] text-white hover:bg-[#0044CC]'
                         }`}
                       >
                         {copiedPhoneId === num.id ? (
                           <>
-                            <Check className="w-4 h-4" />
-                            <span>Copié !</span>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Copié</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="w-4 h-4" />
-                            <span>Copier le numéro</span>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copier</span>
                           </>
                         )}
-                      </Button>
+                      </button>
                     </div>
 
                     {/* SMS Status / Live Waiting Area */}
-                    <div className="p-4 sm:p-5">
+                    <div className="p-3.5 sm:p-4">
                       {num.type === 'rental' ? (
                         hasMessages ? (
                           <button
                             onClick={() => openRentMessagesModal(num.rentalId || '', num.phone, num.service)}
-                            className="w-full px-5 py-4 flex items-center justify-between text-purple-800 bg-purple-50 border-2 border-purple-200 rounded-2xl font-bold hover:bg-purple-100 transition-all shadow-sm"
+                            className="w-full px-4 py-3 flex items-center justify-between text-purple-800 bg-purple-50 border border-purple-200 rounded-xl font-bold hover:bg-purple-100 transition-all shadow-2xs"
                           >
-                            <div className="flex items-center gap-3">
-                              <MessageSquare className="w-5 h-5 text-purple-600" />
-                              <span>{rentMessages.length || num.messageCount} messages reçus — Cliquez pour consulter</span>
+                            <div className="flex items-center gap-2.5">
+                              <MessageSquare className="w-4 h-4 text-purple-600" />
+                              <span className="text-xs sm:text-sm">{rentMessages.length || num.messageCount} messages reçus — Consulter</span>
                             </div>
-                            <ChevronRight className="w-5 h-5" />
+                            <ChevronRight className="w-4 h-4" />
                           </button>
                         ) : (
-                          <div className="w-full bg-blue-50/70 border border-blue-200/80 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-                            <div className="flex items-center gap-3.5">
-                              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                <Loader2 className="w-5 h-5 text-[#0055FF] animate-spin" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-extrabold text-gray-900">En attente de SMS sur cette location...</p>
-                                <p className="text-xs text-gray-500 font-medium mt-0.5">Mise à jour automatique en continu</p>
-                              </div>
+                          <div className="w-full bg-blue-50/70 border border-blue-200/80 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <Loader2 className="w-4 h-4 text-[#0055FF] animate-spin" />
+                              <span className="text-xs sm:text-sm font-bold text-gray-900">En attente de SMS sur cette location...</span>
                             </div>
                           </div>
                         )
                       ) : (
                         hasCode ? (
                           /* SMS CODE RECEIVED HERO BOX */
-                          <div className="bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 sm:p-6 text-center sm:text-left shadow-inner">
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                              <div>
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-200/80 text-emerald-900 text-xs font-black uppercase tracking-wider mb-2">
-                                  ✓ Code Reçu
-                                </div>
-                                <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-900 tracking-tight select-all">
-                                  {num.smsCode?.includes('STATUS_OK:') ? num.smsCode.split(':')[1] : num.smsCode}
-                                </div>
+                          <div className="bg-gradient-to-br from-emerald-50 via-emerald-100/50 to-emerald-50 border-2 border-emerald-400 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+                            <div>
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-200/80 text-emerald-900 text-[10px] font-black uppercase tracking-wider mb-1">
+                                Code Reçu
                               </div>
-
-                              <Button
-                                type="button"
-                                onClick={() => {
-                                  const cleanCode = num.smsCode?.includes('STATUS_OK:')
-                                    ? num.smsCode.split(':')[1]
-                                    : num.smsCode || '';
-                                  copyToClipboard(cleanCode, 'code');
-                                  setCopiedCodeId(num.id);
-                                  setTimeout(() => setCopiedCodeId(null), 2500);
-                                }}
-                                className={`h-12 px-6 rounded-xl font-extrabold text-sm transition-all shadow-md flex items-center gap-2 ${
-                                  copiedCodeId === num.id
-                                    ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                }`}
-                              >
-                                {copiedCodeId === num.id ? (
-                                  <>
-                                    <Check className="w-4 h-4" />
-                                    <span>Code Copié !</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-4 h-4" />
-                                    <span>Copier le Code</span>
-                                  </>
-                                )}
-                              </Button>
+                              <div className="text-2xl font-mono font-black text-emerald-900 tracking-tight select-all">
+                                {num.smsCode?.includes('STATUS_OK:') ? num.smsCode.split(':')[1] : num.smsCode}
+                              </div>
                             </div>
+
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                const cleanCode = num.smsCode?.includes('STATUS_OK:')
+                                  ? num.smsCode.split(':')[1]
+                                  : num.smsCode || '';
+                                copyToClipboard(cleanCode, 'code');
+                                setCopiedCodeId(num.id);
+                                setTimeout(() => setCopiedCodeId(null), 2500);
+                              }}
+                              className={`h-9 px-4 rounded-lg font-extrabold text-xs transition-all flex items-center gap-1.5 ${
+                                copiedCodeId === num.id
+                                  ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              }`}
+                            >
+                              {copiedCodeId === num.id ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Copié !</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copier le Code</span>
+                                </>
+                              )}
+                            </Button>
                           </div>
                         ) : (
-                          /* LIVE WAITING & ACTION BAR */
-                          <div className="bg-blue-50/60 border border-blue-200/70 rounded-2xl p-4 sm:p-5 space-y-4">
-                            <div className="flex items-start gap-3.5">
-                              <div className="w-10 h-10 rounded-xl bg-blue-100/80 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <Activity className="w-5 h-5 text-[#0055FF] animate-pulse" />
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-extrabold text-gray-900">
-                                  📡 En attente de votre SMS en direct...
-                                </h4>
-                                <p className="text-xs text-gray-600 font-medium mt-1 leading-relaxed">
-                                  Entrez le numéro ci-dessus dans l&apos;application <span className="font-bold text-gray-900">{getServiceName(num.service)}</span>. Dès que le SMS arrive, il s&apos;affichera automatiquement ici.
-                                </p>
-                              </div>
+                          /* LIVE COMPACT WAITING STRIP */
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-blue-50/70 border border-blue-200/80 rounded-xl p-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <Loader2 className="w-4 h-4 text-[#0055FF] animate-spin flex-shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-gray-900">
+                                En attente du SMS...
+                              </span>
                             </div>
 
-                            {/* Direct Actions: Check Now & Cancel/Refund */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-blue-100">
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
                               <Button
                                 type="button"
                                 variant="outline"
@@ -3080,17 +3067,17 @@ export default function DashboardPage() {
                                     if (data?.smsCode) {
                                       toast({ title: 'SMS Reçu !', description: 'Le code SMS est maintenant disponible.', variant: 'success' });
                                     } else {
-                                      toast({ title: 'Vérification terminée', description: 'En attente, aucun SMS pour l\'instant...', variant: 'info' });
+                                      toast({ title: 'Vérification terminée', description: 'En attente du SMS...', variant: 'info' });
                                     }
                                     refetchActivations();
                                   } catch (e: any) {
                                     toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                   }
                                 }}
-                                className="w-full sm:w-auto h-10 px-4 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 border-blue-200 text-[#0055FF]"
+                                className="h-8 px-3 rounded-lg text-xs font-bold bg-white hover:bg-blue-50 border-blue-200 text-[#0055FF]"
                               >
-                                <RefreshCw className="w-3.5 h-3.5 mr-2" />
-                                <span>⚡ Vérifier maintenant</span>
+                                <RefreshCw className="w-3 h-3 mr-1.5" />
+                                <span>Actualiser</span>
                               </Button>
 
                               {canCancelActivation(num.expiresAt) ? (
@@ -3115,14 +3102,14 @@ export default function DashboardPage() {
                                       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
                                     }
                                   }}
-                                  className="w-full sm:w-auto h-10 px-4 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 shadow-none"
+                                  className="h-8 px-3 rounded-lg text-xs font-bold bg-red-50 hover:bg-red-100 text-red-700 border border-red-200/80 shadow-none"
                                 >
-                                  <X className="w-3.5 h-3.5 mr-1.5" />
-                                  <span>🛡️ Annuler & Rembourser (Gratuit)</span>
+                                  <X className="w-3 h-3 mr-1" />
+                                  <span>Annuler</span>
                                 </Button>
                               ) : (
-                                <span className="text-xs text-gray-400 font-medium">
-                                  Annulation dans {Math.ceil((300 - getTimeElapsedSinceCreation(num.expiresAt)) / 60)} min
+                                <span className="text-[11px] text-gray-400 font-medium">
+                                  Annulable dans {Math.ceil((300 - getTimeElapsedSinceCreation(num.expiresAt)) / 60)} min
                                 </span>
                               )}
                             </div>
